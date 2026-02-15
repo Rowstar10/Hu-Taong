@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['HuTaong_Tkinter_v0.1.py'],
+    ['HuTaong_Tkinter_v0.2.py'],
     pathex=[],
     binaries=[],
     datas=[('Resources', 'Resources')],
@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='HuTaong_Tkinter_v0.1',
+    name='HuTaong_Tkinter_v0.2',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

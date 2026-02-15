@@ -2,6 +2,18 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 0.2 — 2026-02-15
+
+A rewrite with proper physics and sound.
+
+### Added
+- Sounds: each paddle has its own hit sound.
+- A HUD showing the scores, rally count and ball speed, with a button to switch the AI on or off.
+
+### Changed
+- Rewritten around screens (main menu, settings and game) and a shared game loop.
+- New physics: swept collisions, so the ball can't pass through a paddle, with mass, bounciness and spin.
+
 ## 0.1 — 2026-02-15
 
 The first version.
