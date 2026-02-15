@@ -1,0 +1,5 @@
+# Made by the build tool or by Python as the game runs: no need to keep them in git
+dist/
+build/
+__pycache__/
+*.pyc
