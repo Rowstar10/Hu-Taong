@@ -2,6 +2,13 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 0.3 — 2026-02-15
+
+The game split into modules.
+
+### Changed
+- The single script was split into modules (app, game, objects and physics) with a config file and shared helpers, ready for bigger changes. It plays almost the same as 0.2, with small bounce tweaks.
+
 ## 0.2 — 2026-02-15
 
 A rewrite with proper physics and sound.
