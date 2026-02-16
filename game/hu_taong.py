@@ -9,11 +9,11 @@ from objects.paddle import Paddle
 class Hu_Taong(GameBase):                        
     def build_world(self):
         # Walls & Separator
-        self.top_wall = Wall(self, -100, -100, APP_WIDTH + 100, 0)
-        self.bottom_wall = Wall(self, -100, APP_HEIGHT, APP_WIDTH + 100, APP_HEIGHT + 100)
-        self.left_wall = Wall(self, -100, -100, 0, APP_HEIGHT + 100, is_goal = True)
-        self.right_wall = Wall(self, APP_WIDTH, -100, APP_WIDTH + 100, APP_HEIGHT + 100, is_goal = True)
-        self.separator = Wall(self, APP_WIDTH/2, -100, APP_WIDTH/2, APP_HEIGHT + 100, is_separator = True)
+        self.top_wall = Wall(self, -10, -10, APP_WIDTH + 10, 0)
+        self.bottom_wall = Wall(self, -10, APP_HEIGHT, APP_WIDTH + 10, APP_HEIGHT + 10)
+        self.left_wall = Wall(self, -10, -10, 10, APP_HEIGHT + 10, color = "Red", is_goal = True)
+        self.right_wall = Wall(self, APP_WIDTH - 10, -10, APP_WIDTH + 10, APP_HEIGHT + 10, color = "Royal Blue", is_goal = True)
+        self.separator = Wall(self, APP_WIDTH/2, -10, APP_WIDTH/2, APP_HEIGHT + 10, is_separator = True)
         
         # Players & Ball
         self.p1 = Paddle(self, width = 30, height = 180,
@@ -37,7 +37,7 @@ class Hu_Taong(GameBase):
 
         if nx  ==  1:
             self.p2.score +=  1
-            self.canvas.itemconfigure(self.hud.p1_score_id, text = f"{self.p2.color1}: {self.p2.score}")
+            self.canvas.itemconfigure(self.hud.p2_score_id, text = f"{self.p2.color1}: {self.p2.score}")
             msg = f"{self.p2.color1} scored!"
             msg_color = self.p2.color1
         elif nx  ==  -1:

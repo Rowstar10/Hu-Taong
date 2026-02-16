@@ -25,7 +25,7 @@ PAUSE_HEIGHT = 200
 
 EPSILON = 0.001
 HALF_PI = math.pi / 2
-MAX_BOUNCE_ANGLE = math.radians(60)
+MAX_BOUNCE_ANGLE = math.radians(50)
 MAX_CPF = 5
 
 # Body types

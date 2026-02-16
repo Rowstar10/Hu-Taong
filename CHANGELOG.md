@@ -2,6 +2,20 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 0.4 — 2026-02-16
+
+Faster rallies and a fairer AI.
+
+### Changed
+- The ball keeps its speed off a paddle and speeds up as a rally goes on, up to 5 times as fast by 100 hits.
+- Paddles bounce the ball at up to 50° (was 60°), and the walls are fully bouncy.
+- The goals are coloured red and blue, with a dashed centre line.
+- The AI starts at difficulty 5 out of 10 (was 10), reacts faster at low levels, reads the ball further ahead at high levels, and no longer panics.
+- The ball no longer pushes the paddles back, and paddles move a little slower.
+
+### Fixed
+- Blue's score was shown in Red's place.
+
 ## 0.3 — 2026-02-15
 
 The game split into modules.

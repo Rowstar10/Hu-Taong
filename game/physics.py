@@ -152,42 +152,53 @@ class Physics:
         im_a, im_b = a.inv_mass, b.inv_mass
         im_total = im_a + im_b
         
-        if im_total  ==  0 or (a.body_type  ==  KINEMATIC and b.body_type !=  DYNAMIC):
-            if a.body_type !=  STATIC:
+        if im_total == 0 or (a.body_type == KINEMATIC and b.body_type != DYNAMIC):
+            if a.body_type != STATIC:
                 vn = a.vx * nx + a.vy * ny
                 if vn < 0:
                     a.vx -=  vn * nx
                     a.vy -=  vn * ny
                     
-            if b.body_type !=  STATIC:
+            if b.body_type != STATIC:
                 vn = b.vx * (-nx) + b.vy * (-ny)
                 if vn < 0:
                     b.vx -=  vn * (-nx)
                     b.vy -=  vn * (-ny)
 
             Physics.positional_shove(a, b, nx, ny)
-            a.on_contact(b, data)
-            b.on_contact(a, data)
+            Physics.collision_dispatcher(a, b, data)
             return
 
         impulse_total = -(1 + res) * rvn / im_total
         impulse_x, impulse_y = impulse_total * nx, impulse_total * ny
         
-        if a.body_type !=  STATIC:
+        if a.body_type != STATIC:
             a.vx +=  impulse_x * im_a
             a.vy +=  impulse_y * im_a
 
-        if b.body_type !=  STATIC:
+        if b.body_type != STATIC:
             b.vx -=  impulse_x * im_b
             b.vy -=  impulse_y * im_b
-         
-        a.on_contact(b, data)
-        b.on_contact(a, data)
+
         Physics.positional_shove(a, b, nx, ny)
-        
+        Physics.collision_dispatcher(a, b, data)
+
+    @staticmethod
+    def collision_dispatcher(a, b, data):
+        # Ensure paddle sets bounce first, ball scales speed last
+        if getattr(a, "is_ball", False) and getattr(b, "is_paddle", False):
+            b.on_contact(a, data)
+            a.on_contact(b, data)
+        elif getattr(b, "is_ball", False) and getattr(a, "is_paddle", False):
+            a.on_contact(b, data)
+            b.on_contact(a, data)
+        else:
+            a.on_contact(b, data)
+            b.on_contact(a, data)
+
     @staticmethod
     def clamp_to_world(obj):               
-        if obj.body_type !=  KINEMATIC:
+        if obj.body_type != KINEMATIC:
             return
         
         if obj.x0 < 0:
@@ -202,12 +213,12 @@ class Physics:
     @staticmethod
     def positional_shove(a, b, nx, ny):
         shove = 0.01
-        if a.body_type !=  STATIC:
+        if a.body_type != STATIC:
             a.x0 +=  nx * shove
             a.x1 +=  nx * shove
             a.y0 +=  ny * shove
             a.y1 +=  ny * shove
-        if b.body_type !=  STATIC:
+        if b.body_type != STATIC:
             b.x0 -=  nx * shove
             b.x1 -=  nx * shove
             b.y0 -=  ny * shove

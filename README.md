@@ -1,8 +1,8 @@
-# Hu Taong 0.3
+# Hu Taong 0.4
 
-Pong, the Wangsheng Funeral Parlor way. Version 0.3, 15 February 2026.
+Pong, the Wangsheng Funeral Parlor way. Version 0.4, 16 February 2026.
 
-Tkinter, split into modules (app, game, objects).
+The last Tkinter version, with drawing moved into its own renderer.
 
 ## Play it
 

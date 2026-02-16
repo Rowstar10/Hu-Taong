@@ -4,7 +4,6 @@ from config import STATIC
 class GameObject:
     body_type = None
     has_inputs = False
-    soft_inputs = False
     can_score = False
 
     is_wall = False
@@ -16,8 +15,8 @@ class GameObject:
                  mass = 1, inv_mass = None,
                  restitution = 0,
                  friction = 0,
-                 linear_drag = 0.01,
-                 angular_drag = 0.01):
+                 linear_drag = 0,
+                 angular_drag = 0):
     
         self.game = game
         self.canvas = game.canvas
@@ -54,7 +53,7 @@ class GameObject:
         self.angular_drag = angular_drag
 
         # Soft control strength for objects with inputs
-        self.soft_control_k = 8
+        self.soft_control_k = 12
 
         game.objects.append(self)
 
@@ -72,7 +71,7 @@ class GameObject:
             if self.right in self.game.app.keys_down:
                 dvx +=  self.speed
 
-        a = 1 - math.exp(-self.soft_control_k * dt) if self.soft_controls else 1
+        a = 1 - math.exp(-self.soft_control_k * dt)
         self.vx +=  (dvx - self.vx) * a
         self.vy +=  (dvy - self.vy) * a
 

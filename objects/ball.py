@@ -14,7 +14,7 @@ class Ball(GameObject):
         super().__init__(game, diameter, diameter, x, y,
                          vx = random.choice([1, -1]) * speed,
                          vy = random.choice([1, -1]) * speed,
-                         restitution = 0.4)
+                         restitution = 1)
         
         self.diameter = diameter
         self.speed = speed
@@ -32,8 +32,16 @@ class Ball(GameObject):
             if self.last_paddle is not paddle:
                 play_sound(paddle.sound)
                 self.rally_value +=  1
-                self.vx += nx * self.speed * lerp(0.1, 2, self.rally_value/100)
-                self.vy += ny * self.speed * lerp(0.1, 2, self.rally_value/100)
+                
+                factor = lerp(1, 5, min(self.rally_value / 100, 1))
+                target_speed = self.speed * factor
+                current_speed = math.hypot(self.vx, self.vy)
+                
+                if current_speed > 0:
+                    scale = target_speed / current_speed
+                    self.vx *= scale
+                    self.vy *= scale
+                    
                 self.game.hud.update()
 
             self.last_paddle = paddle
