@@ -1,71 +1,57 @@
-import tkinter as tk
-import time
-from config import FPS, APP_WIDTH, APP_HEIGHT
-from game.physics import Physics
-from game.hud import HUDOverlay
+from __future__ import annotations
 
-# ------------------ Game Template ------------------
+from dataclasses import dataclass
+
+from config import BASE_W, BASE_H
+from game.physics import Physics
+
+
+@dataclass
+class Countdown:
+    remaining: float
+    shown_value: int
+
 
 class GameBase:
-    def __init__(self, app, width = APP_WIDTH, height = APP_HEIGHT):
-        self.app = app
-        self.root = app.root
-        self.canvas = None
+    """Framework-agnostic game world.
 
+    Pygame (or any other frontend) should:
+      - call game.start() once
+      - call game.update(dt) every frame
+      - call renderer.draw(game)
+
+    The game holds simulation state only (no UI widgets).
+    """
+
+    def __init__(self, app, width=BASE_W, height=BASE_H):
+        self.app = app
         self.width = width
         self.height = height
-        
+
         self.objects = []
         self.running = False
         self.paused = False
-        self.last_time = 0
 
-        # countdown state
-        self.in_countdown = False
-        self.countdown_seconds = 0
+        self.countdown = None
         self.countdown_on_finish = None
-        self.countdown_text = None
 
-        # scheduling
-        self.epoch = 0
-        self.after_ids = set()
-        self.loop_after_id = None
-        self.countdown_after_id = None
-
-    def start(self):        
-        self.canvas = tk.Canvas(self.root, width = self.width, height = self.height, bg = "black")
-        self.canvas.pack()
-        
+    def start(self):
         self.objects.clear()
         self.build_world()
-        self.hud = HUDOverlay(self.app, self)
-        self.hud.show()
-        
-        self.running = False
+        self.running = True
         self.paused = False
-        self.in_countdown = False
-        
-        self.countdown(seconds = 3)
+        self.start_countdown(3)
 
     def stop(self):
         self.running = False
         self.paused = False
-        self.in_countdown = False
-        self.bump_epoch()
-        self.hud.hide()
-        self.app.clear_ui()
+        self.countdown = None
 
     def pause(self):
-        self.running = False
+        self.paused = True
 
     def resume(self):
-        if not self.canvas or not self.canvas.winfo_exists():
-            return
-        if self.paused or self.in_countdown:
-            return
-        self.running = True
-        self.last_time = time.perf_counter()
-        self.loop()
+        self.paused = False
 
     def reset_game(self):
         self.stop()
@@ -74,120 +60,41 @@ class GameBase:
     def build_world(self):
         raise NotImplementedError
 
-    def loop(self):
-        # Emergency Stop
-        if not self.running:
-            return
-        if not self.canvas or not self.canvas.winfo_exists():
-            self.running = False
-            return
+    # ---------------- Countdown ----------------
 
-        # Time since last frame
-        now = time.perf_counter()
-        dt = now - self.last_time
-        self.last_time = now
+    def start_countdown(self, seconds, on_finish = None):
+        self.countdown = Countdown(remaining = float(seconds), shown_value = int(seconds))
+        self.countdown_on_finish = on_finish
+        self.paused = True
 
-        # Update game & loop
-        self.update(dt)
-        self.loop_after_id = self.after(int(1000 / FPS), self.loop)
+    def tick_countdown(self, dt):
+        cd = self.countdown
+        if cd is None:
+            return
+        cd.remaining -= dt
+
+        new_shown = int(cd.remaining + 0.9999)  # ceiling-ish
+        if new_shown != cd.shown_value:
+            cd.shown_value = max(0, new_shown)
+
+        if cd.remaining <= 0:
+            self.countdown = None
+            self.paused = False
+            if self.countdown_on_finish:
+                self.countdown_on_finish()
+                self.countdown_on_finish = None
+
+    # ---------------- Main update ----------------
 
     def update(self, dt):
-        Physics.step(self, dt)
-        self.hud.update()
-
-    def countdown(self, seconds, pause_gameplay = True, on_finish = None, overlay = True,
-                  x = None, y = None, size = None):
-        self.cancel_after(self.countdown_after_id)
-        self.countdown_after_id = None
-
-        self.in_countdown = True
-        self.countdown_seconds = int(seconds)
-        self.countdown_pause_gameplay = pause_gameplay
-        self.countdown_on_finish = on_finish
-        self.countdown_overlay = overlay
-        
-        if pause_gameplay:
-            self.pause()
-            
-        if overlay:
-            x = self.width/2 if x is None else x
-            y = self.height/2 if y is None else y
-            size = 80 if size is None else size
-            self.countdown_text = self.canvas.create_text(x, y, text = str(self.countdown_seconds),
-                                                 font = ("Helvetica", size, "bold"),
-                                                 fill = "red")
-                
-        self.countdown_after_id = self.after(1000, self.tick_countdown)
-
-    def tick_countdown(self):
-        if not self.canvas or not self.canvas.winfo_exists():
+        if not self.running:
             return
-        
+
+        if self.countdown is not None:
+            self.tick_countdown(dt)
+            return
+
         if self.paused:
-            self.cancel_after(self.countdown_after_id)
-            self.countdown_after_id = self.after(1000, self.tick_countdown)
             return
 
-        s = self.countdown_seconds
-        
-        if s > 1:
-            s -=  1
-            self.countdown_seconds = s
-            if self.countdown_overlay:
-                self.canvas.itemconfigure(self.countdown_text, text = str(s))
-            self.countdown_after_id = self.after(1000, self.tick_countdown)
-            return
-            
-        if s == 1:
-            self.countdown_seconds = 0
-            if self.countdown_overlay:
-                self.canvas.itemconfigure(self.countdown_text, text = "GO!", fill = "green")
-            self.countdown_after_id = self.after(1000, self.tick_countdown)
-            return
-
-        self.in_countdown = False
-        
-        if self.countdown_overlay:
-            try:
-                self.canvas.delete(self.countdown_text)
-            except tk.TclError:
-                pass
-        if self.countdown_on_finish:
-            on_finish()
-        if self.countdown_pause_gameplay:
-            self.resume()
-
-    def after(self, ms, fn):
-        epoch = self.epoch
-
-        def wrapped():
-            if epoch != self.epoch:
-                return
-            fn()
-
-        aid = self.root.after(ms, wrapped)
-        self.after_ids.add(aid)
-        return aid
-
-    def cancel_after(self, aid):
-        if not aid:
-            return
-        try:
-            self.root.after_cancel(aid)
-        except tk.TclError:
-            pass
-        self.after_ids.discard(aid)
-
-    def cancel_all_afters(self):
-        for aid in list(self.after_ids):
-            try:
-                self.root.after_cancel(aid)
-            except tk.TclError:
-                pass
-            self.after_ids.discard(aid)
-        self.loop_after_id = None
-        self.countdown_after_id = None
-
-    def bump_epoch(self):
-        self.epoch += 1
-        self.cancel_all_afters()
+        Physics.step(self, dt)

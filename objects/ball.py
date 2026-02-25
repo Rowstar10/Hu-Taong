@@ -1,48 +1,48 @@
-import math, random
+import math
+import random
+
 from config import DYNAMIC
-from helpers import play_sound, lerp
+from helpers import lerp
 from objects.game_object import GameObject
+
 
 class Ball(GameObject):
     body_type = DYNAMIC
     is_ball = True
     can_score = True
-    
-    def __init__(self, game, diameter, x, y,
-                 speed = 500, color = "white"):
-        
-        super().__init__(game, diameter, diameter, x, y,
-                         vx = random.choice([1, -1]) * speed,
-                         vy = random.choice([1, -1]) * speed,
-                         restitution = 1)
-        
+
+    def __init__(self, game, diameter, x, y, speed=500, color="white"):
+        super().__init__(
+            game,
+            diameter,
+            diameter,
+            x,
+            y,
+            vx=random.choice([1, -1]) * speed,
+            vy=random.choice([1, -1]) * speed,
+            restitution=0.4,
+        )
+
         self.diameter = diameter
         self.speed = speed
         self.color = color
         self.rally_value = 0
         self.last_paddle = None
-        
-        self.id = self.canvas.create_oval(self.x0, self.y0, self.x1, self.y1, fill = color)
 
     def on_contact(self, other, data):
         nx, ny = data["normal"]
+
         if other.is_paddle:
             paddle = other
-            
+
             if self.last_paddle is not paddle:
-                play_sound(paddle.sound)
-                self.rally_value +=  1
-                
-                factor = lerp(1, 5, min(self.rally_value / 100, 1))
-                target_speed = self.speed * factor
-                current_speed = math.hypot(self.vx, self.vy)
-                
-                if current_speed > 0:
-                    scale = target_speed / current_speed
-                    self.vx *= scale
-                    self.vy *= scale
-                    
-                self.game.hud.update()
+                self.game.app.sound.play(paddle.sound, category="paddle")
+                self.rally_value += 1
+
+                # Keep v0.3 behavior (additive bump). You can swap this to
+                # a target-speed curve later if desired.
+                self.vx += nx * self.speed * lerp(0.1, 2.0, self.rally_value / 100)
+                self.vy += ny * self.speed * lerp(0.1, 2.0, self.rally_value / 100)
 
             self.last_paddle = paddle
 
@@ -51,6 +51,6 @@ class Ball(GameObject):
             return
 
     def reset(self):
-        super().reset()        
+        super().reset()
         self.last_paddle = None
         self.rally_value = 0

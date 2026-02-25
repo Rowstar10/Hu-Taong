@@ -1,5 +1,5 @@
 import math
-from config import DYNAMIC, KINEMATIC, STATIC, MAX_CPF, APP_WIDTH, APP_HEIGHT
+from config import DYNAMIC, KINEMATIC, STATIC, MAX_CPF, BASE_W, BASE_H
 
 class Physics:
     @staticmethod
@@ -27,7 +27,6 @@ class Physics:
                 for obj in movers:
                     obj.commit_position(remaining)
                     Physics.clamp_to_world(obj)
-                    obj.sync_canvas()
                 break
 
             # Find the earliest collision
@@ -44,10 +43,6 @@ class Physics:
             cpf +=  1
     
             Physics.resolve_collision(obj1, obj2, data)
-
-            # Show all changes on canvas
-            for obj in movers:
-                obj.sync_canvas()
 
     @staticmethod
     def detect_collisions(game, objects, remaining):
@@ -151,74 +146,79 @@ class Physics:
         res = (a.restitution + b.restitution) / 2
         im_a, im_b = a.inv_mass, b.inv_mass
         im_total = im_a + im_b
+
+        def call_contacts(a_obj, b_obj):
+            """Deterministic callback ordering.
+
+            For ball+paddle collisions, let the paddle shape the bounce first,
+            then let the ball apply rally/sfx (which may rescale velocity).
+            """
+            if a_obj.is_paddle and b_obj.is_ball:
+                a_obj.on_contact(b_obj, data)
+                b_obj.on_contact(a_obj, data)
+                return
+            if b_obj.is_paddle and a_obj.is_ball:
+                b_obj.on_contact(a_obj, data)
+                a_obj.on_contact(b_obj, data)
+                return
+            a_obj.on_contact(b_obj, data)
+            b_obj.on_contact(a_obj, data)
         
-        if im_total == 0 or (a.body_type == KINEMATIC and b.body_type != DYNAMIC):
-            if a.body_type != STATIC:
+        if im_total  ==  0 or (a.body_type  ==  KINEMATIC and b.body_type !=  DYNAMIC):
+            if a.body_type !=  STATIC:
                 vn = a.vx * nx + a.vy * ny
                 if vn < 0:
                     a.vx -=  vn * nx
                     a.vy -=  vn * ny
                     
-            if b.body_type != STATIC:
+            if b.body_type !=  STATIC:
                 vn = b.vx * (-nx) + b.vy * (-ny)
                 if vn < 0:
                     b.vx -=  vn * (-nx)
                     b.vy -=  vn * (-ny)
 
             Physics.positional_shove(a, b, nx, ny)
-            Physics.collision_dispatcher(a, b, data)
+            call_contacts(a, b)
             return
 
         impulse_total = -(1 + res) * rvn / im_total
         impulse_x, impulse_y = impulse_total * nx, impulse_total * ny
         
-        if a.body_type != STATIC:
+        if a.body_type !=  STATIC:
             a.vx +=  impulse_x * im_a
             a.vy +=  impulse_y * im_a
 
-        if b.body_type != STATIC:
+        if b.body_type !=  STATIC:
             b.vx -=  impulse_x * im_b
             b.vy -=  impulse_y * im_b
-
+         
+        # Separate first so callbacks see resolved (non-overlapping) positions.
         Physics.positional_shove(a, b, nx, ny)
-        Physics.collision_dispatcher(a, b, data)
-
-    @staticmethod
-    def collision_dispatcher(a, b, data):
-        # Ensure paddle sets bounce first, ball scales speed last
-        if getattr(a, "is_ball", False) and getattr(b, "is_paddle", False):
-            b.on_contact(a, data)
-            a.on_contact(b, data)
-        elif getattr(b, "is_ball", False) and getattr(a, "is_paddle", False):
-            a.on_contact(b, data)
-            b.on_contact(a, data)
-        else:
-            a.on_contact(b, data)
-            b.on_contact(a, data)
-
+        call_contacts(a, b)
+        
     @staticmethod
     def clamp_to_world(obj):               
-        if obj.body_type != KINEMATIC:
+        if obj.body_type !=  KINEMATIC:
             return
         
         if obj.x0 < 0:
             (obj.x0, obj.x1, obj.vx) = (0, obj.width, 0)
-        if obj.x1 > APP_WIDTH:
-            (obj.x1, obj.x0, obj.vx) = (APP_WIDTH, APP_WIDTH-obj.width, 0)
+        if obj.x1 > BASE_W:
+            (obj.x1, obj.x0, obj.vx) = (BASE_W, BASE_W-obj.width, 0)
         if obj.y0 < 0:
             (obj.y0, obj.y1, obj.vy) = (0, obj.height, 0)
-        if obj.y1 > APP_HEIGHT:
-            (obj.y1, obj.y0, obj.vy) = (APP_HEIGHT, APP_HEIGHT-obj.height, 0)
+        if obj.y1 > BASE_H:
+            (obj.y1, obj.y0, obj.vy) = (BASE_H, BASE_H-obj.height, 0)
 
     @staticmethod
     def positional_shove(a, b, nx, ny):
         shove = 0.01
-        if a.body_type != STATIC:
+        if a.body_type !=  STATIC:
             a.x0 +=  nx * shove
             a.x1 +=  nx * shove
             a.y0 +=  ny * shove
             a.y1 +=  ny * shove
-        if b.body_type != STATIC:
+        if b.body_type !=  STATIC:
             b.x0 -=  nx * shove
             b.x1 -=  nx * shove
             b.y0 -=  ny * shove

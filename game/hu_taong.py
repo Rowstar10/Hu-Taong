@@ -1,64 +1,93 @@
-import random
-from config import APP_WIDTH, APP_HEIGHT
-from helpers import play_sound
+import pygame, random
+
+from config import BASE_W, BASE_H
 from game.game_base import GameBase
 from objects.wall import Wall
 from objects.ball import Ball
 from objects.paddle import Paddle
 
-class Hu_Taong(GameBase):                        
+
+class Hu_Taong(GameBase):
+    def __init__(self, app, width=BASE_W, height=BASE_H):
+        super().__init__(app, width, height)
+        self.message_text = ""
+        self.message_color = (255, 255, 255)
+        self.message_timer = 0.0
+
     def build_world(self):
         # Walls & Separator
-        self.top_wall = Wall(self, -10, -10, APP_WIDTH + 10, 0)
-        self.bottom_wall = Wall(self, -10, APP_HEIGHT, APP_WIDTH + 10, APP_HEIGHT + 10)
-        self.left_wall = Wall(self, -10, -10, 10, APP_HEIGHT + 10, color = "Red", is_goal = True)
-        self.right_wall = Wall(self, APP_WIDTH - 10, -10, APP_WIDTH + 10, APP_HEIGHT + 10, color = "Royal Blue", is_goal = True)
-        self.separator = Wall(self, APP_WIDTH/2, -10, APP_WIDTH/2, APP_HEIGHT + 10, is_separator = True)
-        
-        # Players & Ball
-        self.p1 = Paddle(self, width = 30, height = 180,
-                         x = 30, y = (APP_HEIGHT - 180)/2,
-                         up = "w", down = "s", left = "a", right = "d",
-                         color1 = "Red", color2 = "Orange Red", sound = "Hu.wav")
+        self.top_wall = Wall(self, -100, -100, BASE_W + 100, 0)
+        self.bottom_wall = Wall(self, -100, BASE_H, BASE_W + 100, BASE_H + 100)
+        self.left_wall = Wall(self, -100, -100, 5, BASE_H + 100, color = "Red", is_goal = True)
+        self.right_wall = Wall(self, BASE_W - 5, -100, BASE_W + 100, BASE_H + 100, color = "Blue", is_goal = True)
+        self.separator = Wall(self, BASE_W / 2, -100, BASE_W / 2, BASE_H + 100, is_separator = True)
 
-        self.p2 = Paddle(self, width = 30, height = 180,
-                         x = APP_WIDTH - 60, y = (APP_HEIGHT - 180)/2,
-                         up = "Up", down = "Down", left = "Left", right = "Right",
-                         color1 = "Blue", color2 = "Royal Blue", sound = "Tao.wav")
-        
-        self.ball = Ball(self, diameter = 50,
-                         x = (APP_WIDTH - 50)/2,
-                         y = (APP_HEIGHT - 50)/2)
+        # Players & Ball
+        self.p1 = Paddle(
+            self,
+            width=30,
+            height=180,
+            x=30,
+            y=(BASE_H - 180) / 2,
+            up = pygame.K_w,
+            down = pygame.K_s,
+            left = pygame.K_a,
+            right = pygame.K_d,
+            color1 = "Red",
+            color2 = "Orange Red",
+            sound="Hu.wav",
+        )
+
+        self.p2 = Paddle(
+            self,
+            width=30,
+            height=180,
+            x=BASE_W - 60,
+            y=(BASE_H - 180) / 2,
+            up = pygame.K_UP,
+            down = pygame.K_DOWN,
+            left = pygame.K_LEFT,
+            right = pygame.K_RIGHT,
+            color1="Blue",
+            color2="Royal Blue",
+            sound="Tao.wav",
+        )
+
+        self.ball = Ball(self, diameter=50, x=(BASE_W - 50) / 2, y=(BASE_H - 50) / 2)
 
     def on_score(self, obj, data):
         self.pause()
-        play_sound("euugh.wav")
-        nx, ny = data["normal"]
+        self.app.sound.play("euugh.wav", category="score")
 
-        if nx  ==  1:
-            self.p2.score +=  1
-            self.canvas.itemconfigure(self.hud.p2_score_id, text = f"{self.p2.color1}: {self.p2.score}")
-            msg = f"{self.p2.color1} scored!"
-            msg_color = self.p2.color1
-        elif nx  ==  -1:
-            self.p1.score +=  1
-            self.canvas.itemconfigure(self.hud.p1_score_id, text = f"{self.p1.color1}: {self.p1.score}")
-            msg = f"{self.p1.color1} scored!"
-            msg_color = self.p1.color1
+        nx, _ny = data["normal"]
+
+        if nx == 1:
+            self.p2.score += 1
+            self.message_text = f"{self.p2.color1} scored!"
+            self.message_color = (60, 140, 255)
+        elif nx == -1:
+            self.p1.score += 1
+            self.message_text = f"{self.p1.color1} scored!"
+            self.message_color = (255, 80, 80)
         else:
             return
-
-        text_id = self.canvas.create_text(APP_WIDTH/2, APP_HEIGHT/2, text = msg,
-                                          font = ("Helvetica", 60, "bold"),
-                                          fill = msg_color)
 
         obj.spawn_vx = nx * obj.speed
         obj.spawn_vy = random.choice([1, -1]) * obj.speed
 
-        self.root.after(2000, lambda: (self.canvas.delete(text_id), self.reset_round()))
+        self.message_timer = 2
 
     def reset_round(self):
         for obj in self.objects:
             obj.reset()
-        self.hud.update()
-        self.countdown(seconds = 3)
+        self.start_countdown(3)
+
+    def update(self, dt):
+        if self.message_timer > 0:
+            self.message_timer -= dt
+            if self.message_timer <= 0:
+                self.message_timer = 0
+                self.message_text = ""
+                self.reset_round()
+
+        super().update(dt)

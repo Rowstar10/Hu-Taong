@@ -14,18 +14,18 @@ IMAGE_DIR = RESOURCE_DIR / "Images"
 # -------- Constants --------
 FPS = 100
 
-MENU_WIDTH = 500
-MENU_HEIGHT = 600
+BASE_W, BASE_H = 1280, 720
 
-APP_WIDTH = 1500
-APP_HEIGHT = 800
-
-PAUSE_WIDTH = 500
-PAUSE_HEIGHT = 200
+RESOLUTIONS = [(960, 540),
+               (1024, 576),
+               (1280, 720),
+               (1600, 900),
+               (1920, 1080),
+               (2560, 1440)]
 
 EPSILON = 0.001
 HALF_PI = math.pi / 2
-MAX_BOUNCE_ANGLE = math.radians(50)
+MAX_BOUNCE_ANGLE = math.radians(60)
 MAX_CPF = 5
 
 # Body types

@@ -2,6 +2,19 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 0.5 — 2026-02-25
+
+Rebuilt in Pygame.
+
+### Changed
+- Rebuilt in Pygame instead of Tkinter, with a new game loop, menus and HUD.
+- Settings are split into Gameplay, Display and Audio pages.
+- Paddles bounce the ball at up to 60° again.
+
+### Added
+- Display settings: resolution (960 x 540 up to 2560 x 1440) and window mode.
+- Audio settings: master volume, and paddle and score sounds on or off.
+
 ## 0.4 — 2026-02-16
 
 Faster rallies and a fairer AI.

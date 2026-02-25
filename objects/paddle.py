@@ -7,14 +7,15 @@ class Paddle(GameObject):
     body_type = KINEMATIC
     is_paddle = True
     has_inputs = True
+    soft_controls = True
         
     def __init__(self, game, width, height, x, y,
                  up, down, left, right, color1, color2,
-                 sound, speed = 1400):
+                 sound, speed = 1500):
     
         super().__init__(game, width, height, x, y,
-                         inv_mass = 0,
-                         restitution = 1,
+                         inv_mass = 0.1,
+                         restitution = 0.8,
                          linear_drag = 1)
         
         self.up = up
@@ -30,19 +31,19 @@ class Paddle(GameObject):
         self.sound = sound
         self.score = 0
 
-        self.id = self.canvas.create_rectangle(self.x0, self.y0, self.x1, self.y1, fill = color1)
 
         # ------------------ AI Settings ------------------
         self.ai_enabled = False
-        self.ai_difficulty = 5
+        self.ai_difficulty = 5 # out of 10
         
         d = clamp(int(self.ai_difficulty), 1, 10)
         W = self.game.width
-        self.reaction_time      = lerp(0.15, 0.05, (d - 1) / 9)
-        self.foresight_dist     = lerp(W / 3, W, (d - 1) / 9) # Only reacts to incoming ball within this distance
-        self.max_pred_bounces   = int(lerp(0, 2, (d - 1) / 9))
-        self.strike_dist        = lerp(100, 300, (d - 1) / 9) # dvx = 50% of maximum speed at strike distance
-        self.arrive_dist        = lerp(300, 100, (d - 1) / 9) # dvy begins to decrease at arrive distance
+        self.reaction_time      = lerp(0.25, 0.05, (d - 1) / 9)
+        self.foresight_dist     = lerp(W / 2, 5 * W / 8, (d - 1) / 9) # Only reacts to incoming ball within this distance
+        self.max_pred_bounces   = 0 if d in [1, 2, 3, 4] else (1 if d in [5, 6, 7, 8] else 2)
+        self.panic_dist         = lerp(100, 300, (d - 1) / 9)
+        self.strike_dist        = lerp(200, 500, (d - 1) / 9) # dvx = 50% of maximum speed at strike distance
+        self.arrive_dist        = lerp(500, 200, (d - 1) / 9) # dvy begins to decrease at arrive distance
 
         self.ai_timer = 0
         self.target = None
@@ -53,51 +54,32 @@ class Paddle(GameObject):
         return True
 
     def on_contact(self, other, data):
-        if other.body_type != DYNAMIC:
+        if other.body_type !=  DYNAMIC:
             return
 
         nx, ny = data["normal"]
         speed = math.hypot(other.vx, other.vy)
         
-        if speed == 0:
-            return
-
-        if nx != 0:
-
+        # -------------- Bouncy Center / Flat Edges --------------
+        if nx !=  0:
             center = (self.y0 + self.y1) / 2
             other_center = (other.y0 + other.y1) / 2
             offset = (other_center - center) / (self.height / 2)
             offset = max(-1, min(1, offset))
 
             angle = offset * MAX_BOUNCE_ANGLE
-
-            dir_x = -nx * math.cos(angle)
-            dir_y = math.sin(angle)
-
-        elif ny != 0:
-
+            other.vx = -nx * speed * math.cos(angle)
+            other.vy = speed * math.sin(angle)
+            
+        if ny !=  0:
             center = (self.x0 + self.x1) / 2
             other_center = (other.x0 + other.x1) / 2
             offset = (other_center - center) / (self.width / 2)
             offset = max(-1, min(1, offset))
-
+            
             angle = offset * MAX_BOUNCE_ANGLE
-
-            dir_x = math.sin(angle)
-            dir_y = -ny * math.cos(angle)
-
-        else:
-            return
-
-        mag = math.hypot(dir_x, dir_y)
-        if mag == 0:
-            return
-
-        dir_x /= mag
-        dir_y /= mag
-
-        other.vx = dir_x * speed
-        other.vy = dir_y * speed
+            other.vx = speed * math.sin(angle)
+            other.vy = -ny * speed * math.cos(angle)
 
     # ------------------------ AI Logic ------------------------
     def ai_input(self, dt):
@@ -149,18 +131,21 @@ class Paddle(GameObject):
             
             if self.target is not None:
                 ball, t = self.target, best_t
-                
+
                 r = ball.diameter / 2
                 ball_cx = (ball.x0 + ball.x1) / 2
                 ball_cy = (ball.y0 + ball.y1) / 2
+                dx = ball_cx - pad_cx
+                dy = ball_cy - pad_cy
+                dist_to_ball = math.hypot(dx, dy)
+                
+                in_panic = dist_to_ball < self.panic_dist
 
                 if self.is_left:
                     defend_x = self.x1 + ball.width / 2
-                    strike_x = W/2
                     ball_behind = ball_cx < (self.x0 - r - 10)
                 else:
                     defend_x = self.x0 - ball.width / 2
-                    strike_x = W/2
                     ball_behind = ball_cx > (self.x1 + r + 10)
                     
                 self.contact_dist_x = abs(defend_x - ball_cx)
@@ -180,17 +165,17 @@ class Paddle(GameObject):
                     pred_cy, pred_bounces = reflect_in_range(pred_cy, r, H - r)
                     can_predict = pred_bounces <= self.max_pred_bounces
                     y_aligned = abs(ball_cy - pad_cy) < self.height / 2
-
+                    
                     if y_aligned:
-                        tar_x = strike_x
+                        tar_x = W / 2
                         
                     if can_predict:
-                        tar_y = pred_cy
+                        tar_y = lerp(pad_cy, pred_cy, 0.8)
                     else:
                         tar_y = clamp(ball_cy, H/2 - self.height/2, H/2 + self.height/2)
                         
                 elif (ball_cx < W/2 and self.is_left) or (ball_cx > W/2 and not self.is_left):
-                    tar_x = strike_x
+                    tar_x = W / 2
                     tar_y = ball_cy
                 
             self.ai_tar_x, self.ai_tar_y = tar_x, tar_y
@@ -216,3 +201,8 @@ class Paddle(GameObject):
 
     def toggle_ai_state(self):
         self.ai_enabled = not self.ai_enabled
+        if self.ai_enabled:
+            d = clamp(int(self.ai_difficulty), 1, 10)
+            self.restitution = lerp(0.4, 0.8, (d - 1) / 9)
+        else:
+            self.restitution = 0.8

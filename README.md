@@ -1,16 +1,17 @@
-# Hu Taong 0.4
+# Hu Taong 0.5
 
-Pong, the Wangsheng Funeral Parlor way. Version 0.4, 16 February 2026.
+Pong, the Wangsheng Funeral Parlor way. Version 0.5, 25 February 2026.
 
-The last Tkinter version, with drawing moved into its own renderer.
+Rebuilt in Pygame.
 
 ## Play it
 
 The easiest way is **Toki Hub**, which installs any version with everything it needs.
 
-From the source, with Python 3 (Tkinter comes with the python.org installer):
+From the source, with Python 3.12 and pygame 2.6.1:
 
 ```
+pip install pygame==2.6.1
 python main.py
 ```
 

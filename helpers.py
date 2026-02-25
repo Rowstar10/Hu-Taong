@@ -1,17 +1,9 @@
-import math, winsound
+import math
+from typing import Dict
+
 from config import SOUND_DIR
 
-def center_window(window, width, height):
-    screen_width = window.winfo_screenwidth()
-    screen_height = window.winfo_screenheight()
-    x = (screen_width - width) // 2
-    y = (screen_height - height) // 2
-    window.geometry(f"{width}x{height}+{x}+{y}")
-
-def play_sound(name):
-    winsound.PlaySound(
-        str(SOUND_DIR / name),
-        winsound.SND_FILENAME | winsound.SND_ASYNC)
+# ------------------ Math helpers ------------------
 
 def clamp(x, lo, hi):
     return lo if x < lo else hi if x > hi else x
