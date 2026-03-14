@@ -1,22 +1,20 @@
 import pygame
-from config import SOUND_DIR
+from config import SOUND_DIR, MUSIC_DIR
 
 SOUND_CACHE = {}
 
 class SoundManager:
     def __init__(self):
         self.master_volume = 0.5
-        self.paddle_enabled = True
-        self.score_enabled = True
+        self.sfx_volume = 0.5
+        self.music_volume = 0.5
 
-    def play(self, name: str, category: str = "general"):
+        self.music_type = "menu"
+        self.paddle_hit_sound = True
+        self.score_sound = True
+
+    def play(self, name: str, loops = 0, multiplier = 1):
         if not pygame.mixer.get_init():
-            return
-
-        # Category filtering
-        if category == "paddle" and not self.paddle_enabled:
-            return
-        if category == "score" and not self.score_enabled:
             return
 
         snd = SOUND_CACHE.get(name)
@@ -24,5 +22,33 @@ class SoundManager:
             snd = pygame.mixer.Sound(str(SOUND_DIR / name))
             SOUND_CACHE[name] = snd
 
-        snd.set_volume(self.master_volume)
-        snd.play()
+        volume = self.sfx_volume * self.master_volume * multiplier
+        volume = max(0, min(volume, 1))
+        snd.set_volume(volume)
+        snd.play(loops)
+
+    def stop(self, name: str):
+        snd = SOUND_CACHE.get(name)
+        snd.stop()
+
+    def play_music(self, name: str, fade_out_ms = 1000, fade_in_ms = 1000, **kwargs):
+        if not pygame.mixer.get_init():
+            return
+
+        if "music_type" in kwargs:
+            self.music_type = kwargs.get("music_type")
+            
+        pygame.mixer.music.fadeout(fade_out_ms)
+        pygame.mixer.music.load(str(MUSIC_DIR / name))
+        self.update_music_volume()
+        pygame.mixer.music.play(loops = -1, fade_ms = fade_in_ms)
+            
+    def update_music_volume(self, multiplier = 1):
+        if not pygame.mixer.get_init():
+            return
+        
+        volume = self.music_volume * self.master_volume * multiplier
+        volume = max(0, min(volume, 1))
+        pygame.mixer.music.set_volume(volume)
+
+        

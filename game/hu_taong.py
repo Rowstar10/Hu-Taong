@@ -1,6 +1,7 @@
 import pygame, random
 
 from config import BASE_W, BASE_H
+from render import theme
 from game.game_base import GameBase
 from objects.wall import Wall
 from objects.ball import Ball
@@ -14,63 +15,86 @@ class Hu_Taong(GameBase):
         self.message_color = (255, 255, 255)
         self.message_timer = 0.0
 
+    def stop(self):
+        super().stop()
+        self.message_timer = 0
+        self.message_color = (255, 255, 255)
+        self.message_text = ""
+        
     def build_world(self):
         # Walls & Separator
-        self.top_wall = Wall(self, -100, -100, BASE_W + 100, 0)
-        self.bottom_wall = Wall(self, -100, BASE_H, BASE_W + 100, BASE_H + 100)
-        self.left_wall = Wall(self, -100, -100, 5, BASE_H + 100, color = "Red", is_goal = True)
-        self.right_wall = Wall(self, BASE_W - 5, -100, BASE_W + 100, BASE_H + 100, color = "Blue", is_goal = True)
-        self.separator = Wall(self, BASE_W / 2, -100, BASE_W / 2, BASE_H + 100, is_separator = True)
+        self.top_wall = Wall(self, -10, -10, BASE_W + 10, 0)
+        self.bottom_wall = Wall(self, -10, BASE_H, BASE_W + 10, BASE_H + 10)
+        self.left_wall = Wall(self, -10, -10, 5, BASE_H + 10, color = "Red", is_goal = True)
+        self.right_wall = Wall(self, BASE_W - 5, -10, BASE_W + 10, BASE_H + 10, color = "Blue", is_goal = True)
+        self.separator = Wall(self, BASE_W / 2, -10, BASE_W / 2, BASE_H + 10, is_separator = True)
 
+        settings = self.app.settings.gameplay
+        
         # Players & Ball
-        self.p1 = Paddle(
-            self,
-            width=30,
-            height=180,
-            x=30,
-            y=(BASE_H - 180) / 2,
-            up = pygame.K_w,
-            down = pygame.K_s,
-            left = pygame.K_a,
-            right = pygame.K_d,
-            color1 = "Red",
-            color2 = "Orange Red",
-            sound="Hu.wav",
-        )
+        self.p1 = Paddle(self,
+                         width = settings.paddle_width,
+                         height = settings.paddle_height,
+                         x = settings.paddle_width,
+                         y = (BASE_H - settings.paddle_height) / 2,
+                         speed = settings.paddle_speed,
+                         up = pygame.K_w,
+                         down = pygame.K_s,
+                         left = pygame.K_a,
+                         right = pygame.K_d,
+                         color1 = "Red",
+                         color2 = "Orange Red",
+                         sound = "Hu.wav")
 
-        self.p2 = Paddle(
-            self,
-            width=30,
-            height=180,
-            x=BASE_W - 60,
-            y=(BASE_H - 180) / 2,
-            up = pygame.K_UP,
-            down = pygame.K_DOWN,
-            left = pygame.K_LEFT,
-            right = pygame.K_RIGHT,
-            color1="Blue",
-            color2="Royal Blue",
-            sound="Tao.wav",
-        )
+        self.p2 = Paddle(self,
+                         width = settings.paddle_width,
+                         height = settings.paddle_height,
+                         x = BASE_W - 2 * settings.paddle_width,
+                         y = (BASE_H - settings.paddle_height) / 2,
+                         speed = settings.paddle_speed,
+                         up = pygame.K_UP,
+                         down = pygame.K_DOWN,
+                         left = pygame.K_LEFT,
+                         right = pygame.K_RIGHT,
+                         color1 = "Blue",
+                         color2 = "Royal Blue",
+                         sound = "Tao.wav")
 
-        self.ball = Ball(self, diameter=50, x=(BASE_W - 50) / 2, y=(BASE_H - 50) / 2)
+        self.ball = Ball(self, diameter = settings.ball_diameter, x = (BASE_W - settings.ball_diameter) / 2, y = (BASE_H - settings.ball_diameter) / 2, speed = settings.ball_speed, color = "white")
 
     def on_score(self, obj, data):
         self.pause()
-        self.app.sound.play("euugh.wav", category="score")
-
         nx, _ny = data["normal"]
+        settings = self.app.settings.gameplay
+        sound = self.app.sound
+        win_score = settings.winning_scores[settings.winning_score_index]
 
         if nx == 1:
             self.p2.score += 1
             self.message_text = f"{self.p2.color1} scored!"
             self.message_color = (60, 140, 255)
+            
+            if self.p2.score >= win_score:
+                if not settings.win_by_two or self.p2.score >= self.p1.score + 2:
+                    self.app.state_manager.push_state("win", p1=self.p1, p2=self.p2, winner=self.p2.color1)
+                    return
+                    
+                    
         elif nx == -1:
             self.p1.score += 1
             self.message_text = f"{self.p1.color1} scored!"
             self.message_color = (255, 80, 80)
+            
+            if self.p1.score >= win_score:
+                if not settings.win_by_two or self.p1.score >= self.p2.score + 2:
+                    self.app.state_manager.push_state("win", p1=self.p1, p2=self.p2, winner=self.p1.color1)
+                    return
+   
         else:
             return
+        
+        if sound.score_sound:
+            self.app.sound.play("euugh.wav")
 
         obj.spawn_vx = nx * obj.speed
         obj.spawn_vy = random.choice([1, -1]) * obj.speed
@@ -83,6 +107,7 @@ class Hu_Taong(GameBase):
         self.start_countdown(3)
 
     def update(self, dt):
+        super().update(dt)
         if self.message_timer > 0:
             self.message_timer -= dt
             if self.message_timer <= 0:
@@ -90,4 +115,52 @@ class Hu_Taong(GameBase):
                 self.message_text = ""
                 self.reset_round()
 
-        super().update(dt)
+    def apply_gameplay_settings(self):
+        super().apply_gameplay_settings()
+        s = self.app.settings.gameplay
+
+        for obj in self.objects:
+            if obj.is_paddle:
+                w_diff = abs(obj.width - s.paddle_width)
+                h_diff = abs(obj.height - s.paddle_height)
+                
+                obj.width = s.paddle_width
+                obj.height = s.paddle_height
+                obj.speed = s.paddle_speed
+
+                obj.x0 -= w_diff / 2
+                obj.y0 -= h_diff / 2
+                obj.x1 = obj.x0 + obj.width
+                obj.y1 = obj.y0 + obj.height
+                
+                if obj.is_left:                    
+                    obj.spawn_x = obj.width
+                    obj.spawn_y = (BASE_H - obj.height) / 2
+                    obj.home_x = obj.spawn_x + obj.width / 2
+                    obj.home_y = obj.spawn_y + obj.height / 2
+                    
+                else:
+                    obj.spawn_x = BASE_W - 2 * obj.width
+                    obj.spawn_y = (BASE_H - obj.height) / 2
+                    obj.home_x = obj.spawn_x + obj.width / 2
+                    obj.home_y = obj.spawn_y + obj.height / 2    
+                    
+                
+            if obj.is_ball:
+                diff = abs(obj.diameter - s.ball_diameter)
+                
+                obj.width = s.ball_diameter
+                obj.height = s.ball_diameter
+                obj.diameter = s.ball_diameter
+                obj.speed = s.ball_speed
+                
+                obj.x0 -= diff / 2
+                obj.y0 -= diff / 2
+                obj.x1 = obj.x0 + obj.width
+                obj.y1 = obj.y0 + obj.height
+                
+                obj.spawn_x = (BASE_W - obj.width) /2
+                obj.spawn_y = (BASE_H - obj.height) / 2
+                obj.home_x = obj.spawn_x + obj.width / 2
+                obj.home_y = obj.spawn_y + obj.height / 2
+                

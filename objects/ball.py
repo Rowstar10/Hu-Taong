@@ -11,7 +11,7 @@ class Ball(GameObject):
     is_ball = True
     can_score = True
 
-    def __init__(self, game, diameter, x, y, speed=500, color="white"):
+    def __init__(self, game, diameter, x, y, speed, color="white"):
         super().__init__(
             game,
             diameter,
@@ -31,18 +31,15 @@ class Ball(GameObject):
 
     def on_contact(self, other, data):
         nx, ny = data["normal"]
-
+        sound = self.game.app.sound
+        
         if other.is_paddle:
             paddle = other
 
             if self.last_paddle is not paddle:
-                self.game.app.sound.play(paddle.sound, category="paddle")
                 self.rally_value += 1
-
-                # Keep v0.3 behavior (additive bump). You can swap this to
-                # a target-speed curve later if desired.
-                self.vx += nx * self.speed * lerp(0.1, 2.0, self.rally_value / 100)
-                self.vy += ny * self.speed * lerp(0.1, 2.0, self.rally_value / 100)
+                if sound.paddle_hit_sound:
+                    sound.play(paddle.sound)
 
             self.last_paddle = paddle
 

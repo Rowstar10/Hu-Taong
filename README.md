@@ -1,8 +1,8 @@
-# Hu Taong 0.5
+# Hu Taong 0.6
 
-Pong, the Wangsheng Funeral Parlor way. Version 0.5, 25 February 2026.
+Pong, the Wangsheng Funeral Parlor way. Version 0.6, 14 March 2026.
 
-Rebuilt in Pygame.
+Settings, fonts, music (8 tracks), sound effects and 12 backgrounds.
 
 ## Play it
 

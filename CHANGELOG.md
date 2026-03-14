@@ -2,6 +2,21 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 0.6 — 2026-03-14
+
+Settings, music and backgrounds.
+
+### Added
+- Gameplay settings: paddle size and speed, ball size and speed, winning score (1, 3, 5, 10, 15 or 20), win by two, and the AI on or off at five difficulties (Baby, Easy, Normal, Hard, Insane).
+- Display settings: resolutions from 854 x 480 up to 7680 x 4320, maximum FPS (30 to 240, or unlimited), Show FPS, and dimming the background.
+- 12 backgrounds, with a picker for the menu and for matches.
+- Music: 8 tracks, chosen separately for the menu, matches and the win screen, with music and sound-effect volumes.
+- Sound effects for the menus, the countdown and winning.
+- A win screen with Play Again, and a confirmation before resetting, leaving or quitting.
+
+### Changed
+- The game is laid out for 1920 x 1080 (was 1280 x 720) and scales to the window.
+
 ## 0.5 — 2026-02-25
 
 Rebuilt in Pygame.

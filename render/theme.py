@@ -3,6 +3,7 @@ NAME_TO_RGB = {
     "black": (0, 0, 0),
     "red": (255, 60, 60),
     "blue": (80, 140, 255),
+    "dark blue": (50, 125, 205),
     "orange red": (255, 120, 60),
     "royal blue": (65, 105, 225),
     "grey5": (13, 13, 13),
@@ -37,9 +38,11 @@ GRAY = (150, 150, 160)
 GRAY_HOVER = (180, 190, 210)
 
 # --- Misc ---
+DARK_BLUE = (50, 125, 205)
 BLUE = (80, 155, 235)
 BLUE_HOVER = (100, 175, 255)
-LIGHT_BLUE = (190, 215, 255)
+LIGHT_BLUE = (170, 195, 235)
+LIGHT_BLUE_HOVER = (190, 215, 255)
 ROYAL_BLUE = (65, 105, 225)
 ROYAL_BLUE_HOVER = (85, 125, 245)
 

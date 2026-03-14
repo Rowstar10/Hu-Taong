@@ -2,11 +2,6 @@ import math
 from config import STATIC
 
 class GameObject:
-    """Pure simulation object.
-
-    Rendering is handled by a renderer that reads object state.
-    """
-
     body_type = None
     has_inputs = False
     soft_inputs = False
@@ -83,6 +78,11 @@ class GameObject:
         a = 1 - math.exp(-self.soft_control_k * dt)
         self.vx += (dvx - self.vx) * a
         self.vy += (dvy - self.vy) * a
+
+    def reconfigure(self, **kwargs):
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
 
     def commit_position(self, dt):
         self.x0 += self.vx * dt

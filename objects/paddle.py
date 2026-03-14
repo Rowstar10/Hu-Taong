@@ -9,13 +9,12 @@ class Paddle(GameObject):
     has_inputs = True
     soft_controls = True
         
-    def __init__(self, game, width, height, x, y,
-                 up, down, left, right, color1, color2,
-                 sound, speed = 1500):
+    def __init__(self, game, width, height, x, y, speed,
+                 up, down, left, right, color1, color2, sound):
     
         super().__init__(game, width, height, x, y,
-                         inv_mass = 0.1,
-                         restitution = 0.8,
+                         inv_mass = 0.05,
+                         restitution = 0.6,
                          linear_drag = 1)
         
         self.up = up
@@ -34,16 +33,12 @@ class Paddle(GameObject):
 
         # ------------------ AI Settings ------------------
         self.ai_enabled = False
-        self.ai_difficulty = 5 # out of 10
-        
-        d = clamp(int(self.ai_difficulty), 1, 10)
-        W = self.game.width
-        self.reaction_time      = lerp(0.25, 0.05, (d - 1) / 9)
-        self.foresight_dist     = lerp(W / 2, 5 * W / 8, (d - 1) / 9) # Only reacts to incoming ball within this distance
-        self.max_pred_bounces   = 0 if d in [1, 2, 3, 4] else (1 if d in [5, 6, 7, 8] else 2)
-        self.panic_dist         = lerp(100, 300, (d - 1) / 9)
-        self.strike_dist        = lerp(200, 500, (d - 1) / 9) # dvx = 50% of maximum speed at strike distance
-        self.arrive_dist        = lerp(500, 200, (d - 1) / 9) # dvy begins to decrease at arrive distance
+
+        self.reaction_time      = 0.15
+        self.foresight_dist     = self.game.width // 2 # Only reacts to incoming ball within this distance
+        self.max_pred_bounces   = 1
+        self.strike_dist        = 500 # dvx = 50% of maximum speed at strike distance
+        self.arrive_dist        = 500 # dvy begins to decrease at arrive distance
 
         self.ai_timer = 0
         self.target = None
@@ -83,7 +78,16 @@ class Paddle(GameObject):
 
     # ------------------------ AI Logic ------------------------
     def ai_input(self, dt):
+        settings = self.game.app.settings.gameplay
+        d = settings.ai_difficulty
         W, H = self.game.width, self.game.height
+        
+        self.reaction_time      = lerp(0.15, 0.05, d / 4)
+        self.foresight_dist     = lerp(W / 2, 3 * W / 4, d / 4) # Only reacts to incoming ball within this distance
+        self.max_pred_bounces   = 0 if d in [0, 1] else (1 if d in [2, 3] else 2)
+        self.strike_dist        = lerp(200, 600, d / 4) # dvx = 50% of maximum speed at strike distance
+        self.arrive_dist        = lerp(500, 350, d / 4) # dvy begins to decrease at arrive distance
+        
         pad_cx  = (self.x0 + self.x1) / 2
         pad_cy  = (self.y0 + self.y1) / 2
         
@@ -138,8 +142,6 @@ class Paddle(GameObject):
                 dx = ball_cx - pad_cx
                 dy = ball_cy - pad_cy
                 dist_to_ball = math.hypot(dx, dy)
-                
-                in_panic = dist_to_ball < self.panic_dist
 
                 if self.is_left:
                     defend_x = self.x1 + ball.width / 2
@@ -198,11 +200,6 @@ class Paddle(GameObject):
         dvy = want_dir_y * self.speed * arrive_drag_y if abs(error_y) > 10 else 0
         
         return dvx, dvy
-
+        
     def toggle_ai_state(self):
         self.ai_enabled = not self.ai_enabled
-        if self.ai_enabled:
-            d = clamp(int(self.ai_difficulty), 1, 10)
-            self.restitution = lerp(0.4, 0.8, (d - 1) / 9)
-        else:
-            self.restitution = 0.8
