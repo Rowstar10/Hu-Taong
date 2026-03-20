@@ -234,7 +234,14 @@ class Renderer:
 
         # ------- Score to win cycle -------
         win_score = settings.winning_scores[settings.winning_score_index]
-        win_score_surf = font.render(f"Score {win_score} to win", True, theme.WHITE)
+        
+        if win_score == "Endless Mode":
+            win_score_color = theme.ORANGE
+        else:
+            win_score = f"Score {win_score} to win"
+            win_score_color = theme.WHITE            
+            
+        win_score_surf = font.render(win_score, True, win_score_color)
         x = win_rect.centerx
         y = current_y
         win_score_rect = win_score_surf.get_rect(center=(x, y))
@@ -261,11 +268,11 @@ class Renderer:
         screen.blit(font.render(">", True, theme.BLACK),
                     font.render(">", True, theme.BLACK).get_rect(center=right_win_rect.center))
 
-        current_y = right_win_rect.bottom
+        current_y = right_win_rect.bottom + gap_y
 
         # -------- Win by Two Toggle --------
         win_by_two_text = "Win by Two: ON" if settings.win_by_two else "Win by Two: OFF"
-        win_by_two_surf = tiny_font.render(win_by_two_text, True, theme.BLACK)
+        win_by_two_surf = small_font.render(win_by_two_text, True, theme.BLACK)
 
         win_by_two_w = win_by_two_surf.get_width() + gap_x
         win_by_two_h = win_by_two_surf.get_height() + gap_y
@@ -438,6 +445,40 @@ class Renderer:
         paddle_size_rect = paddle_size_surf.get_rect(midleft=(x, y))
         screen.blit(paddle_size_surf, paddle_size_rect)
 
+        current_y = paddle_size_rect.bottom + 2 * gap_y
+
+        # -------- Randomise --------
+        randomise_text = "Randomise All"
+        randomise_surf = small_font.render(randomise_text, True, theme.BLACK)
+
+        randomise_w = randomise_surf.get_width() + gap_x
+        randomise_h = randomise_surf.get_height() + gap_y
+        randomise_x = ai_rect.centerx - randomise_w // 2
+        randomise_y = current_y
+
+        randomise_rect = pygame.Rect(randomise_x, randomise_y, randomise_w, randomise_h)
+        
+        randomise_color = theme.GREEN_HOVER if randomise_rect.collidepoint(mouse_pos) else theme.GREEN
+            
+        pygame.draw.rect(screen, randomise_color, randomise_rect, border_radius=12)
+        screen.blit(randomise_surf, randomise_surf.get_rect(center=randomise_rect.center))
+
+        # -------- Reset to defaults --------
+        default_text = "Reset All"
+        default_surf = small_font.render(default_text, True, theme.BLACK)
+
+        default_w = default_surf.get_width() + gap_x
+        default_h = default_surf.get_height() + gap_y
+        default_x = win_rect.centerx - default_w // 2
+        default_y = current_y
+
+        default_rect = pygame.Rect(default_x, default_y, default_w, default_h)
+        
+        default_color = theme.GREEN_HOVER if default_rect.collidepoint(mouse_pos) else theme.GREEN
+            
+        pygame.draw.rect(screen, default_color, default_rect, border_radius=12)
+        screen.blit(default_surf, default_surf.get_rect(center=default_rect.center))
+
         # -------- Reset Buttons --------
         reset_surf = tiny_font.render("Reset", True, theme.BLACK)
         reset_w = reset_surf.get_width() + gap_x
@@ -492,6 +533,9 @@ class Renderer:
         state.ui_hitboxes["paddle_speed_slider"] = paddle_speed_slider_rect
         state.ui_hitboxes["ball_diameter_slider"] = ball_diameter_slider_rect
         state.ui_hitboxes["paddle_size_slider"] = paddle_size_slider_rect
+
+        state.ui_hitboxes["randomise_all"] = randomise_rect
+        state.ui_hitboxes["reset_all"] = default_rect
         
         state.ui_hitboxes["reset_ball_speed"] = reset_ball_speed_rect
         state.ui_hitboxes["reset_paddle_speed"] = reset_paddle_speed_rect
@@ -508,7 +552,8 @@ class Renderer:
         title_font = self.app.fonts.get("helvetica", int(height * 0.18), bold=True)
         subtitle_font = self.app.fonts.get("helvetica", int(height * 0.06), bold=True)
         font = self.app.fonts.get("helvetica", int(height * 0.04), bold=True)
-        small_font = self.app.fonts.get("helvetica", int(height * 0.02), bold=True)
+        small_font = self.app.fonts.get("helvetica", int(height * 0.03), bold=True)
+        tiny_font = self.app.fonts.get("helvetica", int(height * 0.02), bold=True)
 
         gap_x = int(width * 0.02)
         gap_y = int(height * 0.02)
@@ -589,7 +634,7 @@ class Renderer:
         current_y = mode_right_rect.bottom + gap_y
 
         # -------- Apply Button --------
-        apply_surf = font.render("Apply", True, theme.BLACK)
+        apply_surf = small_font.render("Apply", True, theme.BLACK)
         apply_w = apply_surf.get_width() + gap_x
         apply_h = apply_surf.get_height() + gap_y
         apply_x = (width - apply_w) // 2
@@ -629,10 +674,29 @@ class Renderer:
         game_bg_rect = game_bg_surf.get_rect(center=(game_bg_x, game_bg_y))
         screen.blit(game_bg_surf, game_bg_rect)
 
+        # -------- Rotate Backgrounds Toggle --------
+        rotate_bg_text = "Rotate: ON" if self.app.settings.display.rotate_backgrounds else "Rotate: OFF"
+        rotate_bg_surf = small_font.render(rotate_bg_text, True, theme.BLACK)
+
+        rotate_bg_w = rotate_bg_surf.get_width() + gap_x
+        rotate_bg_h = rotate_bg_surf.get_height() + gap_y
+        rotate_bg_x = bg_rect.right + 30
+        rotate_bg_y = bg_rect.centery - rotate_bg_h // 2
+
+        rotate_bg_rect = pygame.Rect(rotate_bg_x, rotate_bg_y, rotate_bg_w, rotate_bg_h)
+        
+        if settings.rotate_backgrounds:
+            rotate_bg_color = theme.ORANGE_HOVER if rotate_bg_rect.collidepoint(mouse_pos) else theme.ORANGE
+        else:
+            rotate_bg_color = theme.RED_HOVER if rotate_bg_rect.collidepoint(mouse_pos) else theme.RED
+            
+        pygame.draw.rect(screen, rotate_bg_color, rotate_bg_rect, border_radius=12)
+        screen.blit(rotate_bg_surf, rotate_bg_surf.get_rect(center=rotate_bg_rect.center))
+
         # ------ FPS Settings ------
         fps_settings_surf = subtitle_font.render("Maximum FPS", True, theme.ORANGE)
         x = width // 2 + fps_settings_surf.get_width() // 2 + 400
-        y = res_settings_rect.centery + 300
+        y = res_settings_rect.centery + 100
         fps_settings_rect = fps_settings_surf.get_rect(center=(x, y))
         screen.blit(fps_settings_surf, fps_settings_rect)
 
@@ -670,7 +734,7 @@ class Renderer:
 
         # -------- Show FPS Toggle --------
         show_fps_text = "Show FPS: ON" if self.app.settings.display.show_fps else "Show FPS: OFF"
-        show_fps_surf = small_font.render(show_fps_text, True, theme.BLACK)
+        show_fps_surf = tiny_font.render(show_fps_text, True, theme.BLACK)
 
         show_fps_w = show_fps_surf.get_width() + gap_x
         show_fps_h = show_fps_surf.get_height() + gap_y
@@ -690,7 +754,7 @@ class Renderer:
         # -------- Dim Overlay --------
         dim_overlay_surf = subtitle_font.render("Dim Overlay", True, theme.ORANGE)
         x = width // 2 - dim_overlay_surf.get_width() // 2 - 400
-        y = res_settings_rect.centery + 300
+        y = res_settings_rect.centery + 100
         dim_overlay_rect = dim_overlay_surf.get_rect(center=(x, y))
         screen.blit(dim_overlay_surf, dim_overlay_rect)
 
@@ -743,7 +807,8 @@ class Renderer:
         state.ui_hitboxes["cycle_mode_left"] = mode_left_rect
         state.ui_hitboxes["cycle_mode_right"] = mode_right_rect
         state.ui_hitboxes["apply"] = apply_rect
-        
+
+        state.ui_hitboxes["toggle_rotate_bg"] = rotate_bg_rect
         state.ui_hitboxes["cycle_max_fps_left"] = max_fps_left_rect
         state.ui_hitboxes["cycle_max_fps_right"] = max_fps_right_rect
         state.ui_hitboxes["toggle_show_fps"] = show_fps_rect
@@ -761,7 +826,8 @@ class Renderer:
         title_font = self.app.fonts.get("helvetica", int(height * 0.18), bold=True)
         subtitle_font = self.app.fonts.get("helvetica", int(height * 0.06), bold=True)
         font = self.app.fonts.get("helvetica", int(height * 0.04), bold=True)
-        small_font = self.app.fonts.get("helvetica", int(height * 0.02), bold=True)
+        small_font = self.app.fonts.get("helvetica", int(height * 0.03), bold=True)
+        tiny_font = self.app.fonts.get("helvetica", int(height * 0.02), bold=True)
 
         gap_x = int(width * 0.02)
         gap_y = int(height * 0.02)
@@ -968,7 +1034,7 @@ class Renderer:
         current_y = paddle_rect.bottom + 4 * gap_y
 
         # ------ Menu BG Music ------
-        menu_bg_music_surf = subtitle_font.render("Menu bg Music", True, theme.BLUE)
+        menu_bg_music_surf = subtitle_font.render("Menu Music", True, theme.BLUE)
         x = width // 2 + 500
         y = master_rect.centery
         menu_bg_music_rect = menu_bg_music_surf.get_rect(center=(x, y))
@@ -1007,7 +1073,7 @@ class Renderer:
         current_y = menu_music_rect.bottom + 3 * gap_y
 
         # ------ Game BG Music ------
-        game_bg_music_surf = subtitle_font.render("Game bg Music", True, theme.BLUE)
+        game_bg_music_surf = subtitle_font.render("Game Music", True, theme.BLUE)
         x = menu_bg_music_rect.centerx
         y = current_y
         game_bg_music_rect = game_bg_music_surf.get_rect(center=(x, y))
@@ -1046,7 +1112,7 @@ class Renderer:
         current_y = game_music_rect.bottom + 3 * gap_y
 
         # ------ Win BG Music ------
-        win_bg_music_surf = subtitle_font.render("Win bg Music", True, theme.BLUE)
+        win_bg_music_surf = subtitle_font.render("Win Music", True, theme.BLUE)
         x = menu_bg_music_rect.centerx
         y = current_y
         win_bg_music_rect = win_bg_music_surf.get_rect(center=(x, y))
@@ -1082,6 +1148,78 @@ class Renderer:
         screen.blit(font.render(">", True, theme.BLACK),
                     font.render(">", True, theme.BLACK).get_rect(center=win_music_right_rect.center))
 
+        current_y = win_music_rect.bottom + 3 * gap_y
+
+        # ------ Lose BG Music ------
+        lose_bg_music_surf = subtitle_font.render("Lose Music", True, theme.BLUE)
+        x = menu_bg_music_rect.centerx
+        y = current_y
+        lose_bg_music_rect = lose_bg_music_surf.get_rect(center=(x, y))
+        screen.blit(lose_bg_music_surf, lose_bg_music_rect)
+
+        current_y = lose_bg_music_rect.bottom + 2 * gap_y
+        
+        # -------- Lose BG Music Cycle --------
+        lose_music_text = s.lose_track[s.lose_music].rstrip(".mp3")
+        lose_music_surf = font.render(f"{lose_music_text}", True, theme.WHITE)
+        x = menu_bg_music_rect.centerx
+        y = current_y
+        lose_music_rect = lose_music_surf.get_rect(center=(x, y))
+        screen.blit(lose_music_surf, lose_music_rect)
+
+        btn_w = font.size("<")[0] + gap_x
+        btn_h = font.size("<")[1] + gap_y
+
+        lose_music_left_rect = pygame.Rect(lose_music_rect.left - btn_w - gap_x,
+                                        current_y - btn_h // 2,
+                                        btn_w, btn_h)
+        
+        lose_music_right_rect = pygame.Rect(lose_music_rect.right + gap_x,
+                                         current_y - btn_h // 2,
+                                         btn_w, btn_h)
+        
+        lose_music_left_color = theme.GRAY_HOVER if lose_music_left_rect.collidepoint(mouse_pos) else theme.GRAY
+        lose_music_right_color = theme.GRAY_HOVER if lose_music_right_rect.collidepoint(mouse_pos) else theme.GRAY
+        pygame.draw.rect(screen, lose_music_left_color, lose_music_left_rect, border_radius=12)
+        screen.blit(font.render("<", True, theme.BLACK),
+                    font.render("<", True, theme.BLACK).get_rect(center=lose_music_left_rect.center))
+        pygame.draw.rect(screen, lose_music_right_color, lose_music_right_rect, border_radius=12)
+        screen.blit(font.render(">", True, theme.BLACK),
+                    font.render(">", True, theme.BLACK).get_rect(center=lose_music_right_rect.center))
+
+        current_y = lose_music_rect.bottom + 2 * gap_y
+
+        # -------- Randomise Music --------
+        randomise_music_text = "Randomise Music"
+        randomise_music_surf = small_font.render(randomise_music_text, True, theme.BLACK)
+
+        randomise_music_w = randomise_music_surf.get_width() + gap_x
+        randomise_music_h = randomise_music_surf.get_height() + gap_y
+        randomise_music_x = menu_bg_music_rect.centerx - randomise_music_w // 2 - 100
+        randomise_music_y = current_y
+
+        randomise_music_rect = pygame.Rect(randomise_music_x, randomise_music_y, randomise_music_w, randomise_music_h)
+        
+        randomise_music_color = theme.BLUE_HOVER if randomise_music_rect.collidepoint(mouse_pos) else theme.BLUE
+            
+        pygame.draw.rect(screen, randomise_music_color, randomise_music_rect, border_radius=12)
+        screen.blit(randomise_music_surf, randomise_music_surf.get_rect(center=randomise_music_rect.center))
+
+        # -------- Loop/Shuffle Music --------
+        loop_music_text = "Loop" if s.loop_music else "Shuffle"
+        loop_music_surf = small_font.render(loop_music_text, True, theme.BLACK)
+
+        loop_music_w = loop_music_surf.get_width() + gap_x
+        loop_music_h = loop_music_surf.get_height() + gap_y
+        loop_music_x = menu_bg_music_rect.centerx - loop_music_w // 2 + 180
+        loop_music_y = current_y
+
+        loop_music_rect = pygame.Rect(loop_music_x, loop_music_y, loop_music_w, loop_music_h)
+        
+        loop_music_color = theme.BLUE_HOVER if loop_music_rect.collidepoint(mouse_pos) else theme.BLUE            
+        pygame.draw.rect(screen, loop_music_color, loop_music_rect, border_radius=12)
+        screen.blit(loop_music_surf, loop_music_surf.get_rect(center=loop_music_rect.center))
+        
         # -------- Back Button --------
         back_surf = font.render("Back", True, theme.BLACK)
         back_w = back_surf.get_width() + gap_x
@@ -1111,7 +1249,12 @@ class Renderer:
                     
         state.ui_hitboxes["cycle_win_music_left"] = win_music_left_rect
         state.ui_hitboxes["cycle_win_music_right"] = win_music_right_rect
-        
+
+        state.ui_hitboxes["cycle_lose_music_left"] = lose_music_left_rect
+        state.ui_hitboxes["cycle_lose_music_right"] = lose_music_right_rect
+
+        state.ui_hitboxes["randomise_music"] = randomise_music_rect
+        state.ui_hitboxes["toggle_loop_music"] = loop_music_rect
         state.ui_hitboxes["toggle_paddle_sounds"] = paddle_rect
         state.ui_hitboxes["toggle_score_sounds"] = score_rect
         
@@ -1197,7 +1340,7 @@ class Renderer:
 
         screen.blit(panel_surface, (x, y))
 
-        from helpers import fit_text
+        from helpers import fit_text, draw_multicolor_text
         
         # ---------- Title ----------
         if title is not None:
@@ -1209,9 +1352,12 @@ class Renderer:
         # ---------- Header ----------
         if header is not None:
             header_font = fit_text(header, int(w * 0.9), int(h * header_size), bold=True)
-            header_surf = header_font.render(header, True, theme.WHITE)
-            header_rect = header_surf.get_rect(center=(x + w // 2, y + int(h * header_y)))
-            screen.blit(header_surf, header_rect)
+            if isinstance(header, list):
+                draw_multicolor_text(screen, header_font, header, (x + w // 2, y + int(h * header_y)))
+            else:
+                header_surf = header_font.render(header, True, theme.WHITE)
+                header_rect = header_surf.get_rect(center=(x + w // 2, y + int(h * header_y)))
+                screen.blit(header_surf, header_rect)
 
         # ---------- Button row ----------
         if buttons is not None:

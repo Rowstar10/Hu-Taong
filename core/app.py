@@ -1,4 +1,4 @@
-import os, pygame
+import os, pygame, random, time
 import pygame._sdl2 as pg_sdl2
 
 from config import BASE_W, BASE_H, RESOLUTIONS, IMAGE_DIR
@@ -43,20 +43,25 @@ class App:
         
         self.display = pygame.display.set_mode(self.current_resolution, pygame.SCALED | pygame.NOFRAME)
         self.virtual = pygame.Surface(self.base_res).convert()
-
-        self.dim_overlay = pygame.Surface(self.base_res, pygame.SRCALPHA)
-        self.dim_overlay.fill((0, 0, 0, 180))
         
+        self.FADE_BG_TIMER = pygame.USEREVENT
+        self.FADE_DELAY = pygame.USEREVENT + 2
+        self.bg_fader = pygame.time.set_timer(self.FADE_BG_TIMER, 30000)
+        self.fading_bg = False
+        
+        self.MUSIC_END = pygame.USEREVENT + 1
         pygame.mixer.init()
+        pygame.mixer.music.set_endevent(self.MUSIC_END)
+        self.ignore_music_end = False
 
         self.keys_down = set()
-        self.settings = Settings()
+        self.settings = Settings(self)
         self.state_manager = StateManager(self)
         self.renderer = Renderer(self)
         self.hud = Hud(self)
         self.ui_layout = UILayout(self)
-        self.fonts = FontManager()
-        self.sound = SoundManager()
+        self.fonts = FontManager(self)
+        self.sound = SoundManager(self)
  
         self.background_cache = {}
         self.thumbnail_cache = {}
@@ -71,13 +76,13 @@ class App:
             
             self.thumbnail_cache[name] = pygame.transform.smoothscale(
                 img, THUMB_SIZE)
+            
+        self.clock = pygame.time.Clock()
+        self.dt = 0.1
+        self.timer = 0
+        self.running = True
 
         self.state_manager.set_state("main_menu", mute = True)
-        self.sound.play("startup.wav")
-
-        self.timer = 0
-        self.clock = pygame.time.Clock()
-        self.running = True
 
     def set_icon(self):
         try:
@@ -108,66 +113,170 @@ class App:
         sy = BASE_H / win_h
         return mx * sx, my * sy
 
+    def run(self):
+        while self.running:
+            self.state_manager.process_changes()
+            self.loop()
+            self.clock_tick()
+            
+        pygame.quit()
+
+    def clock_tick(self):
+        settings = self.settings.display
+        max_fps = settings.max_fps_options[settings.max_fps]
+
+        if max_fps == "Unlimited":
+            self.dt = self.clock.tick() / 1000
+        else:
+            self.dt = self.clock.tick(max_fps) / 1000
+        
     def quit(self):
+        self.sound.play("exit_state.wav")
+        while pygame.mixer.get_busy():
+            pygame.event.poll() 
         self.running = False
+
+    def fade_backgrounds(self):
+        self.fade_timer += self.dt
+        progress = self.fade_timer / self.fade_duration
+        progress = max(0, min(progress, 1))
+
+        old_alpha = int(255 * (1 - progress))
+        new_alpha = int(255 * progress)
+
+        self.old_background.set_alpha(old_alpha)
+        self.new_background.set_alpha(new_alpha)
+
+        self.virtual.blit(self.old_background, (0, 0))
+        self.virtual.blit(self.new_background, (0, 0))
+        
+        current_state = self.state_manager.current()
+        if current_state and current_state.is_overlay:
+            for state in self.state_manager.stack[:-1]:
+                if getattr(state, "background_img", False):
+                    self.virtual.blit(self.old_background, (0, 0))
+                    self.virtual.blit(self.new_background, (0, 0))
+                state.draw(self.virtual)
+                
+        if getattr(current_state, "background_img", False):
+            self.virtual.blit(self.background_cache[current_state.background_img], (0, 0))
+
+        if progress >= 1:
+            self.fading_bg = False
         
     # ---------------- Main loop ----------------
 
-    def run(self):
-        while self.running:
-            settings = self.settings.display
-            
-            max_fps = settings.max_fps_options[settings.max_fps]
-            
-            if max_fps == "Unlimited":
-                self.dt = self.clock.tick() / 1000
-            else:
-                self.dt = self.clock.tick(max_fps) / 1000
-                
-            self.timer -= self.dt
-            
-            if settings.show_fps and self.timer <= 0:
-                self.fps = round(1 / self.dt, 1)
-                self.timer = 0.1
-            
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                    break
+    def loop(self):
+        settings = self.settings.display
+        self.timer -= self.dt
+        
+        if settings.show_fps and self.timer <= 0:
+            self.fps = round(1 / self.dt, 1)
+            self.timer = 0.1
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+                break
 
-                if event.type == pygame.KEYDOWN:
-                    self.keys_down.add(event.key)
+            if event.type == pygame.VIDEORESIZE:
+                self.current_resolution = event.w, event.h
+                self.settings.display.resolution = self.current_resolution
+                self.apply_display_mode()
+
+            if event.type == self.FADE_DELAY:
+                current_state = self.state_manager.current()
+                display = self.settings.display
+                
+                if current_state:
+                    for state in self.state_manager.stack:
+                        if getattr(state, "background_img", False):
+                            self.old_background = self.background_cache[state.background_img]
+                            state.background_img = random.choice(display.backgrounds)
+                            self.new_background = self.background_cache[state.background_img]
+
+                            from core.states.game_state import GameState
+                            if isinstance(state, GameState):
+                                display.game_background = display.backgrounds.index(state.background_img)
+                            else:
+                                display.menu_background = display.backgrounds.index(state.background_img)
+                                
+                            break
+                
+                self.fading_bg = True
+                self.fade_duration = 5
+                self.fade_timer = 0
+                
+                pygame.time.set_timer(self.FADE_BG_TIMER, 30000)
+                
+            elif event.type == self.FADE_BG_TIMER and self.settings.display.rotate_backgrounds:
+                delay = random.randint(0, 30000)
+                pygame.time.set_timer(self.FADE_DELAY, delay, 1)
+                
+            if event.type == self.MUSIC_END:
+                if self.ignore_music_end:
+                    self.ignore_music_end = False
+                    continue
+                
+                audio = self.settings.audio                
+                if audio.loop_music:
+                    if self.sound.music_type == "menu":
+                        music = audio.menu_track[audio.menu_music]
+                    elif self.sound.music_type == "game":
+                        music = audio.game_track[audio.game_music]
+                    elif self.sound.music_type == "win":
+                        music = audio.win_track[audio.win_music]
+                    elif self.sound.music_type == "lose":
+                        music = audio.lose_track[audio.lose_music]
+                else:
+                    if self.sound.music_type == "menu":
+                        music = random.choice(audio.menu_track)
+                        audio.menu_music = audio.menu_track.index(music)
+                    elif self.sound.music_type == "game":
+                        music = random.choice(audio.game_track)
+                        audio.game_music = audio.game_track.index(music)
+                    elif self.sound.music_type == "win":
+                        music = random.choice(audio.win_track)
+                        audio.win_music = audio.win_track.index(music)
+                    elif self.sound.music_type == "lose":
+                        music = random.choice(audio.lose_track)
+                        audio.lose_music = audio.lose_track.index(music)
                     
-                if event.type == pygame.KEYUP:
-                    self.keys_down.discard(event.key)   
-    
-                self.state_manager.handle_event(event)
+                self.sound.play_music(music)
+                                
+            if event.type == pygame.KEYDOWN:
+                self.keys_down.add(event.key)
                 
-            self.state_manager.update(self.dt)
+            if event.type == pygame.KEYUP:
+                self.keys_down.discard(event.key)   
 
+            self.state_manager.handle_event(event)
+            
+        self.state_manager.update(self.dt)
+
+        if self.fading_bg:
+            self.fade_backgrounds()
+            
+        else:
             current_state = self.state_manager.current()
             if current_state and current_state.is_overlay:
                 for state in self.state_manager.stack[:-1]:
                     if getattr(state, "background_img", False):
                         self.virtual.blit(self.background_cache[state.background_img], (0, 0))
                     state.draw(self.virtual)
-                self.virtual.blit(self.dim_overlay, (0, 0))
-                
             if getattr(current_state, "background_img", False):
                 self.virtual.blit(self.background_cache[current_state.background_img], (0, 0))
 
-            dim = pygame.Surface(self.base_res, pygame.SRCALPHA)
-            dim.fill((0, 0, 0, 255 * settings.dim))
-            self.virtual.blit(dim, (0, 0))
-            
-            self.state_manager.draw(self.virtual)
+        dim = pygame.Surface(self.base_res, pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 255 * settings.dim))
+        self.virtual.blit(dim, (0, 0))
+        
+        self.state_manager.draw(self.virtual)
 
-            if settings.show_fps:
-                font = pygame.font.SysFont("Helvetica", int(BASE_H * 0.02), bold = True)
-                fps_surf = font.render(f"{self.fps} FPS", True, theme.WHITE)
-                self.virtual.blit(fps_surf, (BASE_W - 3 * fps_surf.get_width() // 2, BASE_H - 2 * fps_surf.get_height()))
-            
-            pygame.transform.scale(self.virtual, self.current_resolution, self.display)            
-            pygame.display.flip()
-            
-        pygame.quit()      
+        if settings.show_fps:
+            font = pygame.font.SysFont("Helvetica", int(BASE_H * 0.02), bold = True)
+            fps_surf = font.render(f"{self.fps} FPS", True, theme.WHITE)
+            self.virtual.blit(fps_surf, (BASE_W - 3 * fps_surf.get_width() // 2, BASE_H - 2 * fps_surf.get_height()))
+        
+        pygame.transform.scale(self.virtual, self.current_resolution, self.display)         
+        pygame.display.flip()

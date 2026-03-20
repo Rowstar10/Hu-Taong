@@ -14,6 +14,7 @@ class GameState(State):
 
     def enter(self, **kwargs):
         super().enter(**kwargs)
+        self.app.sound.play("startup2.wav")
         if not self.game:
             self.game = Hu_Taong(self.app)
             self.game.start()

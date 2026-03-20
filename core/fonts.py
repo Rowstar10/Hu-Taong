@@ -3,7 +3,8 @@ import pygame
 
 class FontManager:
 
-    def __init__(self):
+    def __init__(self, app):
+        self.app = app
         self.cache = {}
 
     def get(self, name="helvetica", size=24, bold=False, italic=False):

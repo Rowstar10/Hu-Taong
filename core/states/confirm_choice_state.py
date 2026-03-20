@@ -42,7 +42,7 @@ class ConfirmChoiceState(State):
             self.action()
             
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.pop_state()
+            self.pop_state(mute = True)
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = self.app.window_to_base(event.pos)

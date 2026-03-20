@@ -1,3 +1,4 @@
+import random
 from dataclasses import dataclass
 
 from config import BASE_W, BASE_H
@@ -25,11 +26,15 @@ class GameBase:
     def start(self):
         self.objects.clear()
         self.build_world()
+
+        self.app.loop()
+        self.app.clock_tick()
+        
         self.running = True
         self.paused = False
         
-        s = self.app.settings.audio
-        music = s.game_track[s.game_music]
+        audio = self.app.settings.audio
+        music = audio.game_track[audio.game_music]
         self.app.sound.play_music(music, music_type = "game")
         
         self.start_countdown(3)

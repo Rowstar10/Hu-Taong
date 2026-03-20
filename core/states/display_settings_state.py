@@ -95,6 +95,9 @@ class DisplaySettingsState(State):
                 self.app.display_mode = self.app.display_modes[self.display_mode_index]
                 
                 self.app.apply_display_mode()
+
+            if key == "toggle_rotate_bg":
+                settings.rotate_backgrounds = not settings.rotate_backgrounds
                 
             if key == "cycle_max_fps_left":
                 settings.max_fps = (settings.max_fps - 1) % len(settings.max_fps_options)

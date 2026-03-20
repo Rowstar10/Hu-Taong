@@ -74,20 +74,23 @@ class Hu_Taong(GameBase):
             self.message_text = f"{self.p2.color1} scored!"
             self.message_color = (60, 140, 255)
             
-            if self.p2.score >= win_score:
+            if not win_score == "Endless Mode" and self.p2.score >= win_score:
                 if not settings.win_by_two or self.p2.score >= self.p1.score + 2:
-                    self.app.state_manager.push_state("win", p1=self.p1, p2=self.p2, winner=self.p2.color1)
+                    self.app.state_manager.push_state(
+                        "win", p1 = self.p1, p2 = self.p2,
+                        winner=self.p2, loser=self.p1)
                     return
-                    
                     
         elif nx == -1:
             self.p1.score += 1
             self.message_text = f"{self.p1.color1} scored!"
             self.message_color = (255, 80, 80)
             
-            if self.p1.score >= win_score:
+            if not win_score == "Endless Mode" and self.p1.score >= win_score:
                 if not settings.win_by_two or self.p1.score >= self.p2.score + 2:
-                    self.app.state_manager.push_state("win", p1=self.p1, p2=self.p2, winner=self.p1.color1)
+                    self.app.state_manager.push_state(
+                        "win", p1 = self.p1, p2 = self.p2,
+                        winner=self.p1, loser=self.p2)
                     return
    
         else:
@@ -104,6 +107,10 @@ class Hu_Taong(GameBase):
     def reset_round(self):
         for obj in self.objects:
             obj.reset()
+            
+        self.message_text = ""
+        self.message_timer = 0.0
+        
         self.start_countdown(3)
 
     def update(self, dt):
@@ -111,8 +118,6 @@ class Hu_Taong(GameBase):
         if self.message_timer > 0:
             self.message_timer -= dt
             if self.message_timer <= 0:
-                self.message_timer = 0
-                self.message_text = ""
                 self.reset_round()
 
     def apply_gameplay_settings(self):

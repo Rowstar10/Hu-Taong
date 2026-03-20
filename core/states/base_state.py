@@ -29,7 +29,7 @@ class State:
         pass
 
     def draw(self, screen):
-        self.ui_hitboxes.clear
+        self.ui_hitboxes.clear()
         if not self.is_overlay:
             settings = self.app.settings.display
             if self.is_game:

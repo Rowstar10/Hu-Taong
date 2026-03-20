@@ -2,6 +2,22 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 0.7 — 2026-03-20
+
+Endless Mode and a bigger soundtrack.
+
+### Added
+- Endless Mode: play with no score limit, either as the winning score or by carrying on after a match ends.
+- Separate win and lose music, and Loop or Shuffle for the music.
+- Randomise buttons for the music, and Randomise All for random ball and paddle speeds and sizes.
+- Reset All, to put the settings back to their defaults.
+- Rotate: the background fades to a different picture every so often.
+- Red-wins and Blue-wins announcements, a losing sound, a shutdown sound and a second win sound.
+- 9 new music tracks (16 in all). Relaxed Tao is now three tracks.
+
+### Changed
+- Winning score choices are now 3, 5, 11, 15, 21 or Endless (were 1, 3, 5, 10, 15 or 20).
+
 ## 0.6 — 2026-03-14
 
 Settings, music and backgrounds.
