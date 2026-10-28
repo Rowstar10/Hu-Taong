@@ -71,8 +71,7 @@ class DisplaySettings:
                             "bg11.png",
                             "bg12.png"]
 
-        self.menu_background = self.backgrounds.index(random.choice(self.backgrounds))
-        self.game_background = self.backgrounds.index(random.choice(self.backgrounds))
+        self.background = self.backgrounds.index(random.choice(self.backgrounds))
         self.rotate_backgrounds = True
 
 class AudioSettings:

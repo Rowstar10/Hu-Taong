@@ -2,17 +2,16 @@ import pygame, math
 
 from config import BASE_W, BASE_H
 from render import theme
-from core.state_registry import StateRegistry
 from render.ui.background_thumbnail import BackgroundThumbnail
 from core.states.base_state import State
 
-@StateRegistry.register_state("background_selection")
+
 class BackgroundSelectionState(State):
-
-    def __init__(self, app, target):
+    NAME = "background_selection"
+    is_menu = True
+    
+    def __init__(self, app):
         super().__init__(app)
-
-        self.target = target
         self.buttons = []
 
     def enter(self, **kwargs):
@@ -55,8 +54,8 @@ class BackgroundSelectionState(State):
     def draw(self, screen):
         super().draw(screen)
         mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
-        font = pygame.font.SysFont("Helvetica", int(BASE_H * 0.1), bold=True)
-        surf = font.render(f"Choose a {self.target} background", True, theme.ORANGE)
+        font = self.app.font_manager.get("helvetica", int(BASE_H * 0.1), bold=True)
+        surf = font.render(f"Choose a background", True, theme.ORANGE)
         
         gap_x = int(BASE_W * 0.02)
         gap_y = int(BASE_H * 0.02)
@@ -73,7 +72,7 @@ class BackgroundSelectionState(State):
             button.draw(screen)
 
         # -------- Back Button --------
-        font = pygame.font.SysFont("Helvetica", int(BASE_H * 0.05), bold=True)
+        font = self.app.font_manager.get("helvetica", int(BASE_H * 0.05), bold=True)
         back_surf = font.render("Back", True, theme.BLACK)
         back_w = back_surf.get_width() + gap_x
         back_h = back_surf.get_height() + gap_y
@@ -104,11 +103,9 @@ class BackgroundSelectionState(State):
 
     def select_background(self, index):
         settings = self.app.settings.display
-
-        if self.target == "menu":
-            settings.menu_background = index
-        else:
-            settings.game_background = index
+        settings.background = index
+        new_bg_name = settings.backgrounds[index]
+        self.app.bg_current = self.app.background_cache[new_bg_name]
 
         self.app.state_manager.pop_state(mute = True)
-        self.app.sound.play("enter_state.wav")
+        self.app.sound_manager.play("enter_state.wav")

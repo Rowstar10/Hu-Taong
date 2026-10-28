@@ -1,10 +1,9 @@
 import pygame
 
-from core.state_registry import StateRegistry
 from core.states.base_state import State
 
-@StateRegistry.register_state("settings")
 class SettingsState(State):
+    NAME = "settings"
     is_menu = True
         
     def draw(self, screen):

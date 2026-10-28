@@ -1,13 +1,26 @@
-import pygame
-
-from .states import MainMenuState, GameState, PauseState, SettingsState, GameplaySettingsState, DisplaySettingsState, AudioSettingsState, ConfirmChoiceState, BackgroundSelectionState
-from core.state_registry import StateRegistry
+import pygame, pkgutil, importlib, inspect
 
 class StateManager:
+    registry = {}
+    
     def __init__(self, app):
         self.app = app
         self.stack = []
         self.pending_actions = []
+
+    @classmethod
+    def register(cls, name, state_cls):
+        if name in cls.registry:
+            raise ValueError(f"State '{name}' is already registered")
+        cls.registry[name] = state_cls
+
+    @classmethod
+    def create(cls, name, app, **kwargs):
+        if name not in cls.registry:
+            raise ValueError(f"State '{name}' is not registered")
+        spec = inspect.signature(cls.registry[name].__init__).parameters
+        filtered = {k: v for k, v in kwargs.items() if k in spec}
+        return cls.registry[name](app, **filtered)
     
     def process_changes(self):
         if not self.pending_actions:
@@ -20,23 +33,17 @@ class StateManager:
                 while self.stack:
                     state = self.stack.pop()
                     state.exit(**kwargs)
-                state = StateRegistry.create(state_name, self.app, **kwargs)
+                state = StateManager.create(state_name, self.app, **kwargs)
                 self.stack.append(state)
-                #self.app.loop()
-                #self.app.clock_tick()
                 state.enter(**kwargs)
                 
             elif action == "push":
-                state = StateRegistry.create(state_name, self.app, **kwargs)
+                state = StateManager.create(state_name, self.app, **kwargs)
                 self.stack.append(state)
-                #self.app.loop()
-                #self.app.clock_tick()
                 state.enter(**kwargs)
 
             elif action == "pop" and self.stack:
                 state = self.stack.pop()
-                #self.app.loop()
-                #self.app.clock_tick()
                 state.exit(**kwargs)
 
             elif action == "clear":
@@ -46,6 +53,10 @@ class StateManager:
                         state.exit(**kwargs)
                     else:
                         state.exit(mute = True, **kwargs)
+                        
+        current_state = self.current()
+        if getattr(current_state, "background_img", None):
+            self.app.bg_current = self.app.background_cache[current_state.background_img]
 
     def set_state(self, state_name, **kwargs):
         self.pending_actions.append(("set", state_name, kwargs))
@@ -79,3 +90,30 @@ class StateManager:
     def draw(self, screen):
         if self.stack:
             self.stack[-1].draw(screen)
+
+    @classmethod
+    def auto_register(cls, package_name, base_class):
+        package = importlib.import_module(package_name)
+
+        for module_info in pkgutil.iter_modules(package.__path__):
+            module_name = module_info.name
+
+            if module_name.startswith("_") or module_name == "base_state":
+                continue
+
+            module = importlib.import_module(f"{package_name}.{module_name}")
+
+            for _, obj in inspect.getmembers(module, inspect.isclass):
+                if (not issubclass(obj, base_class)
+                    or not getattr(obj, "REGISTER", False)
+                    or obj is base_class
+                    or obj.__module__ != module.__name__):
+                    continue
+
+                state_name = getattr(obj, "NAME", None)
+
+                if state_name is None:
+                    raise ValueError(f"{obj.__name__} must define NAME = 'your_state_name'")
+
+                cls.register(state_name, obj)
+                print(f"[StateManager] Registered '{state_name}' -> {obj.__name__}")

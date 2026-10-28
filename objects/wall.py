@@ -5,7 +5,11 @@ class Wall(GameObject):
     body_type = STATIC
     is_wall = True
 
-    def __init__(self, game, x0, y0, x1, y1, color = None, is_goal = False, is_separator = False):
+    def __init__(self, game, x0, y0, x1, y1,
+                 color = None,
+                 is_goal = False,
+                 is_separator = False):
+        
         width = x1 - x0
         height = y1 - y0
         super().__init__(game, width, height, x0, y0,

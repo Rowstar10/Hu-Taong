@@ -1,18 +1,17 @@
 import pygame
 
-from core.state_registry import StateRegistry
 from core.states.base_state import State
 
-@StateRegistry.register_state("main_menu")
 class MainMenuState(State):
+    NAME = "main_menu"
     is_menu = True
 
     def enter(self, **kwargs):
         audio = self.app.settings.audio
-        sound = self.app.sound
+        sound_manager = self.app.sound_manager
         music = audio.menu_track[audio.menu_music]
-        sound.play("startup.wav")
-        sound.play_music(music, music_type = "menu")
+        sound_manager.play("startup.wav")
+        sound_manager.play_music(music, music_type = "menu")
     
     def exit(self, **kwargs):
         super().exit(**kwargs)

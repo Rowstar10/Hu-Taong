@@ -2,6 +2,15 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 0.8 — 2026-10-28
+
+A behind-the-scenes rebuild of the menus and sound.
+
+### Changed
+- Menus, text and the HUD now scale properly when the window size changes.
+- One Background setting with its own picker screen, instead of separate menu and game backgrounds.
+- The menu drawing, font and sound code was rebuilt and shared between screens, ready for the bigger changes that followed.
+
 ## 0.7 — 2026-03-20
 
 Endless Mode and a bigger soundtrack.

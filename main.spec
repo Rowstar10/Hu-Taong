@@ -1,4 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_submodules
+
+hiddenimports = []
+hiddenimports += collect_submodules('states')
 
 
 a = Analysis(
@@ -6,7 +10,7 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[('Resources', 'Resources')],
-    hiddenimports=[],
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

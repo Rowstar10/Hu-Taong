@@ -2,32 +2,32 @@ import pygame
 
 from render import theme
 from core.states.base_state import State
-from core.state_registry import StateRegistry
 
-@StateRegistry.register_state("win")
 class WinState(State):
+    NAME = "win"
+    is_menu = True
     is_overlay = True
     
     def __init__(self, app, p1, p2, winner, loser):
         super().__init__(app)
 
         audio = self.app.settings.audio
-        sound = self.app.sound
+        sound_manager = self.app.sound_manager
         if not winner.ai_enabled and loser.ai_enabled:
-            sound.play("you_win.wav")
+            sound_manager.play("you_win.wav")
             music = audio.win_track[audio.win_music]
-            sound.play_music(music, music_type = "win")
+            sound_manager.play_music(music, music_type = "win")
             
         elif not loser.ai_enabled and winner.ai_enabled:
-            sound.play("you_lose.wav")
+            sound_manager.play("you_lose.wav")
             music = audio.lose_track[audio.lose_music]
-            sound.play_music(music, music_type = "lose")
+            sound_manager.play_music(music, music_type = "lose")
             
         else:
             snd = "red_wins.wav" if winner == p1 else "blue_wins.wav"
-            sound.play(snd)
+            sound_manager.play(snd)
             music = audio.win_track[audio.win_music]
-            sound.play_music(music, music_type = "win")
+            sound_manager.play_music(music, music_type = "win")
 
         self.p1 = p1
         self.p2 = p2
@@ -71,7 +71,7 @@ class WinState(State):
 
         gameplay = self.app.settings.gameplay
         audio = self.app.settings.audio
-        sound = self.app.sound
+        sound_manager = self.app.sound_manager
         
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
@@ -88,10 +88,10 @@ class WinState(State):
                             action = lambda: (game_state.restart(),
                                               self.pop_state(mute = True),
                                               self.pop_state(mute = True),
-                                              sound.play("enter_state.wav"),
-                                              sound.play_music(music, music_type = "game"))
+                                              sound_manager.play("enter_state.wav"),
+                                              sound_manager.play_music(music, music_type = "game"))
                             
-                            self.push_state("confirm_choice", action = action, header = "Reset Game?", mute = True)
+                            self.push_state("confirm_choice", action = action, header = "Play Again?", mute = True)
                             
                     if key == "continue":
                         from core.states.game_state import GameState
@@ -106,8 +106,8 @@ class WinState(State):
                                               self.pop_state(mute = True),
                                               self.pop_state(mute = True),
                                               game_state.game.reset_round(),
-                                              sound.play("enter_state.wav"),
-                                              sound.play_music(music, music_type = "game"))
+                                              sound_manager.play("enter_state.wav"),
+                                              sound_manager.play_music(music, music_type = "game"))
 
                             self.push_state("confirm_choice", action = action, header = "Enter Endless Mode?", mute = True)
                         
@@ -115,5 +115,5 @@ class WinState(State):
                         self.push_state("settings")
                         
                     if key == "main_menu":
-                        action = lambda: (self.app.sound.play("exit_state.wav"), self.set_state("main_menu", mute = True))
+                        action = lambda: (self.app.sound_manager.play("exit_state.wav"), self.set_state("main_menu", mute = True))
                         self.push_state("confirm_choice", action = action, header = "Return to Main Menu?", mute = True)

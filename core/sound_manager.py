@@ -54,5 +54,6 @@ class SoundManager:
         volume = self.music_volume * self.master_volume * self.multiplier
         volume = max(0, min(volume, 1))
         pygame.mixer.music.set_volume(volume)
+        print(volume, pygame.mixer.music.get_volume())
 
         

@@ -1,14 +1,13 @@
 import pygame
 
 from core.states.game_state import GameState
-from core.state_registry import StateRegistry
 from core.states.base_state import State
 from render import theme
 
-@StateRegistry.register_state("pause")
 class PauseState(State):
-    is_overlay = True
+    NAME = "pause"
     is_menu = True
+    is_overlay = True
 
     def __init__(self, app):
         super().__init__(app)
@@ -16,16 +15,16 @@ class PauseState(State):
         self.ui_cols = 2
 
     def enter(self, **kwargs):
-        sound = self.app.sound
-        sound.play("startup2.wav")
-        sound.multiplier = 0.1
-        sound.update_music_volume()
+        sound_manager = self.app.sound_manager
+        sound_manager.play("startup2.wav")
+        sound_manager.multiplier = 0.1
+        sound_manager.update_music_volume()
     
     def exit(self, **kwargs):
         super().exit(**kwargs)
-        sound = self.app.sound
-        sound.multiplier = 1
-        sound.update_music_volume()
+        sound_manager = self.app.sound_manager
+        sound_manager.multiplier = 1
+        sound_manager.update_music_volume()
         
     def update(self, dt):
         pass
@@ -61,14 +60,14 @@ class PauseState(State):
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
             self.pop_state(mute = True)
-            self.app.sound.play("shutdown.wav")
+            self.app.sound_manager.play("shutdown.wav")
             
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.pop_state(mute = True)
-            self.app.sound.play("shutdown.wav")
+            self.app.sound_manager.play("shutdown.wav")
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            sound = self.app.sound
+            sound_manager = self.app.sound_manager
             mouse_pos = self.app.window_to_base(event.pos)
             key = self.hit_test(mouse_pos)
 
@@ -80,14 +79,14 @@ class PauseState(State):
 
             if key == "resume":
                 self.pop_state(mute = True)
-                self.app.sound.play("shutdown.wav")
+                self.app.sound_manager.play("shutdown.wav")
                 
             if key == "reset":                                
                 if self.game_state:
                     action = lambda: (self.game_state.restart(),
                                       self.pop_state(mute = True),
                                       self.pop_state(mute = True),
-                                      sound.play("enter_state.wav"))
+                                      sound_manager.play("enter_state.wav"))
                     
                     self.push_state("confirm_choice", action = action, header = "Reset Game?", mute = True)
                     
@@ -95,5 +94,5 @@ class PauseState(State):
                 self.push_state("settings")
                 
             if key == "main_menu":
-                action = lambda: (sound.play("exit_state.wav"), self.set_state("main_menu", mute = True))
+                action = lambda: (sound_manager.play("exit_state.wav"), self.set_state("main_menu", mute = True))
                 self.push_state("confirm_choice", action = action, header = "Return to Main Menu?", mute = True)

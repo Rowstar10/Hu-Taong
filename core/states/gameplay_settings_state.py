@@ -1,11 +1,10 @@
 import pygame, random
 
-from core.state_registry import StateRegistry
 from core.states.base_state import State
 from core.states.game_state import GameState
 
-@StateRegistry.register_state("gameplay")
 class GameplaySettingsState(State):
+    NAME = "gameplay"
     is_menu = True
 
     def __init__(self, app):

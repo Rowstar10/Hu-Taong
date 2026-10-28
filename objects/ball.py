@@ -31,15 +31,15 @@ class Ball(GameObject):
 
     def on_contact(self, other, data):
         nx, ny = data["normal"]
-        sound = self.game.app.sound
+        sound_manager = self.game.app.sound_manager
         
         if other.is_paddle:
             paddle = other
 
             if self.last_paddle is not paddle:
                 self.rally_value += 1
-                if sound.paddle_hit_sound:
-                    sound.play(paddle.sound)
+                if sound_manager.paddle_hit_sound:
+                    sound_manager.play(paddle.sound)
 
             self.last_paddle = paddle
 

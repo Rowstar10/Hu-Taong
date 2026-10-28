@@ -1,11 +1,10 @@
 import pygame
 
-from core.state_registry import StateRegistry
 from core.states.base_state import State
 from render import theme
 
-@StateRegistry.register_state("confirm_choice")
 class ConfirmChoiceState(State):
+    NAME = "confirm_choice"
     is_overlay = True
     is_menu = True
 

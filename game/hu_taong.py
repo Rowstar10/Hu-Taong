@@ -25,8 +25,8 @@ class Hu_Taong(GameBase):
         # Walls & Separator
         self.top_wall = Wall(self, -10, -10, BASE_W + 10, 0)
         self.bottom_wall = Wall(self, -10, BASE_H, BASE_W + 10, BASE_H + 10)
-        self.left_wall = Wall(self, -10, -10, 5, BASE_H + 10, color = "Red", is_goal = True)
-        self.right_wall = Wall(self, BASE_W - 5, -10, BASE_W + 10, BASE_H + 10, color = "Blue", is_goal = True)
+        self.left_wall = Wall(self, -10, -10, 5, BASE_H + 10, color = theme.RED, is_goal = True)
+        self.right_wall = Wall(self, BASE_W - 5, -10, BASE_W + 10, BASE_H + 10, color = theme.BLUE, is_goal = True)
         self.separator = Wall(self, BASE_W / 2, -10, BASE_W / 2, BASE_H + 10, is_separator = True)
 
         settings = self.app.settings.gameplay
@@ -66,7 +66,7 @@ class Hu_Taong(GameBase):
         self.pause()
         nx, _ny = data["normal"]
         settings = self.app.settings.gameplay
-        sound = self.app.sound
+        sound_manager = self.app.sound_manager
         win_score = settings.winning_scores[settings.winning_score_index]
 
         if nx == 1:
@@ -96,8 +96,8 @@ class Hu_Taong(GameBase):
         else:
             return
         
-        if sound.score_sound:
-            self.app.sound.play("euugh.wav")
+        if sound_manager.score_sound:
+            self.app.sound_manager.play("euugh.wav")
 
         obj.spawn_vx = nx * obj.speed
         obj.spawn_vy = random.choice([1, -1]) * obj.speed

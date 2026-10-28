@@ -35,7 +35,7 @@ class GameBase:
         
         audio = self.app.settings.audio
         music = audio.game_track[audio.game_music]
-        self.app.sound.play_music(music, music_type = "game")
+        self.app.sound_manager.play_music(music, music_type = "game")
         
         self.start_countdown(3)
 
@@ -66,7 +66,7 @@ class GameBase:
         self.countdown = Countdown(remaining = float(seconds), shown_value = int(seconds))
         self.countdown_on_finish = on_finish
         self.paused = True
-        self.app.sound.play("countdown_tick.wav") 
+        self.app.sound_manager.play("countdown_tick.wav") 
 
     def tick_countdown(self, dt):
         cd = self.countdown
@@ -77,12 +77,12 @@ class GameBase:
         new_shown = int(cd.remaining + 0.999)
         if new_shown != cd.shown_value:
             cd.shown_value = max(0, new_shown)
-            self.app.sound.play("countdown_tick.wav")
+            self.app.sound_manager.play("countdown_tick.wav")
 
         if cd.remaining <= 0:
             self.countdown = None
             self.paused = False
-            self.app.sound.play("countdown_go.wav")
+            self.app.sound_manager.play("countdown_go.wav")
             if self.countdown_on_finish:
                 self.countdown_on_finish()
                 self.countdown_on_finish = None

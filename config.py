@@ -29,7 +29,7 @@ HALF_PI = math.pi / 2
 MAX_BOUNCE_ANGLE = math.radians(60)
 MAX_CPF = 5
 
-# Body types
+# -------- Body types --------
 DYNAMIC = 0
 KINEMATIC = 1
 STATIC = 2

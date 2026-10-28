@@ -1,42 +1,32 @@
 import pygame
 
 from config import BASE_W, BASE_H
-from core.state_registry import StateRegistry
 from render.ui.background_thumbnail import BackgroundThumbnail
 from core.states.base_state import State
 from core.states.background_selection_state import BackgroundSelectionState
 
-@StateRegistry.register_state("display")
 class DisplaySettingsState(State):
+    NAME = "display"
     is_menu = True
 
     def __init__(self, app):
         super().__init__(app)
         settings = self.app.settings.display
-        self.menu_name = settings.backgrounds[settings.menu_background]
-        self.game_name = settings.backgrounds[settings.game_background]
         self.dragging_dim = False
-
-        menu_x = BASE_W // 2 - 256 - 50
-        menu_y = BASE_H - 280
 
         self.res_index = self.app.res_index
         self.display_mode_index = self.app.display_mode_index
         
-        self.menu_thumb = BackgroundThumbnail(
-            rect=(menu_x, menu_y, 256, 144),
-            image=self.app.thumbnail_cache[self.menu_name],
-            action=lambda: self.open_background_selector("menu"))
-        
-        game_x = BASE_W // 2 + 50
-        game_y = BASE_H - 280
-        
-        self.game_thumb = BackgroundThumbnail(
-            rect=(game_x, game_y, 256, 144),
-            image=self.app.thumbnail_cache[self.game_name],
-            action=lambda: self.open_background_selector("game"))
+        menu_x = (BASE_W - 256) // 2
+        menu_y = BASE_H - 340
 
-        self.thumbnails = [self.menu_thumb, self.game_thumb]
+        self.bg_name = settings.backgrounds[settings.background]
+        self.bg_thumb = BackgroundThumbnail(
+            rect=(menu_x, menu_y, 256, 144),
+            image=self.app.bg_current,
+            action=lambda: self.open_background_selector())
+
+        self.thumbnails = [self.bg_thumb]
         
     def draw(self, screen):
         super().draw(screen)
@@ -46,11 +36,8 @@ class DisplaySettingsState(State):
         
         mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
 
-        self.menu_name = settings.backgrounds[settings.menu_background]
-        self.game_name = settings.backgrounds[settings.game_background]
-        
-        self.menu_thumb.image = self.app.thumbnail_cache[self.menu_name]
-        self.game_thumb.image = self.app.thumbnail_cache[self.game_name]
+        self.bg_name = settings.backgrounds[settings.background]
+        self.bg_thumb.image = self.app.thumbnail_cache[self.bg_name]
         
         for thumb in self.thumbnails:
             thumb.update(mouse_pos)
@@ -119,5 +106,5 @@ class DisplaySettingsState(State):
         if event.type == pygame.MOUSEMOTION and self.dragging_dim:
             settings.dim = self.update_slider_from_mouse("dim_slider", event)
 
-    def open_background_selector(self, target):
-        self.app.state_manager.push_state("background_selection", target=target)
+    def open_background_selector(self):
+        self.app.state_manager.push_state("background_selection")

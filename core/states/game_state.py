@@ -1,11 +1,10 @@
 import pygame
 
-from core.state_registry import StateRegistry
 from core.states.base_state import State
 from game.hu_taong import Hu_Taong
 
-@StateRegistry.register_state("game")
 class GameState(State):
+    NAME = "game"
     is_game = True
     
     def __init__(self, app):
@@ -14,7 +13,7 @@ class GameState(State):
 
     def enter(self, **kwargs):
         super().enter(**kwargs)
-        self.app.sound.play("startup2.wav")
+        self.app.sound_manager.play("startup2.wav")
         if not self.game:
             self.game = Hu_Taong(self.app)
             self.game.start()

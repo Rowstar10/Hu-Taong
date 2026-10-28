@@ -1,10 +1,9 @@
 import pygame, random
 
-from core.state_registry import StateRegistry
 from core.states.base_state import State
 
-@StateRegistry.register_state("audio")
 class AudioSettingsState(State):
+    NAME = "audio"
     is_menu = True
 
     def __init__(self, app):
@@ -21,7 +20,7 @@ class AudioSettingsState(State):
         super().handle_event(event)
 
         audio = self.app.settings.audio
-        sound = self.app.sound
+        sound = self.app.sound_manager
         
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.pop_state()
