@@ -1,10 +1,15 @@
 import pygame
 
+from core import save_data
 from core.states.base_state import State
 
 class SettingsState(State):
     NAME = "settings"
     is_menu = True
+
+    def exit(self, **kwargs):
+        super().exit(**kwargs)
+        save_data.save(self.app)
         
     def draw(self, screen):
         super().draw(screen)

@@ -1,4 +1,5 @@
 import random
+from pathlib import Path
 
 class Settings:
     def __init__(self, app):
@@ -38,6 +39,10 @@ class GameplaySettings:
         self.ball_speed_range = self.ball_speed_max - self.ball_speed_min
         self.ball_speed = (self.ball_speed_min + self.ball_speed_max) // 2
 
+        # Match setup (chosen on the Match Setup screen)
+        self.vs_ai = True            # True: you play one paddle and the AI takes the other.
+        self.play_as_blue = False    # Which paddle is yours vs the AI (Red: W A S D, Blue: Arrow Keys).
+
         # Match rules
         self.winning_scores = [3, 5, 11, 15, 21, "Endless Mode"]
         self.winning_score_index = 2
@@ -46,6 +51,44 @@ class GameplaySettings:
         # AI
         self.ai_difficulties = ["Baby", "Easy", "Normal", "Hard", "Insane"]
         self.ai_difficulty = 2
+        self.adaptive_ai = False
+
+        # Chaos mode: new random ball/paddle settings every round.  The player's own
+        # values are kept in _chaos_backup and put back when the match ends.
+        self.chaos_mode = False
+        self._chaos_backup = None
+
+    CHAOS_KEYS = ("ball_speed", "ball_diameter", "paddle_height", "paddle_width", "paddle_speed")
+
+    def stored(self, name):
+        """The player's own value for a setting, even while chaos mode has it borrowed."""
+        if self._chaos_backup is not None and name in self._chaos_backup:
+            return self._chaos_backup[name]
+        return getattr(self, name)
+
+    def chaos_roll(self):
+        if self._chaos_backup is None:
+            self._chaos_backup = {key: getattr(self, key) for key in self.CHAOS_KEYS}
+        self.ball_speed = self.ball_speed_min + random.random() * self.ball_speed_range
+        self.ball_diameter = self.ball_diameter_min + random.random() * self.ball_diameter_range
+        self.paddle_speed = self.paddle_speed_min + random.random() * self.paddle_speed_range
+        t = random.random()
+        self.paddle_height = self.paddle_height_min + t * self.paddle_height_range
+        self.paddle_width = self.paddle_width_min + t * self.paddle_width_range
+
+    def chaos_restore(self):
+        if self._chaos_backup is not None:
+            for key, value in self._chaos_backup.items():
+                setattr(self, key, value)
+            self._chaos_backup = None
+
+    def ai_level(self, own_score, opponent_score):
+        """AI difficulty to use right now.  With adaptive AI it drops a level for every
+        3 points the AI is ahead, and rises one for every 3 it is behind."""
+        if not self.adaptive_ai:
+            return self.ai_difficulty
+        level = round(self.ai_difficulty - (own_score - opponent_score) / 3)
+        return max(0, min(len(self.ai_difficulties) - 1, level))
 
 class DisplaySettings:
     def __init__(self, app):
@@ -77,38 +120,41 @@ class DisplaySettings:
 class AudioSettings:
     def __init__(self, app):
         self.app = app
-        
-        self.menu_track = ["Lofi Hiphop Tao.mp3",
-                           "Lofi Vibe.mp3",
-                           "Relaxed Tao 1.mp3",
-                           "Relaxed Tao 2.mp3",
-                           "Relaxed Tao 3.mp3",
-                           "Retro Relax.mp3",
-                           "Living Beware.mp3"]
 
-        self.game_track = ["Living Beware.mp3",
-                           "Hillichurl REMIX.mp3",
-                           "Epic Conquest.mp3",
-                           "Lofi Hiphop Tao.mp3",
-                           "Lofi Vibe.mp3",
-                           "Relaxed Tao 1.mp3",
-                           "Relaxed Tao 2.mp3",
-                           "Relaxed Tao 3.mp3",
-                           "Arcade Retro.mp3",
-                           "Operation Awesome.mp3"]
+        # One jukebox.  Each track has a mood and the jukebox only picks from the
+        # mood that suits where you are: relaxed in the menus, upbeat in a match,
+        # triumphant on a win, downbeat on a loss.
+        self.pools = {
+            "menu":    ["Lofi Hiphop Tao.mp3",
+                        "Lofi Vibe.mp3",
+                        "Relaxed Tao 1.mp3",
+                        "Relaxed Tao 2.mp3",
+                        "Relaxed Tao 3.mp3",
+                        "Retro Relax.mp3",
+                        "Living Beware.mp3"],
 
-        self.win_track = ["Triumphant Win.mp3",
-                          "Retro Relax.mp3",
-                          "Epic Win.mp3",
-                          "Sweet Melancholy.mp3"]
+            "game":    ["Hillichurl REMIX.mp3",
+                        "Epic Conquest.mp3",
+                        "Arcade Retro.mp3",
+                        "Operation Awesome.mp3"],
 
-        self.lose_track = ["Sweet Melancholy.mp3",
-                           "Grand Defeat.mp3",
-                           "Retro Relax.mp3"]
+            "victory": ["Triumphant Win.mp3",
+                        "Epic Win.mp3"],
 
-        self.menu_music = self.menu_track.index(random.choice(self.menu_track))
-        self.game_music = self.game_track.index(random.choice(self.game_track))
-        self.win_music = self.win_track.index(random.choice(self.win_track))
-        self.lose_music = self.lose_track.index(random.choice(self.lose_track))
-        
+            "defeat":  ["Grand Defeat.mp3",
+                        "Sweet Melancholy.mp3"],
+        }
+
         self.loop_music = False
+
+    @property
+    def all_tracks(self):
+        seen = []
+        for tracks in self.pools.values():
+            seen += [t for t in tracks if t not in seen]
+        return seen
+
+    @staticmethod
+    def track_name(track):
+        """Display name: file name without its extension."""
+        return Path(track).stem if track else ""

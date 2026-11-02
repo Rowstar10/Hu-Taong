@@ -1,7 +1,9 @@
 import os, pygame, random
 
 from config import BASE_W, BASE_H, RESOLUTIONS, IMAGE_DIR
+from core import save_data
 from core.settings import Settings
+from core.stats import Stats
 from core.sound_manager import SoundManager
 from core.state_manager import StateManager
 from core.states.base_state import State
@@ -29,6 +31,8 @@ class App:
         self.ui_layout = UILayout(self)
         self.renderer = Renderer(self)
         self.hud = Hud(self)
+        self.stats = Stats()
+        save_data.load(self)
         
         self.state_manager.auto_register("core.states", State)
         
@@ -68,7 +72,7 @@ class App:
         
         display = self.settings.display
         for bg in display.backgrounds:
-            img = pygame.image.load(IMAGE_DIR / bg).convert_alpha()
+            img = pygame.image.load(IMAGE_DIR / bg).convert()  # opaque -> much faster full-screen blits
             self.background_cache[bg] = pygame.transform.smoothscale(img, self.base_res)
             self.thumbnail_cache[bg] = pygame.transform.smoothscale(img, (256, 144))
 
@@ -78,22 +82,20 @@ class App:
         # ---------- Events ----------
         self.keys_down = set()
         self.BG_FADE = pygame.USEREVENT
-        self.MUSIC_END = pygame.USEREVENT + 1
         
         delay = random.randint(30000, 60000)
         pygame.time.set_timer(self.BG_FADE, delay)
-        pygame.mixer.music.set_endevent(self.MUSIC_END)
         
         self.bg_next = None
         self.bg_transition_active = False
         self.bg_transition_time = 0
         self.bg_transition_duration = 5
-        self.ignore_music_end = False
 
         # ---------- Timing + Main Menu ----------
         self.clock = pygame.time.Clock()
         self.clock_tick()
         self.timer = 0
+        self.fps = 0.0
         self.running = True
         
         self.state_manager.set_state("main_menu", mute = True)
@@ -164,24 +166,6 @@ class App:
                 self.bg_next = None
                 self.bg_transition_active = False
 
-    def advance_music(self):
-        audio = self.settings.audio
-        track_map = {"menu": (audio.menu_track, "menu_music"),
-                     "game": (audio.game_track, "game_music"),
-                     "win":  (audio.win_track,  "win_music"),
-                     "lose": (audio.lose_track, "lose_music")}
-        
-        track_list, idx_attr = track_map.get(
-            self.sound_manager.music_type, (audio.menu_track, "menu_music"))
-        
-        if audio.loop_music:
-            music = track_list[getattr(audio, idx_attr)]
-        else:
-            music = random.choice(track_list)
-            setattr(audio, idx_attr, track_list.index(music))
-            
-        self.sound_manager.play_music(music)
-        
     # ---------------- Run / Main Loop / Clock Tick / Quit ----------------
 
     def run(self):
@@ -198,7 +182,7 @@ class App:
 
         # ---------- Calculate FPS ----------
         if settings.show_fps and self.timer <= 0:
-            self.fps = round(1 / self.dt, 1)
+            self.fps = round(self.clock.get_fps(), 1)  # not 1 / dt: dt can be 0 at Unlimited FPS
             self.timer = 0.1
 
         # ---------- Handle Events ----------
@@ -222,21 +206,16 @@ class App:
 
             # ---------- Background Rotation ----------
             if event.type == self.BG_FADE:
-                self.start_bg_transition()
+                if settings.rotate_backgrounds:
+                    self.start_bg_transition()
                 delay = random.randint(30000, 60000)
                 pygame.time.set_timer(self.BG_FADE, delay)
-
-            # ---------- Jukebox Loop / Shuffle ----------
-            if event.type == self.MUSIC_END:
-                if self.ignore_music_end:
-                    self.ignore_music_end = False
-                    continue
-                self.advance_music()
 
             # ---------- State-Specific Events ----------
             self.state_manager.handle_event(event)
 
         # ---------- Update ----------
+        self.sound_manager.update()
         self.state_manager.update(self.dt)
 
         # ---------- Draw Background & Dim Overlay ----------
@@ -260,6 +239,9 @@ class App:
                 
         current_state.draw(self.virtual)
 
+        # ---------- Now-playing toast ----------
+        self.renderer.draw_toast(self.virtual, self.dt)
+
         # ---------- Show FPS ----------
         if settings.show_fps:
             if not hasattr(self, "fps_font"):
@@ -278,7 +260,9 @@ class App:
                    else self.clock.tick(max_fps)) / 1000
 
     def quit(self):
+        save_data.save(self)
         self.sound_manager.play("exit_state.wav")
         while pygame.mixer.get_busy():
-            pygame.event.poll() 
+            pygame.event.poll()
+            pygame.time.wait(10)
         self.running = False

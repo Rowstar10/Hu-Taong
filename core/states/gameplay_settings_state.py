@@ -36,6 +36,13 @@ class GameplaySettingsState(State):
             if key == "cycle_ai_right":
                 audio.ai_difficulty = (audio.ai_difficulty + 1) % len(audio.ai_difficulties)
                 
+            if key == "toggle_adaptive_ai":
+                audio.adaptive_ai = not audio.adaptive_ai
+            if key == "toggle_chaos_mode":
+                audio.chaos_mode = not audio.chaos_mode
+                if not audio.chaos_mode:
+                    audio.chaos_restore()
+
             if key == "cycle_win_score_left":
                 audio.winning_score_index = (audio.winning_score_index - 1) % len(audio.winning_scores)
             if key == "cycle_win_score_right":
@@ -59,6 +66,7 @@ class GameplaySettingsState(State):
                 self.dragging_paddle_size = True
                 percent = self.update_slider_from_mouse("paddle_size_slider", event)
                 audio.paddle_height = audio.paddle_height_min + percent * audio.paddle_height_range
+                audio.paddle_width = audio.paddle_width_min + percent * audio.paddle_width_range
 
             if key == "randomise_all":
                 audio.ball_speed = audio.ball_speed_min + random.random() * audio.ball_speed_range

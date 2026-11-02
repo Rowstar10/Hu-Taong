@@ -72,12 +72,12 @@ class BackgroundSelectionState(State):
             button.draw(screen)
 
         # -------- Back Button --------
-        font = self.app.font_manager.get("helvetica", int(BASE_H * 0.05), bold=True)
+        font = self.app.font_manager.get("helvetica", int(BASE_H * 0.04), bold=True)
         back_surf = font.render("Back", True, theme.BLACK)
         back_w = back_surf.get_width() + gap_x
         back_h = back_surf.get_height() + gap_y
         back_x = (BASE_W - back_w) // 2
-        back_y = BASE_H - back_h - gap_y
+        back_y = BASE_H - back_h - int(BASE_H * 0.03)
 
         back_rect = pygame.Rect(back_x, back_y, back_w, back_h)
         back_color = theme.RED_HOVER if back_rect.collidepoint(mouse_pos) else theme.RED

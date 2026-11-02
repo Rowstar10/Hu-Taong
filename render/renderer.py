@@ -1,8 +1,11 @@
-import pygame
+import math, random, pygame
+from collections import deque
 
 from config import BASE_W, BASE_H
 from render import theme
 from render.theme import color
+from helpers import lerp
+from render.ui.layout import (Stack, Grid, Text, Button, Cycle, Slider, Slot, Space)
 
 class Renderer:
     def __init__(self, app):
@@ -11,497 +14,393 @@ class Renderer:
         self.title_font     = app.font_manager.get("helvetica", 100, bold=True)
         self.countdown_font = app.font_manager.get("helvetica", 80,  bold=True)
 
-        self._arrow_cache: dict = {}
-        self._overlay_dim_surf: pygame.Surface | None = None
-        self._panel_cache: dict = {}
+        # Game feel: all purely visual, none of it touches the physics.
+        self._toast = None              # [surface, age]
+        self._shake_time = 0.0
+        self._shake_total = 0.0
+        self._shake_mag = 0
+        self._trail = deque(maxlen=10)
+        self._trail_sprites = {}
 
-        # Gap constants — BASE_W/H never change so compute once
-        self._gx = int(BASE_W * 0.02)
-        self._gy = int(BASE_H * 0.02)
+    # ── Shorthands ─────────────────────────────────────────────────────────────
+    # Menus are *described* here (what is on the screen); UILayout decides where
+    # everything goes.  See render/ui/layout.py.
 
-    # ── Low-level helpers ──────────────────────────────────────────────────────
+    @property
+    def ui(self):
+        return self.app.ui_layout
 
-    def fnt(self, frac, bold=True):
-        """Shorthand: proportional helvetica font by BASE_H fraction."""
-        return self.app.font_manager.get("helvetica", int(BASE_H * frac), bold=bold)
+    def section(self, ui, s, header, col, *controls):
+        """A coloured header with its controls underneath."""
+        return Stack([Text(header, ui.fnt(0.05, s), col), *controls], gap=int(ui.gap * 0.9 * s))
 
-    def get_arrow_surfs(self, font):
-        key = id(font)
-        if key not in self._arrow_cache:
-            self._arrow_cache[key] = (
-                font.render("<", True, theme.BLACK),
-                font.render(">", True, theme.BLACK),
-            )
-        return self._arrow_cache[key]
-
-    def get_overlay_dim_surf(self, W, H):
-        if self._overlay_dim_surf is None or self._overlay_dim_surf.get_size() != (W, H):
-            self._overlay_dim_surf = pygame.Surface((W, H), pygame.SRCALPHA)
-            self._overlay_dim_surf.fill((0, 0, 0, 170))
-        return self._overlay_dim_surf
-
-    def get_panel_surf(self, w, h):
-        key = (w, h)
-        if key not in self._panel_cache:
-            surf = pygame.Surface((w, h), pygame.SRCALPHA)
-            pygame.draw.rect(surf, (30, 30, 30, 230), surf.get_rect(), border_radius=18)
-            pygame.draw.rect(surf, (90, 90, 90, 255), surf.get_rect(), width=2, border_radius=18)
-            self._panel_cache[key] = surf
-        return self._panel_cache[key]
-
-    # ── Mid-level draw helpers ─────────────────────────────────────────────────
-
-    def draw_button(self, screen, mouse_pos, font, text, cx, cy,
-                    col, hover, *, fg=None):
-        """Draw a centred rounded button; return its Rect."""
-        if fg is None:
-            fg = theme.BLACK
-        surf = font.render(text, True, fg)
-        w = surf.get_width()  + self._gx
-        h = surf.get_height() + self._gy
-        rect = pygame.Rect(cx - w // 2, cy - h // 2, w, h)
-        pygame.draw.rect(screen, hover if rect.collidepoint(mouse_pos) else col,
-                         rect, border_radius=12)
-        screen.blit(surf, surf.get_rect(center=rect.center))
-        return rect
-
-    def draw_toggle(self, screen, mouse_pos, font, text, cx, cy,
-                    on, on_col, on_hov, off_col, off_hov):
-        """draw_button with colour chosen by boolean `on`."""
-        col, hov = (on_col, on_hov) if on else (off_col, off_hov)
-        return self.draw_button(screen, mouse_pos, font, text, cx, cy, col, hov)
-
-    def draw_title(self, screen, text, col, y_frac=0.1):
-        """Draw a proportional title and return the bottom y coordinate."""
-        surf = self.fnt(0.18).render(text, True, col)
-        rect = surf.get_rect(center=(BASE_W // 2, int(BASE_H * y_frac)))
-        screen.blit(surf, rect)
-        return rect.bottom
-
-    def draw_slider(self, screen, mouse_pos, cx, cy, slider_w, slider_h,
-                    value, fill_color, *, label=None, label_font=None):
-        """Draw a horizontal slider; return its Rect.
-        If `label` is given, render it to the right of the track.
-        """
-        slider_x = cx - slider_w // 2
-        rect = pygame.Rect(slider_x, cy, slider_w, slider_h)
-
-        pygame.draw.rect(screen, theme.DARK_GRAY, rect, border_radius=6)
-        fill_w = int(slider_w * max(0.0, min(1.0, value)))
-        if fill_w > 0:
-            pygame.draw.rect(screen, fill_color,
-                             pygame.Rect(slider_x, cy, fill_w, slider_h),
-                             border_radius=6)
-
-        kr = slider_h * 1.2
-        kx, ky = slider_x + fill_w, cy + slider_h // 2
-        dx, dy = mouse_pos[0] - kx, mouse_pos[1] - ky
-        pygame.draw.circle(screen,
-                           theme.WHITE_HOVER if dx*dx + dy*dy <= kr*kr else theme.WHITE,
-                           (int(kx), int(ky)), int(kr))
-
-        if label is not None:
-            lf = label_font or self.fnt(0.04)
-            lsurf = lf.render(label, True, theme.WHITE)
-            screen.blit(lsurf, lsurf.get_rect(midleft=(rect.right + self._gx, ky)))
-
-        return rect
-
-    def draw_labeled_cycle(self, screen, mouse_pos, font, text, col, cx, cy):
-        """Render value text centred at (cx, cy), draw < > arrows, return (left_rect, right_rect)."""
-        surf = font.render(text, True, col)
-        rect = surf.get_rect(center=(cx, cy))
-        screen.blit(surf, rect)
-        return self.draw_cycle_row(screen, mouse_pos, font, cx, cy, surf, rect)
-
-    def draw_cycle_row(self, screen, mouse_pos, font, cx, cy, label_surf, label_rect):
-        """Draw < > arrows around an already-blitted label; return (left_rect, right_rect)."""
-        arrow_l, arrow_r = self.get_arrow_surfs(font)
-        aw, ah = font.size("<")
-        bw, bh = aw + self._gx, ah + self._gy
-
-        lr = pygame.Rect(label_rect.left  - bw - self._gx, cy - bh // 2, bw, bh)
-        rr = pygame.Rect(label_rect.right + self._gx,      cy - bh // 2, bw, bh)
-
-        lc = theme.GRAY_HOVER if lr.collidepoint(mouse_pos) else theme.GRAY
-        rc = theme.GRAY_HOVER if rr.collidepoint(mouse_pos) else theme.GRAY
-        pygame.draw.rect(screen, lc, lr, border_radius=12)
-        pygame.draw.rect(screen, rc, rr, border_radius=12)
-        screen.blit(arrow_l, arrow_l.get_rect(center=lr.center))
-        screen.blit(arrow_r, arrow_r.get_rect(center=rr.center))
-        return lr, rr
-
-    def draw_back_button(self, screen, mouse_pos, font):
-        """Back button pinned to the bottom centre; return its Rect."""
-        return self.draw_button(
-            screen, mouse_pos, font, "Back",
-            BASE_W // 2, BASE_H - self.fnt(0.04).get_height() - self._gy * 2,
-            theme.RED, theme.RED_HOVER)
+    def vgap(self, ui, s, mult=1.0):
+        return int(ui.gap * mult * s)
 
     # ── Main menu ──────────────────────────────────────────────────────────────
 
     def draw_main_menu(self, state, screen):
-        mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
-        sf = self.fnt(0.06)
+        ui = self.ui
 
-        self.draw_title(screen, "Hu Taong!", theme.RED, y_frac=0.125)
+        def build(s):
+            f = ui.fnt(0.06, s)
+            return Stack([Button("play",        "Play Game", f, (theme.GREEN,  theme.GREEN_HOVER)),
+                          Button("stats",       "Stats",     f, (theme.BLUE,   theme.BLUE_HOVER)),
+                          Button("settings",    "Settings",  f, (theme.ORANGE, theme.ORANGE_HOVER)),
+                          Button("prompt_quit", "Quit Game", f, (theme.RED,    theme.RED_HOVER))],
+                         gap=self.vgap(ui, s, 1.5), uniform=True)
 
-        play_rect     = self.draw_button(screen, mouse_pos, sf, "Play Game",
-                                         BASE_W // 2, int(BASE_H * 0.48),
-                                         theme.GREEN,  theme.GREEN_HOVER)
-        settings_rect = self.draw_button(screen, mouse_pos, sf, "Settings",
-                                         BASE_W // 2, play_rect.bottom + 2 * self._gy,
-                                         theme.ORANGE, theme.ORANGE_HOVER)
-        quit_rect     = self.draw_button(screen, mouse_pos, sf, "Quit Game",
-                                         BASE_W // 2, settings_rect.bottom + 2 * self._gy,
-                                         theme.RED,    theme.RED_HOVER)
+        ui.screen_menu(state, screen, build, title="Hu Taong!", color=theme.RED,
+                       title_size=0.18, back=False)
 
-        state.ui_hitboxes["play"]        = play_rect
-        state.ui_hitboxes["settings"]    = settings_rect
-        state.ui_hitboxes["prompt_quit"] = quit_rect
+    # ── Match setup ────────────────────────────────────────────────────────────
+
+    def draw_match_setup_menu(self, state, screen):
+        ui = self.ui
+        g = self.app.settings.gameplay
+
+        def build(s):
+            f, sm = ui.fnt(0.05, s), ui.fnt(0.03, s)
+            G = theme.GREEN
+            gap = int(BASE_W * 0.02 * s)
+
+            def choice(key, text, selected, on=(G, theme.GREEN_HOVER), enabled=lambda: True):
+                def colors():
+                    if not enabled():
+                        return (theme.DARK_GRAY, theme.DARK_GRAY)    # greyed out, not clickable
+                    return on if selected() else (theme.GRAY, theme.GRAY_HOVER)
+                return Button(key, text, f, colors)
+
+            opponent = self.section(ui, s, "Opponent", G, Stack([
+                choice("opponent_ai",    "vs AI",    lambda: g.vs_ai),
+                choice("opponent_human", "vs Human", lambda: not g.vs_ai)],
+                vertical=False, gap=gap, uniform=True))
+
+            vs_ai = lambda: g.vs_ai
+            paddle = self.section(ui, s, "Your Paddle", G, Stack([
+                choice("side_red",  "Red",  lambda: not g.play_as_blue, (theme.RED,  theme.RED_HOVER),  vs_ai),
+                choice("side_blue", "Blue", lambda: g.play_as_blue,     (theme.BLUE, theme.BLUE_HOVER), vs_ai)],
+                vertical=False, gap=gap, uniform=True))
+
+            def summary():
+                if not g.vs_ai:
+                    return "Red: W A S D      Blue: Arrow Keys"
+                me, ai = ("Blue", "Red") if g.play_as_blue else ("Red", "Blue")
+                keys = "Arrow Keys" if g.play_as_blue else "W A S D"
+                return f"You: {me} ({keys})      AI: {ai}"
+            samples = ["You: Blue (Arrow Keys)      AI: Red", "Red: W A S D      Blue: Arrow Keys"]
+            caption = Text(summary, sm, theme.WHITE, samples=samples)
+
+            start = Button("start_match", "Start Match", ui.fnt(0.06, s), (theme.ORANGE, theme.ORANGE_HOVER))
+            return Stack([opponent, paddle, caption, start], gap=self.vgap(ui, s, 2))
+
+        ui.screen_menu(state, screen, build, title="Match Setup", color=theme.GREEN)
 
     # ── Settings menu ──────────────────────────────────────────────────────────
 
     def draw_settings_menu(self, state, screen):
-        mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
-        sf = self.fnt(0.06)
+        ui = self.ui
 
-        self.draw_title(screen, "Settings", theme.ORANGE)
+        def build(s):
+            f = ui.fnt(0.06, s)
+            return Stack([Button("display",  "Display",  f, (theme.ORANGE, theme.ORANGE_HOVER)),
+                          Button("gameplay", "Gameplay", f, (theme.GREEN,  theme.GREEN_HOVER)),
+                          Button("audio",    "Audio",    f, (theme.BLUE,   theme.BLUE_HOVER))],
+                         vertical=False, gap=int(BASE_W * 0.02 * s), uniform=True)
 
-        btn_y = int(BASE_H * 0.55)
-        # Centre button drives positioning of the two flanking ones
-        gw = sf.size("Gameplay")[0] + self._gx          # gameplay button width
-        cx = (BASE_W - gw) // 2 + gw // 2               # its centre x
-
-        gameplay_rect = self.draw_button(screen, mouse_pos, sf, "Gameplay",
-                                         cx, btn_y, theme.GREEN, theme.GREEN_HOVER)
-        display_rect  = self.draw_button(screen, mouse_pos, sf, "Display",
-                                         gameplay_rect.left - self._gx - sf.size("Display")[0] // 2 - self._gx // 2,
-                                         btn_y, theme.ORANGE, theme.ORANGE_HOVER)
-        audio_rect    = self.draw_button(screen, mouse_pos, sf, "Audio",
-                                         gameplay_rect.right + self._gx + sf.size("Audio")[0] // 2 + self._gx // 2,
-                                         btn_y, theme.BLUE, theme.BLUE_HOVER)
-
-        back_rect = self.draw_back_button(screen, mouse_pos, self.fnt(0.04))
-
-        state.ui_hitboxes.update(gameplay=gameplay_rect, display=display_rect,
-                                 audio=audio_rect, back=back_rect)
+        ui.screen_menu(state, screen, build, title="Settings", color=theme.ORANGE)
 
     # ── Gameplay settings ──────────────────────────────────────────────────────
 
     def draw_gameplay_settings_menu(self, state, screen):
-        mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
-        s  = self.app.settings.gameplay
-        sf = self.fnt(0.06)
-        f  = self.fnt(0.04)
-        sm = self.fnt(0.03)
-        ty = self.fnt(0.02)
+        ui = self.ui
+        g = self.app.settings.gameplay
 
-        title_bottom = self.draw_title(screen, "Gameplay", theme.GREEN)
-        current_y = title_bottom + 6 * self._gy
+        def build(s):
+            f, sm, ty = ui.fnt(0.04, s), ui.fnt(0.03, s), ui.fnt(0.022, s)
+            G = theme.GREEN
+            track_w = int(BASE_W * 0.17 * s)
 
-        lx, rx = BASE_W // 2 - 180, BASE_W // 2 + 180
+            label_sample = f"{g.paddle_height_max} x {g.paddle_width_max}"  # widest label; shared so tracks line up
 
-        # Column headers
-        for text, cx, anchor in [("AI Difficulty", lx, "midright"), ("Winning Score", rx, "midleft")]:
-            surf = sf.render(text, True, theme.GREEN)
-            rect = surf.get_rect(**{anchor: (cx, current_y)})
-            screen.blit(surf, rect)
-        ai_cx  = sf.render("AI Difficulty", True, theme.GREEN).get_rect(midright=(lx, current_y)).centerx
-        win_cx = sf.render("Winning Score", True, theme.GREEN).get_rect(midleft=(rx, current_y)).centerx
-        current_y += sf.get_height() + 2 * self._gy
+            def slider(key, reset, value, lo, rng, label, sample=None):
+                return Slider(key, lambda: (value() - lo) / rng, G, f, label, label_sample,
+                              reset_key=reset, reset_font=ty, track_w=track_w)
 
-        # AI difficulty cycle
-        ai_diff  = s.ai_difficulties[s.ai_difficulty]
-        ai_color = theme.GREEN if s.ai_difficulty == 0 else theme.WHITE if s.ai_difficulty < 4 else theme.RED
-        left_ai_rect, right_ai_rect = self.draw_labeled_cycle(
-            screen, mouse_pos, f, ai_diff, ai_color, ai_cx, current_y)
+            win_texts = ["Endless Mode" if v == "Endless Mode" else f"Score {v} to win"
+                         for v in g.winning_scores]
+            ai_col = lambda: (theme.GREEN if g.ai_difficulty == 0 else
+                              theme.WHITE if g.ai_difficulty < len(g.ai_difficulties) - 1 else theme.RED)
+            win_col = lambda: theme.ORANGE if g.winning_scores[g.winning_score_index] == "Endless Mode" else theme.WHITE
 
-        # Win score cycle
-        raw = s.winning_scores[s.winning_score_index]
-        win_text  = "Endless Mode" if raw == "Endless Mode" else f"Score {raw} to win"
-        win_color = theme.ORANGE if raw == "Endless Mode" else theme.WHITE
-        left_win_rect, right_win_rect = self.draw_labeled_cycle(
-            screen, mouse_pos, f, win_text, win_color, win_cx, current_y)
+            ai = self.section(ui, s, "AI Difficulty", G,
+                              Cycle("cycle_ai", lambda: g.ai_difficulties[g.ai_difficulty],
+                                    f, g.ai_difficulties, ai_col),
+                              Button("toggle_adaptive_ai",
+                                     lambda: f"Adaptive AI: {'ON' if g.adaptive_ai else 'OFF'}", sm,
+                                     lambda: ((theme.GREEN, theme.GREEN_HOVER) if g.adaptive_ai
+                                              else (theme.RED, theme.RED_HOVER)),
+                                     samples=["Adaptive AI: ON", "Adaptive AI: OFF"]))
+            win = self.section(ui, s, "Winning Score", G,
+                               Cycle("cycle_win_score", lambda: win_texts[g.winning_score_index],
+                                     f, win_texts, win_col),
+                               Button("toggle_win_by_two",
+                                      lambda: f"Win by Two: {'ON' if g.win_by_two else 'OFF'}", sm,
+                                      lambda: ((theme.GREEN, theme.GREEN_HOVER) if g.win_by_two
+                                               else (theme.RED, theme.RED_HOVER)),
+                                      samples=["Win by Two: ON", "Win by Two: OFF"]))
 
-        current_y = right_win_rect.bottom + self._gy
+            ball_speed = self.section(ui, s, "Ball Speed", G, slider(
+                "ball_speed_slider", "reset_ball_speed", lambda: g.ball_speed,
+                g.ball_speed_min, g.ball_speed_range,
+                lambda: str(int(g.ball_speed))))
+            paddle_speed = self.section(ui, s, "Paddle Speed", G, slider(
+                "paddle_speed_slider", "reset_paddle_speed", lambda: g.paddle_speed,
+                g.paddle_speed_min, g.paddle_speed_range,
+                lambda: str(int(g.paddle_speed))))
+            ball_size = self.section(ui, s, "Ball Diameter", G, slider(
+                "ball_diameter_slider", "reset_ball_diameter", lambda: g.ball_diameter,
+                g.ball_diameter_min, g.ball_diameter_range,
+                lambda: str(int(g.ball_diameter))))
+            paddle_size = self.section(ui, s, "Paddle Size", G, slider(
+                "paddle_size_slider", "reset_paddle_size", lambda: g.paddle_height,
+                g.paddle_height_min, g.paddle_height_range,
+                lambda: f"{int(g.paddle_height)} x {int(g.paddle_width)}"))
 
-        # Win by two toggle
-        wbt_rect = self.draw_toggle(
-            screen, mouse_pos, sm,
-            "Win by Two: ON" if s.win_by_two else "Win by Two: OFF",
-            win_cx, current_y, s.win_by_two,
-            theme.GREEN, theme.GREEN_HOVER, theme.RED, theme.RED_HOVER)
-        current_y = wbt_rect.bottom + 6 * self._gy
+            rand = Button("randomise_all", "Randomise All", sm, (G, theme.GREEN_HOVER))
+            reset = Button("reset_all", "Reset All", sm, (G, theme.GREEN_HOVER))
+            chaos = Button("toggle_chaos_mode", lambda: f"Chaos Mode: {'ON' if g.chaos_mode else 'OFF'}", sm,
+                           lambda: ((theme.ORANGE, theme.ORANGE_HOVER) if g.chaos_mode
+                                    else (theme.RED, theme.RED_HOVER)),
+                           samples=["Chaos Mode: ON", "Chaos Mode: OFF"])
+            actions = Stack([rand, chaos, reset], vertical=False, gap=int(BASE_W * 0.015 * s))
 
-        # Paired slider rows
-        slider_w = int(BASE_W * 0.25)
-        slider_h = int(BASE_H * 0.02)
+            return Grid([[ai, win],
+                         [ball_speed, paddle_speed],
+                         [ball_size, paddle_size],
+                         [actions]],
+                        gap_x=int(BASE_W * 0.06 * s), gap_y=self.vgap(ui, s, 2.2))
 
-        for (header, cx, key, val, lo, hi) in [
-            ("Ball Speed",   ai_cx,  "ball_speed_slider",
-             s.ball_speed,   s.ball_speed_min,   s.ball_speed_range),
-            ("Paddle Speed", win_cx, "paddle_speed_slider",
-             s.paddle_speed, s.paddle_speed_min, s.paddle_speed_range),
-        ]:
-            screen.blit(sf.render(header, True, theme.GREEN),
-                        sf.render(header, True, theme.GREEN).get_rect(center=(cx, current_y)))
-        current_y += sf.get_height() + 2 * self._gy
-
-        bs_rect = self.draw_slider(screen, mouse_pos, ai_cx,  current_y, slider_w, slider_h,
-                                   (s.ball_speed   - s.ball_speed_min)  / s.ball_speed_range,
-                                   theme.GREEN, label=str(int(s.ball_speed)), label_font=f)
-        ps_rect = self.draw_slider(screen, mouse_pos, win_cx, current_y, slider_w, slider_h,
-                                   (s.paddle_speed - s.paddle_speed_min) / s.paddle_speed_range,
-                                   theme.GREEN, label=str(int(s.paddle_speed)), label_font=f)
-        current_y = ps_rect.bottom + 4 * self._gy
-
-        for (header, cx) in [("Ball Diameter", ai_cx), ("Paddle Size", win_cx)]:
-            screen.blit(sf.render(header, True, theme.GREEN),
-                        sf.render(header, True, theme.GREEN).get_rect(center=(cx, current_y)))
-        current_y += sf.get_height() + 2 * self._gy
-
-        bd_rect = self.draw_slider(screen, mouse_pos, ai_cx,  current_y, slider_w, slider_h,
-                                   (s.ball_diameter  - s.ball_diameter_min)  / s.ball_diameter_range,
-                                   theme.GREEN, label=str(int(s.ball_diameter)), label_font=f)
-        pz_rect = self.draw_slider(screen, mouse_pos, win_cx, current_y, slider_w, slider_h,
-                                   (s.paddle_height  - s.paddle_height_min)  / s.paddle_height_range,
-                                   theme.GREEN,
-                                   label=f"{int(s.paddle_height)} x {int(s.paddle_width)}",
-                                   label_font=f)
-        current_y = pz_rect.bottom + 2 * self._gy
-
-        # Reset buttons — one shared surface blitted 4×
-        reset_surf = ty.render("Reset", True, theme.BLACK)
-        rw = reset_surf.get_width()  + self._gx
-        rh = reset_surf.get_height() + self._gy
-        reset_rects = {
-            "reset_ball_speed":    pygame.Rect(bs_rect.left - rw - self._gx // 2, bs_rect.centery - rh // 2, rw, rh),
-            "reset_paddle_speed":  pygame.Rect(ps_rect.left - rw - self._gx // 2, bs_rect.centery - rh // 2, rw, rh),
-            "reset_ball_diameter": pygame.Rect(bd_rect.left - rw - self._gx // 2, bd_rect.centery - rh // 2, rw, rh),
-            "reset_paddle_size":   pygame.Rect(pz_rect.left - rw - self._gx // 2, bd_rect.centery - rh // 2, rw, rh),
-        }
-        for rect in reset_rects.values():
-            pygame.draw.rect(screen,
-                             theme.WHITE_HOVER if rect.collidepoint(mouse_pos) else theme.WHITE,
-                             rect, border_radius=12)
-            screen.blit(reset_surf, reset_surf.get_rect(center=rect.center))
-
-        rand_rect = self.draw_button(screen, mouse_pos, sm, "Randomise All",
-                                     ai_cx,  current_y, theme.GREEN, theme.GREEN_HOVER)
-        def_rect  = self.draw_button(screen, mouse_pos, sm, "Reset All",
-                                     win_cx, current_y, theme.GREEN, theme.GREEN_HOVER)
-        back_rect = self.draw_back_button(screen, mouse_pos, f)
-
-        state.ui_hitboxes.update(
-            cycle_ai_left=left_ai_rect, cycle_ai_right=right_ai_rect,
-            cycle_win_score_left=left_win_rect, cycle_win_score_right=right_win_rect,
-            toggle_win_by_two=wbt_rect,
-            ball_speed_slider=bs_rect, paddle_speed_slider=ps_rect,
-            ball_diameter_slider=bd_rect, paddle_size_slider=pz_rect,
-            randomise_all=rand_rect, reset_all=def_rect, back=back_rect,
-            **reset_rects)
+        ui.screen_menu(state, screen, build, title="Gameplay", color=theme.GREEN)
 
     # ── Display settings ───────────────────────────────────────────────────────
 
     def draw_display_settings_menu(self, state, screen):
-        mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
-        s  = self.app.settings.display
-        sf = self.fnt(0.06)
-        f  = self.fnt(0.04)
-        sm = self.fnt(0.03)
-        ty = self.fnt(0.02)
+        ui = self.ui
+        d = self.app.settings.display
+        app = self.app
 
-        title_bottom = self.draw_title(screen, "Display", theme.ORANGE)
-        current_y = title_bottom + 3 * self._gy
+        def build(s):
+            f, sm, ty = ui.fnt(0.04, s), ui.fnt(0.03, s), ui.fnt(0.022, s)
+            O = theme.ORANGE
 
-        # Resolution
-        res_hdr = sf.render("Resolution", True, theme.ORANGE)
-        res_hdr_rect = res_hdr.get_rect(center=(BASE_W // 2, current_y))
-        screen.blit(res_hdr, res_hdr_rect)
-        current_y = res_hdr_rect.bottom + 3 * self._gy
+            res_texts = [f"{w} x {h}" for (w, h) in app.resolutions]
+            mode_texts = [m.capitalize() for m in app.display_modes]
 
-        res = self.app.resolutions[state.res_index]
-        left_rect, right_rect = self.draw_labeled_cycle(
-            screen, mouse_pos, f, f"{res[0]} x {res[1]}", theme.WHITE,
-            BASE_W // 2, current_y)
-        current_y = right_rect.bottom + 3 * self._gy
+            resolution = self.section(
+                ui, s, "Resolution", O,
+                Cycle("cycle_res", lambda: res_texts[state.res_index], f, res_texts),
+                Cycle("cycle_mode", lambda: mode_texts[state.display_mode_index], f, mode_texts),
+                Button("apply", "Apply", sm, (O, theme.ORANGE_HOVER)))
 
-        # Display mode
-        mode_text = self.app.display_modes[state.display_mode_index].capitalize()
-        mode_left_rect, mode_right_rect = self.draw_labeled_cycle(
-            screen, mouse_pos, f, mode_text, theme.WHITE, BASE_W // 2, current_y)
-        current_y = mode_right_rect.bottom + self._gy
+            max_fps = self.section(
+                ui, s, "Maximum FPS", O,
+                Cycle("cycle_max_fps", lambda: str(d.max_fps_options[d.max_fps]), f,
+                      [str(o) for o in d.max_fps_options]),
+                Button("toggle_show_fps", lambda: f"Show FPS: {'ON' if d.show_fps else 'OFF'}", sm,
+                       lambda: ((O, theme.ORANGE_HOVER) if d.show_fps else (theme.RED, theme.RED_HOVER)),
+                       samples=["Show FPS: ON", "Show FPS: OFF"]))
 
-        # Apply + Background header
-        apply_rect = self.draw_button(screen, mouse_pos, sm, "Apply",
-                                      BASE_W // 2, current_y, theme.ORANGE, theme.ORANGE_HOVER)
-        current_y = apply_rect.bottom + 4 * self._gy
+            background = self.section(
+                ui, s, "Background", O,
+                Slot("background_thumb", int(256 * s), int(144 * s)),
+                Button("toggle_rotate_bg", lambda: f"Rotate: {'ON' if d.rotate_backgrounds else 'OFF'}", sm,
+                       lambda: ((O, theme.ORANGE_HOVER) if d.rotate_backgrounds else (theme.RED, theme.RED_HOVER)),
+                       samples=["Rotate: ON", "Rotate: OFF"]))
 
-        bg_hdr = sf.render("Background", True, theme.ORANGE)
-        bg_rect = bg_hdr.get_rect(center=(BASE_W // 2, current_y))
-        screen.blit(bg_hdr, bg_rect)
+            dim = self.section(
+                ui, s, "Dim Overlay", O,
+                Slider("dim_slider", lambda: d.dim, O, f, lambda: f"{int(100 * d.dim)}%", "100%",
+                       track_w=int(BASE_W * 0.17 * s)))
 
-        rot_rect = self.draw_toggle(
-            screen, mouse_pos, sm,
-            "Rotate: ON" if s.rotate_backgrounds else "Rotate: OFF",
-            BASE_W // 2, BASE_H - 180, s.rotate_backgrounds,
-            theme.ORANGE, theme.ORANGE_HOVER, theme.RED, theme.RED_HOVER)
+            return Grid([[resolution, max_fps],
+                         [background, dim]],
+                        gap_x=int(BASE_W * 0.08 * s), gap_y=self.vgap(ui, s, 2.4))
 
-        # FPS column (right)
-        fps_cx = BASE_W // 2 + sf.size("Maximum FPS")[0] // 2 + 400
-        fps_cy = res_hdr_rect.centery + 100
-        screen.blit(sf.render("Maximum FPS", True, theme.ORANGE),
-                    sf.render("Maximum FPS", True, theme.ORANGE).get_rect(center=(fps_cx, fps_cy)))
-        fps_y = fps_cy + sf.get_height() + 3 * self._gy
-
-        max_fps_left_rect, max_fps_right_rect = self.draw_labeled_cycle(
-            screen, mouse_pos, f,
-            str(s.max_fps_options[s.max_fps]), theme.WHITE, fps_cx, fps_y)
-
-        show_fps_rect = self.draw_toggle(
-            screen, mouse_pos, ty,
-            "Show FPS: ON" if s.show_fps else "Show FPS: OFF",
-            fps_cx, max_fps_right_rect.bottom + self._gy, s.show_fps,
-            theme.ORANGE, theme.ORANGE_HOVER, theme.RED, theme.RED_HOVER)
-
-        # Dim column (left)
-        dim_cx = BASE_W // 2 - sf.size("Dim Overlay")[0] // 2 - 400
-        screen.blit(sf.render("Dim Overlay", True, theme.ORANGE),
-                    sf.render("Dim Overlay", True, theme.ORANGE).get_rect(center=(dim_cx, fps_cy)))
-        dim_y = fps_cy + sf.get_height() + 3 * self._gy
-
-        dim_rect = self.draw_slider(
-            screen, mouse_pos, dim_cx, dim_y,
-            int(BASE_W * 0.2), int(BASE_H * 0.02),
-            s.dim, theme.ORANGE,
-            label=f"{int(100 * s.dim)}%", label_font=f)
-
-        back_rect = self.draw_back_button(screen, mouse_pos, f)
-
-        state.ui_hitboxes.update(
-            cycle_res_left=left_rect, cycle_res_right=right_rect,
-            cycle_mode_left=mode_left_rect, cycle_mode_right=mode_right_rect,
-            apply=apply_rect, toggle_rotate_bg=rot_rect,
-            cycle_max_fps_left=max_fps_left_rect, cycle_max_fps_right=max_fps_right_rect,
-            toggle_show_fps=show_fps_rect, dim_slider=dim_rect, back=back_rect)
+        ui.screen_menu(state, screen, build, title="Display", color=theme.ORANGE)
 
     # ── Audio settings ─────────────────────────────────────────────────────────
 
     def draw_audio_settings_menu(self, state, screen):
-        mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
+        ui = self.ui
         sound = self.app.sound_manager
-        audio   = self.app.settings.audio
-        sf  = self.fnt(0.06)
-        f   = self.fnt(0.04)
-        sm  = self.fnt(0.03)
+        audio = self.app.settings.audio
 
-        title_bottom = self.draw_title(screen, "Audio", theme.BLUE)
-        current_y = title_bottom + 4 * self._gy
-        left_cx   = BASE_W // 2 - 400
-        slider_w  = int(BASE_W * 0.3)
-        slider_h  = int(BASE_H * 0.02)
+        def build(s):
+            f, sm, ty = ui.fnt(0.04, s), ui.fnt(0.03, s), ui.fnt(0.022, s)
+            B = theme.BLUE
+            track_w = int(BASE_W * 0.2 * s)
 
-        # Shared reset surface
-        reset_surf = sm.render("Reset", True, theme.BLACK)
-        rv_w = reset_surf.get_width()  + self._gx
-        rv_h = reset_surf.get_height() + self._gy
+            def volume(header, key, value):
+                return self.section(ui, s, header, B, Slider(
+                    key + "_slider", value, B, f, lambda: f"{int(round(100 * value()))}%", "100%",
+                    reset_key="reset_" + key, reset_font=ty, track_w=track_w))
 
-        vol_slider_rects = {}
-        reset_vol_rects  = {}
+            def sound_toggle(key, name, flag):
+                return Button(key, lambda: f"{name}: {'ON' if flag() else 'OFF'}", sm,
+                              lambda: ((B, theme.BLUE_HOVER) if flag() else (theme.RED, theme.RED_HOVER)),
+                              samples=[f"{name}: ON", f"{name}: OFF"])
 
-        for key, label, value in [
-            ("master_volume_slider", "Master Volume", sound.master_volume),
-            ("music_volume_slider",  "Music Volume",  sound.music_volume),
-            ("sfx_volume_slider",    "SFX Volume",    sound.sfx_volume),
-        ]:
-            screen.blit(sf.render(label, True, theme.BLUE),
-                        sf.render(label, True, theme.BLUE).get_rect(center=(left_cx, current_y)))
-            current_y += sf.get_height() + 2 * self._gy
+            mood_notes = {"menu":    "Relaxed music for the menus",
+                          "game":    "Upbeat music for matches",
+                          "victory": "Triumphant music",
+                          "defeat":  "Downbeat music"}
 
-            sl = self.draw_slider(screen, mouse_pos, left_cx, current_y,
-                                  slider_w, slider_h, value, theme.BLUE,
-                                  label=f"{int(100 * value)}%", label_font=sf)
-            vol_slider_rects[key] = sl
+            volumes = Stack([
+                volume("Master Volume", "master_volume", lambda: sound.master_volume),
+                volume("Music Volume",  "music_volume",  lambda: sound.music_volume),
+                volume("SFX Volume",    "sfx_volume",    lambda: sound.sfx_volume),
+                Stack([sound_toggle("toggle_paddle_sounds", "Paddle Sounds", lambda: sound.paddle_hit_sound),
+                       sound_toggle("toggle_score_sounds",  "Score Sound",   lambda: sound.score_sound)],
+                      vertical=False, gap=int(BASE_W * 0.01 * s))],
+                gap=self.vgap(ui, s, 1.4))
 
-            rk = "reset_" + key.replace("_slider", "")
-            rv_rect = pygame.Rect(sl.left - rv_w - self._gx // 2,
-                                  sl.centery - rv_h // 2, rv_w, rv_h)
-            reset_vol_rects[rk] = rv_rect
-            pygame.draw.rect(screen,
-                             theme.WHITE_HOVER if rv_rect.collidepoint(mouse_pos) else theme.WHITE,
-                             rv_rect, border_radius=12)
-            screen.blit(reset_surf, reset_surf.get_rect(center=rv_rect.center))
-            current_y = sl.bottom + 3 * self._gy
+            jukebox = self.section(
+                ui, s, "Music", B,
+                Cycle("cycle_music", lambda: audio.track_name(sound.now_playing), f,
+                      [audio.track_name(t) for t in audio.all_tracks]),
+                Stack([Button("randomise_music", "Randomise Music", sm, (B, theme.BLUE_HOVER)),
+                       Button("toggle_loop_music", lambda: "Loop" if audio.loop_music else "Shuffle", sm,
+                              (B, theme.BLUE_HOVER), samples=["Loop", "Shuffle"])],
+                      vertical=False, gap=int(BASE_W * 0.01 * s)),
+                Text(lambda: mood_notes[sound.mood], ty, theme.WHITE, samples=list(mood_notes.values())))
 
-        # Sound toggles
-        paddle_cx = left_cx - sm.size("Paddle Sounds: ON")[0] // 2 - self._gx // 2
-        for tog_key, text, flag, cx in [
-            ("toggle_paddle_sounds",
-             f"Paddle Sounds: {'ON' if sound.paddle_hit_sound else 'OFF'}",
-             sound.paddle_hit_sound, paddle_cx),
-            ("toggle_score_sounds",
-             f"Score Sound: {'ON' if sound.score_sound else 'OFF'}",
-             sound.score_sound, left_cx + self._gx // 2),
-        ]:
-            state.ui_hitboxes[tog_key] = self.draw_toggle(
-                screen, mouse_pos, sm, text, cx, current_y, flag,
-                theme.BLUE, theme.BLUE_HOVER, theme.RED, theme.RED_HOVER)
+            return Grid([[volumes, jukebox]], gap_x=int(BASE_W * 0.07 * s))
 
-        current_y += sm.get_height() + 5 * self._gy
+        ui.screen_menu(state, screen, build, title="Audio", color=theme.BLUE)
 
-        # Music cycle rows
-        music_cx  = BASE_W // 2 + 500
-        music_y   = title_bottom + 4 * self._gy    # aligns with volume section top
-        music_hitboxes = {}
+    # ── Stats ──────────────────────────────────────────────────────────────────
 
-        for base, label, track_list, idx in [
-            ("menu_music", "Menu Music", audio.menu_track, audio.menu_music),
-            ("game_music", "Game Music", audio.game_track, audio.game_music),
-            ("win_music",  "Win Music",  audio.win_track,  audio.win_music),
-            ("lose_music", "Lose Music", audio.lose_track, audio.lose_music),
-        ]:
-            screen.blit(sf.render(label, True, theme.BLUE),
-                        sf.render(label, True, theme.BLUE).get_rect(center=(music_cx, music_y)))
-            music_y += sf.get_height() + 2 * self._gy
+    def draw_stats_menu(self, state, screen):
+        ui = self.ui
+        st = self.app.stats
 
-            lr, rr = self.draw_labeled_cycle(
-                screen, mouse_pos, f,
-                track_list[idx].rstrip(".mp3"), theme.WHITE,
-                music_cx, music_y)
-            music_hitboxes[f"cycle_{base}_left"]  = lr
-            music_hitboxes[f"cycle_{base}_right"] = rr
-            music_y += f.get_height() + 3 * self._gy
+        def build(s):
+            f, sm = ui.fnt(0.035, s), ui.fnt(0.03, s)
+            B = theme.BLUE
+            rows = [("Matches Played",      lambda: str(st.matches)),
+                    ("Wins vs AI",          lambda: str(st.wins_vs_ai)),
+                    ("Losses vs AI",        lambda: str(st.losses_vs_ai)),
+                    ("Win Rate vs AI",      lambda: f"{st.win_rate}%"),
+                    ("Win Streak",          lambda: f"{st.win_streak}  (best {st.best_win_streak})"),
+                    ("2-Player Wins",       lambda: f"Red {st.wins_red}  -  {st.wins_blue} Blue"),
+                    ("Points Scored",       lambda: str(st.points)),
+                    ("Longest Rally",       lambda: str(st.best_rally)),
+                    ("Fastest Ball",        lambda: f"{st.top_ball_speed} pps"),
+                    ("Time Played",         lambda: st.format_time(st.play_time))]
+            table = Grid([[Text(label, f, B, align="right"),
+                           Text(value, f, theme.WHITE, align="left",
+                                samples=["Red 9999  -  9999 Blue", "9999  (best 9999)"])]
+                          for label, value in rows],
+                         gap_x=int(BASE_W * 0.03 * s), gap_y=int(ui.gap * 0.6 * s))
+            return Stack([table, Button("reset_stats", "Reset Stats", sm, (theme.RED, theme.RED_HOVER))],
+                         gap=self.vgap(ui, s, 2))
 
-        rand_rect = self.draw_button(screen, mouse_pos, sm, "Randomise Music",
-                                     music_cx - 100, music_y, theme.BLUE, theme.BLUE_HOVER)
-        loop_rect = self.draw_toggle(
-            screen, mouse_pos, sm,
-            "Loop" if audio.loop_music else "Shuffle",
-            music_cx + 180, music_y, audio.loop_music,
-            theme.BLUE, theme.BLUE_HOVER, theme.BLUE, theme.BLUE_HOVER)
+        ui.screen_menu(state, screen, build, title="Stats", color=theme.BLUE)
 
-        back_rect = self.draw_back_button(screen, mouse_pos, f)
+    # ── Game feel (purely visual) ──────────────────────────────────────────────
 
-        state.ui_hitboxes.update(vol_slider_rects)
-        state.ui_hitboxes.update(reset_vol_rects)
-        state.ui_hitboxes.update(music_hitboxes)
-        state.ui_hitboxes.update(randomise_music=rand_rect,
-                                 toggle_loop_music=loop_rect, back=back_rect)
+    def shake(self, magnitude, duration):
+        self._shake_mag, self._shake_time, self._shake_total = magnitude, duration, duration
+
+    def _shake_offset(self):
+        if self._shake_time <= 0:
+            return 0, 0
+        self._shake_time = max(0.0, self._shake_time - self.app.dt)
+        mag = self._shake_mag * self._shake_time / self._shake_total
+        return random.uniform(-mag, mag), random.uniform(-mag, mag)
+
+    def show_toast(self, text):
+        font = self.ui.fnt(0.03)
+        label = font.render(text, True, theme.WHITE)
+        pad = int(BASE_H * 0.015)
+        surf = pygame.Surface((label.get_width() + 2 * pad, label.get_height() + 2 * pad), pygame.SRCALPHA)
+        pygame.draw.rect(surf, (20, 20, 20, 215), surf.get_rect(), border_radius=14)
+        pygame.draw.rect(surf, (90, 90, 90, 255), surf.get_rect(), width=2, border_radius=14)
+        surf.blit(label, (pad, pad))
+        self._toast = [surf, 0.0]
+
+    def draw_toast(self, screen, dt):
+        """Slides in at the bottom-left, holds, then fades out."""
+        if self._toast is None:
+            return
+        surf, age = self._toast
+        age += dt
+        self._toast[1] = age
+        slide, hold, fade = 0.35, 3.0, 0.5
+        if age > slide + hold + fade:
+            self._toast = None
+            return
+        t = min(1.0, age / slide)
+        x = int(lerp(-surf.get_width(), BASE_W * 0.02, 1 - (1 - t) ** 3))
+        surf.set_alpha(255 if age < slide + hold else int(255 * (1 - (age - slide - hold) / fade)))
+        screen.blit(surf, (x, BASE_H - surf.get_height() - int(BASE_H * 0.03)))
+
+    def _trail_sprite(self, diameter, i, rgb):
+        key = (diameter, i, rgb)
+        sprite = self._trail_sprites.get(key)
+        if sprite is None:
+            n = self._trail.maxlen
+            size = max(4, int(diameter * (0.45 + 0.5 * (i + 1) / n)))
+            sprite = pygame.Surface((size, size), pygame.SRCALPHA)
+            pygame.draw.ellipse(sprite, (*rgb, int(35 + 85 * (i + 1) / n)), sprite.get_rect())
+            if len(self._trail_sprites) > 400:
+                self._trail_sprites.clear()
+            self._trail_sprites[key] = sprite
+        return sprite
+
+    def _draw_trail(self, screen, ball, ox, oy):
+        cx, cy = (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2
+        if self._trail:
+            lx, ly = self._trail[-1]
+            moved = math.hypot(cx - lx, cy - ly)
+            if moved > ball.width * 4:          # ball respawned: don't smear across the court
+                self._trail.clear()
+            elif moved >= ball.width * 0.35:
+                self._trail.append((cx, cy))
+        else:
+            self._trail.append((cx, cy))
+
+        paddle = getattr(ball, "last_paddle", None)
+        rgb = tuple(color(paddle.color1)) if paddle else (255, 255, 255)
+        d = int(ball.width)
+        for i, (x, y) in enumerate(list(self._trail)[:-1]):
+            sprite = self._trail_sprite(d, i, rgb)
+            screen.blit(sprite, (int(x + ox - sprite.get_width() / 2), int(y + oy - sprite.get_height() / 2)))
 
     # ── Game world ─────────────────────────────────────────────────────────────
 
     def draw_world(self, screen, game):
         W, H = BASE_W, BASE_H
-        pygame.draw.line(screen, (160, 160, 160), (W // 2, 0), (W // 2, H), 2)
+        ox, oy = self._shake_offset()
+        pygame.draw.line(screen, (160, 160, 160), (W // 2 + ox, oy), (W // 2 + ox, H + oy), 2)
 
         for obj in game.objects:
-            rect = pygame.Rect(int(obj.x0), int(obj.y0), int(obj.width), int(obj.height))
+            if obj.is_ball:
+                self._draw_trail(screen, obj, ox, oy)
+
+        for obj in game.objects:
+            rect = pygame.Rect(int(obj.x0 + ox), int(obj.y0 + oy), int(obj.width), int(obj.height))
             if obj.is_ball:
                 pygame.draw.ellipse(screen, color(getattr(obj, "color",  "white")), rect)
                 pygame.draw.ellipse(screen, theme.BLACK, rect, width=2)
             elif obj.is_paddle:
-                pygame.draw.rect(screen, color(getattr(obj, "color1", "white")), rect)
+                col = color(getattr(obj, "color1", "white"))
+                flash = getattr(obj, "flash", 0.0)
+                if flash > 0:
+                    obj.flash = max(0.0, flash - self.app.dt * 5)
+                    col = tuple(int(lerp(c, 255, 0.7 * flash)) for c in col)
+                pygame.draw.rect(screen, col, rect)
                 pygame.draw.rect(screen, theme.BLACK, rect, width=2)
             elif obj.is_wall:
                 pygame.draw.rect(screen, theme.BLACK, rect)
@@ -519,44 +418,42 @@ class Renderer:
                 (60, 220, 120) if v == 0 else (255, 60, 60))
             screen.blit(surf, surf.get_rect(center=(W // 2, H // 2)))
 
+            if game.p1.score + game.p2.score == 0:   # first serve: remind players of the controls
+                self._draw_controls_hint(screen, game)
+
+    def _draw_controls_hint(self, screen, game):
+        ui = self.ui
+        font = ui.fnt(0.032)
+        for paddle, cx in ((game.p1, BASE_W * 0.25), (game.p2, BASE_W * 0.75)):
+            text = "AI" if paddle.ai_enabled else paddle.controls_label
+            label = ui.text(font, text, theme.WHITE)
+            pad = int(BASE_H * 0.015)
+            w, h = label.get_width() + 2 * pad, label.get_height() + 2 * pad
+            x, y = int(cx - w / 2), int(BASE_H * 0.7)
+            screen.blit(ui.panel_surf(w, h), (x, y))
+            screen.blit(label, (x + pad, y + pad))
+
     # ── Overlay ────────────────────────────────────────────────────────────────
 
-    def draw_overlay(self, state, screen, *,
-                     title=None, header=None, buttons=None,
-                     title_size=0.3, header_size=0.3, btn_size=0.14,
-                     title_y=0.2, header_y=0.4, btn_y=0.75,
-                     title_color=theme.WHITE, panel_rect=None, dim=True):
+    def draw_overlay(self, state, screen, *, title=None, header=None, buttons=None,
+                     title_size=0.08, header_size=0.05, btn_size=0.045,
+                     title_color=theme.WHITE, dim=True):
+        """Auto-sized panel: title, optional header (str or list of (text, colour)
+        parts) and a grid of (key, text, colour, hover) buttons."""
+        ui = self.ui
 
-        W, H = BASE_W, BASE_H
-        mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
+        def build(s):
+            items = []
+            if title is not None:
+                items.append(Text(title, ui.fnt(title_size, s), title_color))
+            if header is not None:
+                items.append(Text(header, ui.fnt(header_size, s)))
+            if buttons is not None:
+                bf = ui.fnt(btn_size, s)
+                cols = getattr(state, "ui_cols", len(buttons))
+                nodes = [Button(key, text, bf, (c1, c2)) for key, text, c1, c2 in buttons]
+                rows = [nodes[i:i + cols] for i in range(0, len(nodes), cols)]
+                items.append(Grid(rows, gap_x=int(BASE_W * 0.015 * s), gap_y=int(ui.gap * s), uniform=True))
+            return Stack(items, gap=int(ui.gap * 1.6 * s))
 
-        if panel_rect is None:
-            pw, ph = int(W * 0.1), int(H * 0.2)
-            panel_rect = pygame.Rect(W // 2 - pw // 2, H // 2 - ph // 2, pw, ph)
-        x, y, w, h = panel_rect
-
-        if dim:
-            screen.blit(self.get_overlay_dim_surf(W, H), (0, 0))
-        screen.blit(self.get_panel_surf(w, h), (x, y))
-
-        from helpers import fit_text, draw_multicolor_text
-
-        if title is not None:
-            tf   = fit_text(title, int(w * 0.9), int(h * title_size), bold=True)
-            surf = tf.render(title, True, title_color)
-            screen.blit(surf, surf.get_rect(center=(x + w // 2, y + int(h * title_y))))
-
-        if header is not None:
-            hf = fit_text(header, int(w * 0.9), int(h * header_size), bold=True)
-            if isinstance(header, list):
-                draw_multicolor_text(screen, hf, header, (x + w // 2, y + int(h * header_y)))
-            else:
-                surf = hf.render(header, True, theme.WHITE)
-                screen.blit(surf, surf.get_rect(center=(x + w // 2, y + int(h * header_y))))
-
-        if buttons is not None:
-            bf = self.app.font_manager.get("helvetica", int(h * btn_size), bold=True)
-            cols = getattr(state, "ui_cols", len(buttons))
-            self.app.ui_layout.draw_button_grid(
-                state, screen, (x, y + int(h * 0.25), w, int(h * btn_y)),
-                buttons, cols=cols, btn_font=bf)
+        ui.overlay(state, screen, build, dim=dim)

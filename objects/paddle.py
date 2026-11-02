@@ -79,7 +79,8 @@ class Paddle(GameObject):
     # ------------------------ AI Logic ------------------------
     def ai_input(self, dt):
         settings = self.game.app.settings.gameplay
-        d = settings.ai_difficulty # 0 - 4
+        opponent = self.game.p2 if self is self.game.p1 else self.game.p1
+        d = settings.ai_level(self.score, opponent.score) # 0 - 4
         W, H = self.game.width, self.game.height
         
         self.reaction_time      = lerp(0.15, 0.05, d / 4)

@@ -1,0 +1,88 @@
+import json, os
+from pathlib import Path
+
+# Which attributes are written to disk.  Anything not listed here (resolution,
+# window mode...) is deliberately left at its default on every launch.
+GAMEPLAY = ["paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "ball_speed",
+            "winning_score_index", "win_by_two", "ai_difficulty", "adaptive_ai", "chaos_mode",
+            "vs_ai", "play_as_blue"]
+DISPLAY = ["max_fps", "show_fps", "dim", "rotate_backgrounds", "background"]
+AUDIO = ["loop_music"]
+INDEX_FIELDS = {"winning_score_index", "ai_difficulty", "max_fps", "background"}  # whole numbers only
+SOUND = ["master_volume", "sfx_volume", "music_volume", "paddle_hit_sound", "score_sound"]
+
+
+def save_path():
+    base = os.environ.get("APPDATA") or (Path.home() / ".local" / "share")
+    return Path(base) / "HuTaong" / "save.json"
+
+
+def _limits(app):
+    g, d = app.settings.gameplay, app.settings.display
+    limits = {name: (getattr(g, name + "_min"), getattr(g, name + "_max"))
+              for name in ("paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "ball_speed")}
+    limits.update(winning_score_index = (0, len(g.winning_scores) - 1),
+                  ai_difficulty = (0, len(g.ai_difficulties) - 1),
+                  max_fps = (0, len(d.max_fps_options) - 1),
+                  background = (0, len(d.backgrounds) - 1),
+                  dim = (0, 1),
+                  master_volume = (0, 1), sfx_volume = (0, 1), music_volume = (0, 1))
+    return limits
+
+
+def collect(app):
+    s = app.settings
+    return {"version": 1,
+            "gameplay": {key: s.gameplay.stored(key) for key in GAMEPLAY},
+            "display": {key: getattr(s.display, key) for key in DISPLAY},
+            "audio": {key: getattr(s.audio, key) for key in AUDIO},
+            "sound": {key: getattr(app.sound_manager, key) for key in SOUND},
+            "stats": app.stats.to_dict()}
+
+
+def _restore(obj, saved, limits):
+    """Copy values onto `obj`, ignoring anything unknown, mistyped or out of range."""
+    if not isinstance(saved, dict):
+        return
+    for name, value in saved.items():
+        if not hasattr(obj, name):
+            continue
+        current = getattr(obj, name)
+        if isinstance(current, bool):
+            if isinstance(value, bool):
+                setattr(obj, name, value)
+        elif isinstance(current, (int, float)):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            lo, hi = limits.get(name, (value, value))
+            value = max(lo, min(hi, value))
+            setattr(obj, name, int(round(value)) if name in INDEX_FIELDS else value)
+
+
+def save(app):
+    path = save_path()
+    try:
+        path.parent.mkdir(parents = True, exist_ok = True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(collect(app), indent = 2))
+        tmp.replace(path)          # never leave a half-written save behind
+    except OSError as e:
+        print(f"[save_data] could not save: {e}")
+
+
+def load(app):
+    try:
+        data = json.loads(save_path().read_text())
+    except (OSError, ValueError):
+        return                     # first launch, or a damaged file: keep defaults
+
+    if not isinstance(data, dict):
+        return
+
+    limits = _limits(app)
+    s = app.settings
+    _restore(s.gameplay, data.get("gameplay"), limits)
+    _restore(s.display, data.get("display"), limits)
+    _restore(s.audio, data.get("audio"), limits)
+    _restore(app.sound_manager, data.get("sound"), limits)
+    app.stats.load_dict(data.get("stats"))

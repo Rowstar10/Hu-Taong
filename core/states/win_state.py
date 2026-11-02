@@ -1,5 +1,6 @@
 import pygame
 
+from core import save_data
 from render import theme
 from core.states.base_state import State
 
@@ -11,23 +12,21 @@ class WinState(State):
     def __init__(self, app, p1, p2, winner, loser):
         super().__init__(app)
 
-        audio = self.app.settings.audio
         sound_manager = self.app.sound_manager
+        self.app.stats.record_match(p1, winner, loser)
+        save_data.save(self.app)
         if not winner.ai_enabled and loser.ai_enabled:
             sound_manager.play("you_win.wav")
-            music = audio.win_track[audio.win_music]
-            sound_manager.play_music(music, music_type = "win")
+            sound_manager.set_mood("victory")
             
         elif not loser.ai_enabled and winner.ai_enabled:
             sound_manager.play("you_lose.wav")
-            music = audio.lose_track[audio.lose_music]
-            sound_manager.play_music(music, music_type = "lose")
+            sound_manager.set_mood("defeat")
             
         else:
             snd = "red_wins.wav" if winner == p1 else "blue_wins.wav"
             sound_manager.play(snd)
-            music = audio.win_track[audio.win_music]
-            sound_manager.play_music(music, music_type = "win")
+            sound_manager.set_mood("victory")
 
         self.p1 = p1
         self.p2 = p2
@@ -37,20 +36,12 @@ class WinState(State):
 
     def draw(self, screen):
         super().draw(screen)
-        W, H = self.app.base_w, self.app.base_h
-        
-        panel_w = int(W * 0.4)
-        panel_h = int(H * 0.6)
-        panel_rect = pygame.Rect(W // 2 - panel_w // 2,
-                                 H // 2 - panel_h // 2,
-                                 panel_w, panel_h)
-
         title = f"{self.winner.color1} Wins!"
         
-        header = [{"word": f"{self.p1.color1}: ", "color": self.p1.color1},
-                  {"word": f"{self.p1.score}      ", "color": theme.WHITE},
-                  {"word": f"{self.p2.color1}: ", "color": self.p2.color1},
-                  {"word": f"{self.p2.score}", "color": theme.WHITE}]
+        header = [(f"{self.p1.color1}: ", theme.color(self.p1.color1)),
+                  (f"{self.p1.score}      ", theme.WHITE),
+                  (f"{self.p2.color1}: ", theme.color(self.p2.color1)),
+                  (f"{self.p2.score}", theme.WHITE)]
         
         buttons = [("play_again", "Play Again?", theme.GREEN, theme.GREEN_HOVER),
                    ("continue", "Endless Mode...", theme.BLUE, theme.BLUE_HOVER),
@@ -61,16 +52,13 @@ class WinState(State):
             self,
             screen,
             title=title, header=header, buttons=buttons,
-            title_size=0.3, header_size=0.06, btn_size=0.055,
-            header_y=0.45, btn_y=0.8,
-            title_color=self.winner.color1,
-            panel_rect=panel_rect)
+            title_size=0.1, header_size=0.05, btn_size=0.045,
+            title_color=theme.color(self.winner.color1))
         
     def handle_event(self, event):
         super().handle_event(event)
 
         gameplay = self.app.settings.gameplay
-        audio = self.app.settings.audio
         sound_manager = self.app.sound_manager
         
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -84,12 +72,11 @@ class WinState(State):
                         game_state = self.app.state_manager.get_state(GameState)
                         
                         if game_state:
-                            music = audio.game_track[audio.game_music]
                             action = lambda: (game_state.restart(),
                                               self.pop_state(mute = True),
                                               self.pop_state(mute = True),
                                               sound_manager.play("enter_state.wav"),
-                                              sound_manager.play_music(music, music_type = "game"))
+                                              sound_manager.set_mood("game"))
                             
                             self.push_state("confirm_choice", action = action, header = "Play Again?", mute = True)
                             
@@ -101,13 +88,12 @@ class WinState(State):
                             gameplay.winning_score_index = gameplay.winning_scores.index("Endless Mode")
                             
                         if game_state:
-                            music = audio.game_track[audio.game_music]
                             action = lambda: (enter_endless_mode(),
                                               self.pop_state(mute = True),
                                               self.pop_state(mute = True),
                                               game_state.game.reset_round(),
                                               sound_manager.play("enter_state.wav"),
-                                              sound_manager.play_music(music, music_type = "game"))
+                                              sound_manager.set_mood("game"))
 
                             self.push_state("confirm_choice", action = action, header = "Enter Endless Mode?", mute = True)
                         

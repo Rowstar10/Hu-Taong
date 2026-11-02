@@ -1,4 +1,4 @@
-import pygame, random
+import pygame
 
 from core.states.base_state import State
 
@@ -51,69 +51,12 @@ class AudioSettingsState(State):
             if key == "reset_sfx_volume":
                 sound.sfx_volume = 0.5
 
-            if key == "cycle_menu_music_left":
-                audio.menu_music = (audio.menu_music - 1) % len(audio.menu_track)
-                if sound.music_type == "menu":
-                    music = audio.menu_track[audio.menu_music]
-                    sound.play_music(music)
-            if key == "cycle_menu_music_right":
-                audio.menu_music = (audio.menu_music + 1) % len(audio.menu_track)
-                if sound.music_type == "menu":
-                    music = audio.menu_track[audio.menu_music]
-                    sound.play_music(music)
-                
-            if key == "cycle_game_music_left":
-                audio.game_music = (audio.game_music - 1) % len(audio.game_track)
-                if sound.music_type == "game":
-                    music = audio.game_track[audio.game_music]
-                    sound.play_music(music)
-            if key == "cycle_game_music_right":
-                audio.game_music = (audio.game_music + 1) % len(audio.game_track)
-                if sound.music_type == "game":
-                    music = audio.game_track[audio.game_music]
-                    sound.play_music(music)
-                
-            if key == "cycle_win_music_left":
-                audio.win_music = (audio.win_music - 1) % len(audio.win_track)
-                if sound.music_type == "win":
-                    music = audio.win_track[audio.win_music]
-                    sound.play_music(music)
-            if key == "cycle_win_music_right":
-                audio.win_music = (audio.win_music + 1) % len(audio.win_track)
-                if sound.music_type == "win":
-                    music = audio.win_track[audio.win_music]
-                    sound.play_music(music)
-
-            if key == "cycle_lose_music_left":
-                audio.lose_music = (audio.lose_music - 1) % len(audio.lose_track)
-                if sound.music_type == "lose":
-                    music = audio.lose_track[audio.lose_music]
-                    sound.play_music(music)
-            if key == "cycle_lose_music_right":
-                audio.lose_music = (audio.lose_music + 1) % len(audio.lose_track)
-                if sound.music_type == "lose":
-                    music = audio.lose_track[audio.lose_music]
-                    sound.play_music(music)
-
+            if key == "cycle_music_left":
+                sound.step_track(-1)
+            if key == "cycle_music_right":
+                sound.step_track(1)
             if key == "randomise_music":
-                menu_music = random.choice(audio.menu_track)
-                game_music = random.choice(audio.game_track)
-                win_music = random.choice(audio.win_track)
-                lose_music = random.choice(audio.lose_track)
-                
-                audio.menu_music = audio.menu_track.index(menu_music)
-                audio.game_music = audio.game_track.index(game_music)
-                audio.win_music = audio.win_track.index(win_music)
-                audio.lose_music = audio.lose_track.index(lose_music)
-                
-                if sound.music_type == "menu":
-                    sound.play_music(menu_music)
-                if sound.music_type == "game":
-                    sound.play_music(game_music)
-                if sound.music_type == "win":
-                    sound.play_music(win_music)
-                if sound.music_type == "lose":
-                    sound.play_music(lose_music)
+                sound.random_track()
 
             if key == "toggle_loop_music":
                 audio.loop_music = not audio.loop_music

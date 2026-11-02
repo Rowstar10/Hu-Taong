@@ -7,11 +7,9 @@ class MainMenuState(State):
     is_menu = True
 
     def enter(self, **kwargs):
-        audio = self.app.settings.audio
         sound_manager = self.app.sound_manager
-        music = audio.menu_track[audio.menu_music]
         sound_manager.play("startup.wav")
-        sound_manager.play_music(music, music_type = "menu")
+        sound_manager.set_mood("menu")
     
     def exit(self, **kwargs):
         super().exit(**kwargs)
@@ -24,7 +22,7 @@ class MainMenuState(State):
         super().handle_event(event)
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-            self.set_state("game", mute = True)
+            self.push_state("match_setup")
             
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.push_state("confirm_choice", action = lambda: self.app.quit(), header = "Quit to desktop?", mute = True)
@@ -33,7 +31,9 @@ class MainMenuState(State):
             mouse_pos = self.app.window_to_base(event.pos)
             key = self.hit_test(mouse_pos)
             if key == "play":
-                self.set_state("game", mute = True)
+                self.push_state("match_setup")
+            if key == "stats":
+                self.push_state("stats")
             if key == "settings":
                 self.push_state("settings")
             if key == "prompt_quit":

@@ -1,6 +1,6 @@
 import pygame, math
 
-from config import SOUND_DIR
+from config import MIXER_STEPS
 
 # ------------------ Math helpers ------------------
 
@@ -23,7 +23,32 @@ def reflect_in_range(y, lo, hi):
 def lerp(a, b, t):
     return a + (b - a) * t
 
+def to_mixer_volume(gain):
+    """Convert a 0-1 gain into a volume the mixer can actually represent.
+
+    The mixer only has MIXER_STEPS + 1 levels and truncates anything between
+    them, so a small-but-nonzero gain (e.g. master 10% x music 7%) would silently
+    become 0 and cut the audio.  A gain is therefore only ever silent if it is
+    exactly zero (a slider the user dragged to 0); anything else is held at the
+    quietest audible step instead.
+    """
+    if gain <= 0:
+        return 0.0
+    return clamp(round(gain * MIXER_STEPS), 1, MIXER_STEPS) / MIXER_STEPS
+
+_FIT_CACHE = {}
+
 def fit_text(text, max_width, start_size, bold=False):
+    if isinstance(text, list):
+        key = ("".join(d["word"] for d in text if isinstance(d, dict) and "word" in d),
+               max_width, start_size, bold)
+    else:
+        key = (str(text), max_width, start_size, bold)
+    if key not in _FIT_CACHE:
+        _FIT_CACHE[key] = _fit_text(text, max_width, start_size, bold)
+    return _FIT_CACHE[key]
+
+def _fit_text(text, max_width, start_size, bold=False):
     size = start_size
     
     if isinstance(text, list):

@@ -28,6 +28,7 @@ EPSILON = 0.001
 HALF_PI = math.pi / 2
 MAX_BOUNCE_ANGLE = math.radians(60)
 MAX_CPF = 5
+MIXER_STEPS = 128  # SDL_mixer volumes are integers 0..128
 
 # -------- Body types --------
 DYNAMIC = 0

@@ -31,24 +31,13 @@ class PauseState(State):
 
     def draw(self, screen):
         super().draw(screen)
-        W, H = self.app.base_w, self.app.base_h
-        
-        panel_w = int(W * 0.45)
-        panel_h = int(H * 0.25)
-        panel_rect = pygame.Rect(W // 2 - panel_w // 2,
-                                 H // 2 - panel_h // 2,
-                                 panel_w, panel_h)
-        
         buttons = [("resume", "Resume", theme.GREEN, theme.GREEN_HOVER),
                    ("reset", "Reset", theme.BLUE, theme.BLUE_HOVER),
                    ("settings", "Settings", theme.ORANGE, theme.ORANGE_HOVER),
                    ("main_menu", "Main Menu", theme.RED, theme.RED_HOVER)]
         
         self.app.renderer.draw_overlay(self, screen,
-                                       title = "Paused", buttons = buttons,
-                                       title_size = 0.35,
-                                       title_y = 0.25, btn_y = 0.8,
-                                       panel_rect = panel_rect)
+                                       title = "Paused", buttons = buttons)
 
         
         if self.game_state:

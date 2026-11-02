@@ -10,10 +10,12 @@ class GameState(State):
     def __init__(self, app):
         super().__init__(app)
         self.game = None
+        self.last_total_score = 0
 
     def enter(self, **kwargs):
         super().enter(**kwargs)
         self.app.sound_manager.play("startup2.wav")
+        self.app.sound_manager.set_mood("game")
         if not self.game:
             self.game = Hu_Taong(self.app)
             self.game.start()
@@ -22,15 +24,24 @@ class GameState(State):
         if self.game:
             self.game.stop()
             self.game = None
+        self.app.settings.gameplay.chaos_restore()
         super().exit(**kwargs)
 
     def restart(self):
         self.game.reset_game()
+        self.last_total_score = 0
         
     def update(self, dt):
         super().update(dt)
         if self.game:
             self.game.update(dt)
+            self.app.stats.track(self.game, dt)
+
+            total = self.game.p1.score + self.game.p2.score
+            if total > self.last_total_score:
+                self.app.stats.points += total - self.last_total_score
+                self.app.renderer.shake(14, 0.3)
+            self.last_total_score = total
             
     def draw(self, screen):
         super().draw(screen)

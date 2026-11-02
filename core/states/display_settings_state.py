@@ -17,12 +17,10 @@ class DisplaySettingsState(State):
         self.res_index = self.app.res_index
         self.display_mode_index = self.app.display_mode_index
         
-        menu_x = (BASE_W - 256) // 2
-        menu_y = BASE_H - 340
-
+        # The renderer decides where the thumbnail goes (see draw()).
         self.bg_name = settings.backgrounds[settings.background]
         self.bg_thumb = BackgroundThumbnail(
-            rect=(menu_x, menu_y, 256, 144),
+            rect=(0, 0, 256, 144),
             image=self.app.bg_current,
             action=lambda: self.open_background_selector())
 
@@ -33,6 +31,7 @@ class DisplaySettingsState(State):
         settings = self.app.settings.display
         
         self.app.renderer.draw_display_settings_menu(self, screen)
+        self.bg_thumb.rect = self.ui_hitboxes["background_thumb"]
         
         mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
 

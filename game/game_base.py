@@ -33,10 +33,6 @@ class GameBase:
         self.running = True
         self.paused = False
         
-        audio = self.app.settings.audio
-        music = audio.game_track[audio.game_music]
-        self.app.sound_manager.play_music(music, music_type = "game")
-        
         self.start_countdown(3)
 
     def stop(self):

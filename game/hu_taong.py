@@ -30,6 +30,10 @@ class Hu_Taong(GameBase):
         self.separator = Wall(self, BASE_W / 2, -10, BASE_W / 2, BASE_H + 10, is_separator = True)
 
         settings = self.app.settings.gameplay
+
+        # Red (left) always uses W A S D, Blue (right) always uses the arrow keys
+        p1_keys = dict(up = pygame.K_w,  down = pygame.K_s,    left = pygame.K_a,    right = pygame.K_d)
+        p2_keys = dict(up = pygame.K_UP, down = pygame.K_DOWN, left = pygame.K_LEFT, right = pygame.K_RIGHT)
         
         # Players & Ball
         self.p1 = Paddle(self,
@@ -38,10 +42,7 @@ class Hu_Taong(GameBase):
                          x = settings.paddle_width,
                          y = (BASE_H - settings.paddle_height) / 2,
                          speed = settings.paddle_speed,
-                         up = pygame.K_w,
-                         down = pygame.K_s,
-                         left = pygame.K_a,
-                         right = pygame.K_d,
+                         **p1_keys,
                          color1 = "Red",
                          color2 = "Orange Red",
                          sound = "Hu.wav")
@@ -52,13 +53,16 @@ class Hu_Taong(GameBase):
                          x = BASE_W - 2 * settings.paddle_width,
                          y = (BASE_H - settings.paddle_height) / 2,
                          speed = settings.paddle_speed,
-                         up = pygame.K_UP,
-                         down = pygame.K_DOWN,
-                         left = pygame.K_LEFT,
-                         right = pygame.K_RIGHT,
+                         **p2_keys,
                          color1 = "Blue",
                          color2 = "Royal Blue",
                          sound = "Tao.wav")
+
+        self.p1.controls_label, self.p2.controls_label = "W A S D", "Arrow Keys"
+
+        # vs AI: the AI takes whichever paddle the player didn't pick
+        self.p1.ai_enabled = settings.vs_ai and settings.play_as_blue
+        self.p2.ai_enabled = settings.vs_ai and not settings.play_as_blue
 
         self.ball = Ball(self, diameter = settings.ball_diameter, x = (BASE_W - settings.ball_diameter) / 2, y = (BASE_H - settings.ball_diameter) / 2, speed = settings.ball_speed, color = "white")
 
@@ -105,6 +109,15 @@ class Hu_Taong(GameBase):
         self.message_timer = 2
 
     def reset_round(self):
+        settings = self.app.settings.gameplay
+        if settings.chaos_mode:
+            settings.chaos_roll()
+            self.apply_gameplay_settings()
+            for obj in self.objects:
+                if obj.is_ball:   # launch at the new speed, in the same directions
+                    obj.spawn_vx = obj.speed * (1 if obj.spawn_vx >= 0 else -1)
+                    obj.spawn_vy = obj.speed * (1 if obj.spawn_vy >= 0 else -1)
+
         for obj in self.objects:
             obj.reset()
             

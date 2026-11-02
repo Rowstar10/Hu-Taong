@@ -35,6 +35,7 @@ class Ball(GameObject):
         
         if other.is_paddle:
             paddle = other
+            paddle.flash = 1.0   # the renderer fades this out
 
             if self.last_paddle is not paddle:
                 self.rally_value += 1

@@ -15,24 +15,14 @@ class ConfirmChoiceState(State):
     
     def draw(self, screen):
         super().draw(screen)
-        W, H = self.app.base_w, self.app.base_h
-        
-        panel_w = int(W * 0.2)
-        panel_h = int(H * 0.15)
-        panel_rect = pygame.Rect(W // 2 - panel_w // 2,
-                                 H // 2 - panel_h // 2,
-                                 panel_w, panel_h)
-        
         buttons = [("confirm", "Yes", theme.GREEN, theme.GREEN_HOVER),
                    ("cancel", "No", theme.RED, theme.RED_HOVER)]
 
         self.app.renderer.draw_overlay(self, screen,
                                        title = self.header,
                                        buttons = buttons,
-                                       title_size = 0.3,
-                                       btn_size = 0.2,
-                                       title_y = 0.3,
-                                       panel_rect = panel_rect)
+                                       title_size = 0.05,
+                                       btn_size = 0.04)
 
     def handle_event(self, event):
         super().handle_event(event)

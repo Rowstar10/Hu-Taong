@@ -2,6 +2,22 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 0.9 — 2026-11-02
+
+Match setup, stats, and settings that are remembered.
+
+### Added
+- A Match Setup screen: choose your opponent (another player or the AI) and which paddle you play.
+- Adaptive AI: it eases off while it's ahead and sharpens up when it's behind, to keep matches close.
+- Chaos Mode: new random sizes and speeds every round.
+- A Stats screen: matches played, wins and losses against the AI, win rate, win streak, longest rally, fastest ball, points scored and time played, with Reset Stats.
+- Settings and stats are saved between sessions.
+- Music by mood: relaxed in the menus, upbeat in matches, and triumphant or downbeat after a match, with the track name shown as it starts.
+- The controls are shown on screen (Red: W A S D, Blue: arrow keys).
+
+### Changed
+- Text too long for its space now shrinks to fit instead of running off the edge.
+
 ## 0.8 — 2026-10-28
 
 A behind-the-scenes rebuild of the menus and sound.
