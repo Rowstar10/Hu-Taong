@@ -26,6 +26,8 @@ class StateManager:
         if not self.pending_actions:
             return
 
+        before = self.stack[self.screen_index()] if self.stack else None
+
         while len(self.pending_actions) > 0:
             action, state_name, kwargs = self.pending_actions.pop(0)
 
@@ -58,6 +60,9 @@ class StateManager:
         if getattr(current_state, "background_img", None):
             self.app.bg_current = self.app.background_cache[current_state.background_img]
 
+        if self.stack and self.stack[self.screen_index()] is not before:
+            self.app.fx.fade()
+
     def set_state(self, state_name, **kwargs):
         self.pending_actions.append(("set", state_name, kwargs))
 
@@ -72,6 +77,13 @@ class StateManager:
                 
     def current(self):
         return self.stack[-1] if self.stack else None
+
+    def screen_index(self):
+        # An overlay shows what is behind it, down to the nearest full screen
+        first = len(self.stack) - 1
+        while first > 0 and self.stack[first].is_overlay:
+            first -= 1
+        return first
     
     def get_state(self, state_type):
         for state in reversed(self.stack):

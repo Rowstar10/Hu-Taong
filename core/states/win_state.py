@@ -1,5 +1,6 @@
 import pygame
 
+from config import BASE_W, BASE_H
 from core import save_data
 from render import theme
 from core.states.base_state import State
@@ -32,16 +33,23 @@ class WinState(State):
         self.p2 = p2
         self.winner = winner
         self.loser = loser
+        self.lost = not loser.ai_enabled and winner.ai_enabled
         self.ui_cols = 2
+
+        # Fan out from beside the panel, so the result stays readable
+        tint = "red" if winner == p1 else "blue"
+        count = 6 if self.lost else 22
+        self.app.fx.burst(BASE_W / 2 - 430, BASE_H / 2, count, 64, tint, arc = (2.2, 4.1))
+        self.app.fx.burst(BASE_W / 2 + 430, BASE_H / 2, count, 64, tint, arc = (-.95, .95))
 
     def draw(self, screen):
         super().draw(screen)
         title = f"{self.winner.color1} Wins!"
         
         header = [(f"{self.p1.color1}: ", theme.color(self.p1.color1)),
-                  (f"{self.p1.score}      ", theme.WHITE),
+                  (f"{self.p1.score}      ", theme.PARCHMENT),
                   (f"{self.p2.color1}: ", theme.color(self.p2.color1)),
-                  (f"{self.p2.score}", theme.WHITE)]
+                  (f"{self.p2.score}", theme.PARCHMENT)]
         
         buttons = [("play_again", "Play Again?", theme.GREEN, theme.GREEN_HOVER),
                    ("continue", "Endless Mode...", theme.BLUE, theme.BLUE_HOVER),
@@ -53,7 +61,7 @@ class WinState(State):
             screen,
             title=title, header=header, buttons=buttons,
             title_size=0.1, header_size=0.05, btn_size=0.045,
-            title_color=theme.color(self.winner.color1))
+            title_color=theme.color(self.winner.color1), mark="败" if self.lost else "胜")
         
     def handle_event(self, event):
         super().handle_event(event)

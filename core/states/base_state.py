@@ -1,5 +1,7 @@
 import pygame
 
+from core import save_data
+
 class State:
     NAME = None
     REGISTER = True
@@ -52,6 +54,15 @@ class State:
 
     def pop_state(self, **kwargs):
         self.app.state_manager.pop_state(**kwargs)
+
+    def confirm_reset(self, header, reset):
+        def action():
+            reset()
+            save_data.save(self.app)
+            self.pop_state(mute = True)
+            self.app.sound_manager.play("enter_state.wav")
+
+        self.push_state("confirm_choice", action = action, header = header, mute = True)
 
     def update_slider_from_mouse(self, slider, event):
         mx, my = self.app.window_to_base(event.pos)

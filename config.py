@@ -11,6 +11,7 @@ RESOURCE_DIR = BASE_DIR / "Resources"
 SOUND_DIR = RESOURCE_DIR / "Sounds"
 MUSIC_DIR = SOUND_DIR / "Music"
 IMAGE_DIR = RESOURCE_DIR / "Images"
+FONT_DIR = RESOURCE_DIR / "Fonts"
 
 # -------- Constants --------
 BASE_W, BASE_H = 1920, 1080
@@ -23,6 +24,11 @@ RESOLUTIONS = [(854, 480),
                (2560, 1440),
                (3840, 2160),
                (7680, 4320)]
+
+DEFAULT_DISPLAY_MODE = 1
+
+# Backgrounds are scaled past the screen edges by this much, for parallax
+BG_OVERSCAN = (30, 17)
 
 EPSILON = 0.001
 HALF_PI = math.pi / 2

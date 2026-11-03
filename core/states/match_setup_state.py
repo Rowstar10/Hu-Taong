@@ -13,6 +13,7 @@ class MatchSetupState(State):
 
     def start_match(self):
         save_data.save(self.app)
+        self.app.fx.swarm()
         self.set_state("game", mute = True)
 
     def handle_event(self, event):

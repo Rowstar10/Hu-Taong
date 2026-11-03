@@ -49,6 +49,37 @@ ROYAL_BLUE_HOVER = (85, 125, 245)
 ORANGE = (235, 145, 40)
 ORANGE_HOVER = (255, 165, 60)
 
+# --- Hu Tao ---
+INK = (16, 7, 9)
+LACQUER_TOP = (58, 17, 19)
+LACQUER_MID = (36, 11, 13)
+LACQUER_BOTTOM = (21, 7, 9)
+
+CRIMSON = (178, 28, 36)
+CRIMSON_BRIGHT = (226, 52, 44)
+EMBER = (255, 122, 44)
+FLAME = (255, 186, 96)
+
+GOLD_DARK = (128, 88, 42)
+GOLD = (214, 170, 92)
+GOLD_BRIGHT = (250, 220, 150)
+
+PAPER = (238, 218, 170)
+PAPER_DARK = (204, 172, 116)
+CINNABAR = (176, 28, 26)
+PARCHMENT = (240, 226, 200)
+
+GHOST = (232, 240, 255)
+SPIRIT_BLUE = (92, 168, 255)
+
+# Lacquer finish for each accent: (face top, face bottom, lip, text)
+LACQUER = {"crimson": ((182, 38, 40), (112, 16, 22), (58, 8, 12), GOLD_BRIGHT),
+           "jade":    ((46, 128, 98), (18, 72, 56), (8, 38, 30), GOLD_BRIGHT),
+           "amber":   ((192, 118, 40), (124, 64, 16), (66, 32, 8), PARCHMENT),
+           "azure":   ((48, 98, 170), (20, 50, 106), (10, 24, 58), GOLD_BRIGHT),
+           "ink":     ((66, 38, 34), (30, 15, 15), (12, 6, 6), GOLD),
+           "paper":   ((242, 224, 180), (206, 176, 122), (120, 88, 50), CINNABAR)}
+
 # --- Color Roles ---
 BACKGROUND = BLACK_BLUE
 TEXT = WHITE
@@ -56,6 +87,11 @@ TEXT_DARK = BLACK
 POSITIVE = GREEN
 NEGATIVE = RED
 NEUTRAL = GRAY
+
+def finish(accent):
+    """The lacquer finish for one of the accent colours above."""
+    return {GREEN: "jade", BLUE: "azure", ORANGE: "amber", WHITE: "paper",
+            GRAY: "ink", DARK_GRAY: "ink"}.get(accent, "crimson")
 
 def color(name_or_rgb):
     if isinstance(name_or_rgb, tuple):

@@ -1,5 +1,6 @@
 import pygame
 
+from core.sound_manager import DEFAULT_VOLUME
 from core.states.base_state import State
 
 class AudioSettingsState(State):
@@ -43,13 +44,15 @@ class AudioSettingsState(State):
                 sound.sfx_volume = self.update_slider_from_mouse("sfx_volume_slider", event)
                 
             if key == "reset_master_volume":
-                sound.master_volume = 0.5
+                sound.master_volume = DEFAULT_VOLUME
                 sound.update_music_volume()
             if key == "reset_music_volume":
-                sound.music_volume = 0.5
+                sound.music_volume = DEFAULT_VOLUME
                 sound.update_music_volume()
             if key == "reset_sfx_volume":
-                sound.sfx_volume = 0.5
+                sound.sfx_volume = DEFAULT_VOLUME
+            if key == "reset_defaults":
+                self.confirm_reset("Reset audio settings?", self.app.reset_audio_settings)
 
             if key == "cycle_music_left":
                 sound.step_track(-1)

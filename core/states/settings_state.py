@@ -31,5 +31,7 @@ class SettingsState(State):
                 self.push_state("display")
             if key == "audio":
                 self.push_state("audio")
+            if key == "reset_all":
+                self.confirm_reset("Reset ALL settings?", self.app.reset_all_settings)
             if key == "back":
                 self.pop_state()

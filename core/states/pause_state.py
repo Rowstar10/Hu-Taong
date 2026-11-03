@@ -37,7 +37,7 @@ class PauseState(State):
                    ("main_menu", "Main Menu", theme.RED, theme.RED_HOVER)]
         
         self.app.renderer.draw_overlay(self, screen,
-                                       title = "Paused", buttons = buttons)
+                                       title = "Paused", buttons = buttons, mark = "停")
 
         
         if self.game_state:

@@ -2,6 +2,20 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 1.0 — 2026-11-03
+
+First release, with a new Wangsheng Funeral Parlor look.
+
+### Added
+- A new look themed on the Wangsheng Funeral Parlor: lacquer and paper panels, plum blossom headings, title boards, and paddles drawn as lacquered staffs.
+- Effects: butterflies, embers, sparks, falling petals and bursts.
+- New fonts: Ma Shan Zheng and Philosopher.
+- A loading screen, and "Red scored!" and "Blue scored!" banners.
+- A Match the Display resolution option.
+- Reset to Default on each settings screen, and Reset All Settings.
+- 17 more backgrounds (29 in all) and 27 more music tracks (43 in all).
+- CREDITS.md, crediting the artists, musicians and font designers.
+
 ## 0.9 — 2026-11-02
 
 Match setup, stats, and settings that are remembered.

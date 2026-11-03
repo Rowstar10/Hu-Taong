@@ -22,7 +22,8 @@ class DisplaySettingsState(State):
         self.bg_thumb = BackgroundThumbnail(
             rect=(0, 0, 256, 144),
             image=self.app.bg_current,
-            action=lambda: self.open_background_selector())
+            action=lambda: self.open_background_selector(),
+            art=self.app.art)
 
         self.thumbnails = [self.bg_thumb]
         
@@ -95,7 +96,10 @@ class DisplaySettingsState(State):
             if key == "dim_slider":
                 self.dragging_dim = True
                 settings.dim = self.update_slider_from_mouse("dim_slider", event)
-                
+
+            if key == "reset_defaults":
+                self.confirm_reset("Reset display settings?", self.reset_defaults)
+
             if key == "back":
                 self.pop_state()
 
@@ -104,6 +108,11 @@ class DisplaySettingsState(State):
             
         if event.type == pygame.MOUSEMOTION and self.dragging_dim:
             settings.dim = self.update_slider_from_mouse("dim_slider", event)
+
+    def reset_defaults(self):
+        self.app.reset_display_settings()
+        self.res_index = self.app.res_index
+        self.display_mode_index = self.app.display_mode_index
 
     def open_background_selector(self):
         self.app.state_manager.push_state("background_selection")

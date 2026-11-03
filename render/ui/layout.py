@@ -2,6 +2,7 @@ import pygame
 
 from config import BASE_W, BASE_H
 from render import theme
+from render.art import ADD, mix
 
 # ======================================================================
 #  Layout engine
@@ -60,7 +61,7 @@ class Text(Node):
     """`text` is a str, a callable returning a str, or a list of (str, colour) parts.
     `samples` lists every string it may show, so its width stays fixed."""
 
-    def __init__(self, text, font, color=theme.WHITE, samples=None, align="center"):
+    def __init__(self, text, font, color=theme.PARCHMENT, samples=None, align="center"):
         super().__init__()
         self.text, self.font, self.color = text, font, color
         self.samples, self.align = samples, align
@@ -90,65 +91,124 @@ class Text(Node):
             self.align, self.rect.centerx - total // 2)
         for t, col in parts:
             surf = ui.text(self.font, t, col)
-            ui.screen.blit(surf, (x, self.rect.centery - surf.get_height() // 2))
+            y = self.rect.centery - surf.get_height() // 2
+            ui.screen.blit(ui.text(self.font, t, theme.INK), (x + 2, y + 2))
+            ui.screen.blit(surf, (x, y))
             x += surf.get_width()
 
 
-class Button(Node):
-    """Rounded button.  `colors` may be a callable returning (normal, hover)."""
+class Label(Node):
+    """A section heading between two plum blossoms."""
 
-    def __init__(self, key, text, font, colors, samples=None, fg=theme.BLACK):
+    FLOWER = 26
+
+    def __init__(self, text, font):
         super().__init__()
-        self.key, self.text, self.font = key, text, font
-        self.colors, self.samples, self.fg = colors, samples, fg
+        self.text, self.font = text, font
 
     def measure(self):
-        samples = self.samples or [_val(self.text)]
-        self.w = max(self.font.size(s)[0] for s in samples) + int(BASE_W * 0.02)
-        self.h = self.font.size("Ag")[1] + int(BASE_H * 0.02)
+        self.w = self.font.size(self.text)[0] + 2 * (self.FLOWER + 12)
+        self.h = self.font.size("Ag")[1]
         return self.w, self.h
 
     def draw(self, ui):
-        normal, hover = _val(self.colors)
-        col = hover if self.rect.collidepoint(ui.mouse) else normal
-        pygame.draw.rect(ui.screen, col, self.rect, border_radius=12)
-        surf = ui.text(self.font, _val(self.text), self.fg)
+        cx, cy = self.rect.center
+        ui.renderer.text(ui.screen, self.text, self.font, theme.GOLD, center=(cx, cy))
+        half = self.w // 2 - self.FLOWER // 2
+        flower = ui.art.blossom(self.FLOWER)
+        ui.screen.blit(flower, flower.get_rect(center=(cx - half, cy)))
+        ui.screen.blit(flower, flower.get_rect(center=(cx + half, cy)))
+
+
+class Title(Node):
+    """Gilded calligraphy, used for the headline of an overlay."""
+
+    def __init__(self, text, font, color):
+        super().__init__()
+        self.text, self.font, self.color = text, font, color
+
+    def measure(self):
+        self.w, self.h = self.font.size(self.text)
+        return self.w, self.h
+
+    def draw(self, ui):
+        tint = _val(self.color)
+        surf = ui.art.gilded(self.text, self.font, top=mix(tint, (255, 255, 255), .55), bottom=tint)
         ui.screen.blit(surf, surf.get_rect(center=self.rect.center))
+
+
+class Button(Node):
+    """Lacquered button.  `colors` may be a callable returning (normal, hover);
+    the normal colour picks the finish, and DARK_GRAY means greyed out."""
+
+    def __init__(self, key, text, font, colors, samples=None):
+        super().__init__()
+        self.key, self.text, self.font = key, text, font
+        self.colors, self.samples = colors, samples
+
+    def measure(self):
+        samples = self.samples or [_val(self.text)]
+        self.w = max(self.font.size(s)[0] for s in samples) + int(BASE_W * 0.03)
+        self.h = self.font.size("Ag")[1] + int(BASE_H * 0.024)
+        return self.w, self.h
+
+    def draw(self, ui):
+        normal, _ = _val(self.colors)
+        enabled = normal != theme.DARK_GRAY
+        ui.renderer.draw_lacquer(ui.screen, ui.mouse if enabled else (-1, -1), self.rect,
+                                 _val(self.text), self.font, theme.finish(normal),
+                                 fg=None if enabled else theme.GRAY)
+        ui.state.ui_hitboxes[self.key] = self.rect
+
+
+class Toggle(Node):
+    """Dark plaque stamped with a seal that reads on or off."""
+
+    def __init__(self, key, text, font, on, samples):
+        super().__init__()
+        self.key, self.text, self.font, self.on, self.samples = key, text, font, on, samples
+
+    def measure(self):
+        self.h = self.font.size("Ag")[1] + 22
+        self.w = max(self.font.size(s)[0] for s in self.samples) + self.h + 34
+        return self.w, self.h
+
+    def draw(self, ui):
+        ui.renderer.draw_toggle(ui.screen, ui.mouse, self.rect, _val(self.text), self.font, _val(self.on))
         ui.state.ui_hitboxes[self.key] = self.rect
 
 
 class Cycle(Node):
     """[<]  value  [>]  -- the value box is as wide as the widest option."""
 
-    def __init__(self, key, text, font, samples, color=theme.WHITE):
+    def __init__(self, key, text, font, samples, color=theme.PARCHMENT):
         super().__init__()
         self.key, self.text, self.font, self.samples, self.color = key, text, font, samples, color
 
     def measure(self):
-        gap = int(BASE_W * 0.01)
-        self.arrow_w = self.font.size("<")[0] + int(BASE_W * 0.02)
-        self.arrow_h = self.font.size("Ag")[1] + int(BASE_H * 0.02)
-        value_w = max(self.font.size(s)[0] for s in self.samples) + 2 * gap
-        self.w = 2 * self.arrow_w + value_w + 2 * gap
-        self.h = self.arrow_h
+        gap = int(BASE_W * 0.007)
+        self.arrow = self.font.size("Ag")[1] + 12
+        value_w = max(self.font.size(s)[0] for s in self.samples) + 4 * gap
+        self.w = 2 * self.arrow + value_w + 2 * gap
+        self.h = self.arrow
+        self.gap = gap
         return self.w, self.h
 
     def place(self, x, y, w, h):
         super().place(x, y, w, h)
         r = self.rect
-        self.left = pygame.Rect(r.left, r.top, self.arrow_w, self.arrow_h)
-        self.right = pygame.Rect(r.right - self.arrow_w, r.top, self.arrow_w, self.arrow_h)
+        self.left = pygame.Rect(r.left, r.top, self.arrow, self.arrow)
+        self.right = pygame.Rect(r.right - self.arrow, r.top, self.arrow, self.arrow)
+        self.plate = pygame.Rect(self.left.right + self.gap, r.top + 2,
+                                 r.width - 2 * (self.arrow + self.gap), self.arrow - 4)
 
     def draw(self, ui):
-        for rect, glyph, suffix in ((self.left, "<", "_left"), (self.right, ">", "_right")):
-            col = theme.GRAY_HOVER if rect.collidepoint(ui.mouse) else theme.GRAY
-            pygame.draw.rect(ui.screen, col, rect, border_radius=12)
-            surf = ui.text(self.font, glyph, theme.BLACK)
-            ui.screen.blit(surf, surf.get_rect(center=rect.center))
-            ui.state.ui_hitboxes[self.key + suffix] = rect
+        ui.screen.blit(ui.art.inset(self.plate.w, self.plate.h), self.plate)
+        ui.renderer.text(ui.screen, _val(self.text), self.font, _val(self.color), center=self.plate.center)
 
-        surf = ui.text(self.font, _val(self.text), _val(self.color))
-        ui.screen.blit(surf, surf.get_rect(center=self.rect.center))
+        for rect, left, suffix in ((self.left, True, "_left"), (self.right, False, "_right")):
+            ui.screen.blit(ui.art.chevron(rect.w, left, rect.collidepoint(ui.mouse)), rect)
+            ui.state.ui_hitboxes[self.key + suffix] = rect
 
 
 class Slider(Node):
@@ -164,16 +224,17 @@ class Slider(Node):
 
     def measure(self):
         self.gap = int(BASE_W * 0.012)
-        self.track_h = int(BASE_H * 0.02)
-        self.knob_r = int(self.track_h * 1.2)
+        self.track_h = int(BASE_H * 0.017)
+        self.knob_r = int(self.track_h * 1.4)
         self.reset_w = self.reset_h = 0
         if self.reset_key:
-            self.reset_w = self.reset_font.size("Reset")[0] + int(BASE_W * 0.015)
-            self.reset_h = self.reset_font.size("Ag")[1] + int(BASE_H * 0.012)
-        self.label_w = self.font.size(self.label_sample)[0]
+            self.reset_w = self.reset_font.size("Reset")[0] + int(BASE_W * 0.018)
+            self.reset_h = self.reset_font.size("Ag")[1] + int(BASE_H * 0.014)
+        self.label_w = self.font.size(self.label_sample)[0] + 28
+        self.label_h = self.font.size("Ag")[1] + 6
         self.pad = self.knob_r + self.gap // 2      # the knob overhangs both ends of the track
         self.w = self.reset_w + self.pad + self.track_w + self.pad + self.label_w
-        self.h = max(2 * self.knob_r + 2, self.reset_h)
+        self.h = max(2 * self.knob_r + 2, self.reset_h, self.label_h)
         return self.w, self.h
 
     def place(self, x, y, w, h):
@@ -182,33 +243,35 @@ class Slider(Node):
         x0 = r.left + self.reset_w + self.pad
         self.reset_rect = pygame.Rect(r.left, r.centery - self.reset_h // 2, self.reset_w, self.reset_h)
         self.track = pygame.Rect(x0, r.centery - self.track_h // 2, self.track_w, self.track_h)
-        self.label_x = self.track.right + self.pad
+        self.plate = pygame.Rect(self.track.right + self.pad, r.centery - self.label_h // 2,
+                                 self.label_w, self.label_h)
         # grab area is as tall as the knob, not just the thin track
         self.grab = self.track.inflate(0, 2 * self.knob_r - self.track_h)
 
     def draw(self, ui):
-        screen, t = ui.screen, self.track
+        screen, t, art = ui.screen, self.track, ui.art
         value = max(0.0, min(1.0, _val(self.value)))
 
-        pygame.draw.rect(screen, theme.DARK_GRAY, t, border_radius=6)
-        fill_w = int(t.width * value)
+        screen.blit(art.inset(t.w, t.h), t)
+        fill_w = int((t.w - 6) * value)
         if fill_w > 0:
-            pygame.draw.rect(screen, self.color, (t.x, t.y, fill_w, t.height), border_radius=6)
+            bar = art.slider_fill(t.w - 6, t.h - 6, self.color)
+            screen.blit(bar, (t.x + 3, t.y + 3), (0, 0, fill_w, t.h - 6))
 
-        kx, ky = t.x + fill_w, t.centery
+        kx, ky = t.x + 3 + fill_w, t.centery
         dx, dy = ui.mouse[0] - kx, ui.mouse[1] - ky
         hot = dx * dx + dy * dy <= self.knob_r ** 2
-        pygame.draw.circle(screen, theme.WHITE_HOVER if hot else theme.WHITE, (kx, ky), self.knob_r)
+        if hot:
+            halo = art.glow(48, (120, 54, 20))
+            screen.blit(halo, halo.get_rect(center=(kx, ky)), special_flags=ADD)
+        knob = art.blossom(2 * self.knob_r + (8 if hot else 0), (214, 168, 88), (150, 26, 26))
+        screen.blit(knob, knob.get_rect(center=(kx, ky)))
 
-        surf = ui.text(self.font, _val(self.label), theme.WHITE)
-        screen.blit(surf, surf.get_rect(midleft=(self.label_x, ky)))
+        screen.blit(art.inset(self.plate.w, self.plate.h), self.plate)
+        ui.renderer.text(screen, _val(self.label), self.font, theme.PARCHMENT, center=self.plate.center)
 
         if self.reset_key:
-            hov = self.reset_rect.collidepoint(ui.mouse)
-            pygame.draw.rect(screen, theme.WHITE_HOVER if hov else theme.WHITE,
-                             self.reset_rect, border_radius=12)
-            rs = ui.text(self.reset_font, "Reset", theme.BLACK)
-            screen.blit(rs, rs.get_rect(center=self.reset_rect.center))
+            ui.renderer.draw_lacquer(screen, ui.mouse, self.reset_rect, "Reset", self.reset_font, "ink")
             ui.state.ui_hitboxes[self.reset_key] = self.reset_rect
 
         ui.state.ui_hitboxes[self.key] = self.grab
@@ -300,11 +363,11 @@ class Grid(Node):
 
 
 class Frame(Node):
-    """Panel with padding around a single child (used by overlays)."""
+    """Lacquered panel with padding around a single child (used by overlays)."""
 
-    def __init__(self, child, pad):
+    def __init__(self, child, pad, mark=None):
         super().__init__()
-        self.child, self.pad = child, pad
+        self.child, self.pad, self.mark = child, pad, mark
 
     def measure(self):
         cw, ch = self.child.measure()
@@ -318,7 +381,7 @@ class Frame(Node):
                          r.width - 2 * self.pad, r.height - 2 * self.pad)
 
     def draw(self, ui):
-        ui.screen.blit(ui.panel_surf(self.rect.width, self.rect.height), self.rect.topleft)
+        ui.renderer.draw_board(ui.screen, self.rect, self.mark)
         self.child.draw(ui)
 
 
@@ -331,14 +394,19 @@ class UILayout:
 
     SCALES = (1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.6, 0.5)
 
+    # The lacquered board every settings screen sits on, and the room inside it
+    PANEL = pygame.Rect(120, 130, 1680, 790)
+    PANEL_TOP = 72
+    PANEL_BOTTOM = 56
+    PANEL_SIDE = 60
+    FOOTER_Y = 1004
+
     def __init__(self, app):
         self.app = app
-        self.margin_x = int(BASE_W * 0.04)
-        self.margin_y = int(BASE_H * 0.03)
+        self.art = app.art
         self.gap = int(BASE_H * 0.02)
 
         self._text_cache = {}
-        self._panel_cache = {}
         self._dim_surf = None
 
         # set every frame by screen_menu()/overlay()
@@ -346,9 +414,16 @@ class UILayout:
         self.state = None
         self.mouse = (0, 0)
 
+    @property
+    def renderer(self):
+        return self.app.renderer
+
     # ---------- Shared caches ----------
     def fnt(self, frac, scale=1.0, bold=True):
-        return self.app.font_manager.get("helvetica", max(8, int(BASE_H * frac * scale)), bold=bold)
+        return self.app.font_manager.get("ui", max(8, int(BASE_H * frac * scale)), bold=bold)
+
+    def brush(self, frac, scale=1.0):
+        return self.app.font_manager.get("brush", max(8, int(BASE_H * frac * scale)))
 
     def text(self, font, text, color):
         key = (font, text, color)
@@ -359,77 +434,69 @@ class UILayout:
             surf = self._text_cache[key] = font.render(text, True, color)
         return surf
 
-    def panel_surf(self, w, h):
-        key = (w, h)
-        if key not in self._panel_cache:
-            surf = pygame.Surface((w, h), pygame.SRCALPHA)
-            pygame.draw.rect(surf, (30, 30, 30, 230), surf.get_rect(), border_radius=18)
-            pygame.draw.rect(surf, (90, 90, 90, 255), surf.get_rect(), width=2, border_radius=18)
-            self._panel_cache[key] = surf
-        return self._panel_cache[key]
-
     def dim_surf(self):
         if self._dim_surf is None:
-            self._dim_surf = pygame.Surface((BASE_W, BASE_H), pygame.SRCALPHA)
-            self._dim_surf.fill((0, 0, 0, 170))
+            self._dim_surf = pygame.Surface((BASE_W, BASE_H))
+            self._dim_surf.fill((14, 3, 5))
+            self._dim_surf.set_alpha(165)
         return self._dim_surf
 
     # ---------- Full-screen menus ----------
-    def screen_menu(self, state, screen, builder, *, title, color,
-                    title_size=0.14, back=True):
-        """Title at the top, optional Back button at the bottom, body centred between."""
+    def screen_menu(self, state, screen, builder, *, title, mark, reset=None, back=True):
+        """Title board, a lacquered panel holding the body, and a footer of Back and Reset."""
         laid = getattr(state, "_laid", None)
         if laid is None:
-            laid = state._laid = self._fit_screen(builder, title, color, title_size, back)
-        title_node, body, back_node = laid
+            laid = state._laid = self._fit_screen(builder, reset, back)
+        body, footer = laid
 
         self._begin(state, screen)
-        title_node.draw(self)
+        self.renderer.draw_frame(screen, title, mark)
         body.draw(self)
-        if back_node:
-            back_node.draw(self)
+        for node in footer:
+            node.draw(self)
 
-    def _fit_screen(self, builder, title, color, title_size, back):
+    def _fit_screen(self, builder, reset, back):
+        p = self.PANEL
+        top, bottom = p.top + self.PANEL_TOP, p.bottom - self.PANEL_BOTTOM
+
         for scale in self.SCALES:
-            title_node = Text(title, self.fnt(title_size, scale), color)
-            back_node = (Button("back", "Back", self.fnt(0.04, scale),
-                                (theme.RED, theme.RED_HOVER)) if back else None)
             body = builder(scale)
-
-            title_node.measure()
             body.measure()
-            if back_node:
-                back_node.measure()
-
-            top = self.margin_y
-            title_node.place(0, top, BASE_W, title_node.h)
-            top += title_node.h + self.gap
-            bottom = BASE_H - self.margin_y
-            if back_node:
-                back_node.place(0, bottom - back_node.h, BASE_W, back_node.h)
-                bottom -= back_node.h + self.gap
-
-            fits = body.h <= bottom - top and body.w <= BASE_W - 2 * self.margin_x
+            fits = body.h <= bottom - top and body.w <= p.width - 2 * self.PANEL_SIDE
             if fits or scale == self.SCALES[-1]:
-                body.place(0, top, BASE_W, bottom - top)
-                return title_node, body, back_node
+                body.place(p.left, top, p.width, bottom - top)
+                break
+
+        footer = []
+        if back:
+            node = Button("back", "Back", self.fnt(0.04), (theme.RED, theme.RED_HOVER))
+            node.measure()
+            node.w = max(node.w, 280)
+            node.place(0, self.FOOTER_Y - node.h // 2, BASE_W, node.h)
+            footer.append(node)
+        if reset:
+            node = Button("reset_defaults", reset, self.fnt(0.034), (theme.WHITE, theme.WHITE_HOVER))
+            node.measure()
+            node.place(p.right - node.w, self.FOOTER_Y - node.h // 2, node.w, node.h)
+            footer.append(node)
+        return body, footer
 
     # ---------- Overlays ----------
-    def overlay(self, state, screen, builder, *, dim=True, pad=None):
+    def overlay(self, state, screen, builder, *, dim=True, pad=None, mark=None):
         """Auto-sized panel centred on screen, over an optional dimmed backdrop."""
         laid = getattr(state, "_laid", None)
         if laid is None:
-            laid = state._laid = self._fit_overlay(builder, pad)
+            laid = state._laid = self._fit_overlay(builder, pad, mark)
 
         self._begin(state, screen)
         if dim:
             screen.blit(self.dim_surf(), (0, 0))
         laid.draw(self)
 
-    def _fit_overlay(self, builder, pad):
-        pad = pad if pad is not None else int(BASE_H * 0.04)
+    def _fit_overlay(self, builder, pad, mark):
+        pad = pad if pad is not None else int(BASE_H * 0.065)
         for scale in self.SCALES:
-            frame = Frame(builder(scale), int(pad * scale))
+            frame = Frame(builder(scale), int(pad * scale), mark)
             frame.measure()
             if (frame.w <= BASE_W * 0.9 and frame.h <= BASE_H * 0.9) or scale == self.SCALES[-1]:
                 frame.place(0, 0, BASE_W, BASE_H)

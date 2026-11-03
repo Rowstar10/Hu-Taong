@@ -1,6 +1,16 @@
 import random
 from pathlib import Path
 
+from config import IMAGE_DIR
+
+def find_backgrounds():
+    numbered = {}
+    for path in IMAGE_DIR.glob("bg*.*"):
+        number = path.stem[2:]
+        if number.isdigit():
+            numbered[int(number)] = path.name
+    return [numbered[number] for number in sorted(numbered)]
+
 class Settings:
     def __init__(self, app):
         self.app = app
@@ -11,45 +21,50 @@ class Settings:
 class GameplaySettings:
     def __init__(self, app):
         self.app = app
-        
+
         # Paddle
         self.paddle_width_min = 20
         self.paddle_width_max = 60
         self.paddle_width_range = self.paddle_width_max - self.paddle_width_min
-        self.paddle_width = (self.paddle_width_min + self.paddle_width_max) // 2
-        
+
         self.paddle_height_min = 100
         self.paddle_height_max = 300
         self.paddle_height_range = self.paddle_height_max - self.paddle_height_min
-        self.paddle_height = (self.paddle_height_min + self.paddle_height_max) // 2
-        
+
         self.paddle_speed_min = 1000
         self.paddle_speed_max = 2000
         self.paddle_speed_range = self.paddle_speed_max - self.paddle_speed_min
-        self.paddle_speed = (self.paddle_speed_min + self.paddle_speed_max) // 2
-        
+
         # Ball
         self.ball_diameter_min = 20
         self.ball_diameter_max = 100
         self.ball_diameter_range = self.ball_diameter_max - self.ball_diameter_min
-        self.ball_diameter = (self.ball_diameter_min + self.ball_diameter_max) // 2
-        
+
         self.ball_speed_min = 200
         self.ball_speed_max = 800
         self.ball_speed_range = self.ball_speed_max - self.ball_speed_min
+
+        # Match rules
+        self.winning_scores = [3, 5, 11, 15, 21, "Endless Mode"]
+
+        # AI
+        self.ai_difficulties = ["Baby", "Easy", "Normal", "Hard", "Insane"]
+
+        self.reset()
+
+    def reset(self):
+        self.paddle_width = (self.paddle_width_min + self.paddle_width_max) // 2
+        self.paddle_height = (self.paddle_height_min + self.paddle_height_max) // 2
+        self.paddle_speed = (self.paddle_speed_min + self.paddle_speed_max) // 2
+        self.ball_diameter = (self.ball_diameter_min + self.ball_diameter_max) // 2
         self.ball_speed = (self.ball_speed_min + self.ball_speed_max) // 2
 
         # Match setup (chosen on the Match Setup screen)
         self.vs_ai = True            # True: you play one paddle and the AI takes the other.
         self.play_as_blue = False    # Which paddle is yours vs the AI (Red: W A S D, Blue: Arrow Keys).
 
-        # Match rules
-        self.winning_scores = [3, 5, 11, 15, 21, "Endless Mode"]
         self.winning_score_index = 2
         self.win_by_two = True
-
-        # AI
-        self.ai_difficulties = ["Baby", "Easy", "Normal", "Hard", "Insane"]
         self.ai_difficulty = 2
         self.adaptive_ai = False
 
@@ -93,28 +108,20 @@ class GameplaySettings:
 class DisplaySettings:
     def __init__(self, app):
         self.app = app
-        
-        self.max_fps_options = [30, 60, 120, 144, 165, 240, "Unlimited"]
-        self.max_fps = 2
-        self.show_fps = True
-        
-        self.dim = 0
-        self.resolution = (1920, 1080)
 
-        self.backgrounds = ["bg1.png",
-                            "bg2.png",
-                            "bg3.png",
-                            "bg4.png",
-                            "bg5.png",
-                            "bg6.png",
-                            "bg7.png",
-                            "bg8.png",
-                            "bg9.png",
-                            "bg10.png",
-                            "bg11.png",
-                            "bg12.png"]
+        self.max_fps_options = [30, 60, 120, 144, 165, 240, "Unlimited"]
+
+        self.backgrounds = find_backgrounds()
 
         self.background = self.backgrounds.index(random.choice(self.backgrounds))
+
+        self.reset()
+
+    def reset(self):
+        self.max_fps = 2
+        self.show_fps = True
+        self.dim = 0
+        self.resolution = (1920, 1080)
         self.rotate_backgrounds = True
 
 class AudioSettings:
@@ -131,20 +138,50 @@ class AudioSettings:
                         "Relaxed Tao 2.mp3",
                         "Relaxed Tao 3.mp3",
                         "Retro Relax.mp3",
-                        "Living Beware.mp3"],
+                        "Living Beware.mp3",
+                        "Guzheng City.mp3",
+                        "Ishikari Lore.mp3",
+                        "Ripples.mp3",
+                        "Path of the Goblin King.mp3",
+                        "Liyan.mp3",
+                        "Asian String Suite.mp3",
+                        "New Dusks Light.mp3",
+                        "Jade Kings Throne.mp3"],
 
             "game":    ["Hillichurl REMIX.mp3",
                         "Epic Conquest.mp3",
                         "Arcade Retro.mp3",
-                        "Operation Awesome.mp3"],
+                        "Operation Awesome.mp3",
+                        "Shenyang.mp3",
+                        "Big Mojo.mp3",
+                        "Mountain Emperor.mp3",
+                        "Scheming Weasel.mp3",
+                        "Graveyard Shift.mp3",
+                        "Burnt Spirit.mp3",
+                        "Sunrise in the Dynasty.mp3",
+                        "Chipnese.ogg",
+                        "Taiko Drums.ogg"],
 
             "victory": ["Triumphant Win.mp3",
-                        "Epic Win.mp3"],
+                        "Epic Win.mp3",
+                        "Winner Winner.mp3",
+                        "Our Story Begins.mp3",
+                        "Finding Movement.mp3",
+                        "Ten Fanfares.ogg"],
 
             "defeat":  ["Grand Defeat.mp3",
-                        "Sweet Melancholy.mp3"],
+                        "Sweet Melancholy.mp3",
+                        "Ghost Processional.mp3",
+                        "Peaceful Desolation.mp3",
+                        "On the Shore.mp3",
+                        "Nu Flute.mp3",
+                        "Asian Duet.mp3",
+                        "Death of a Ninja.mp3"],
         }
 
+        self.reset()
+
+    def reset(self):
         self.loop_music = False
 
     @property

@@ -73,6 +73,14 @@ class Hu_Taong(GameBase):
         sound_manager = self.app.sound_manager
         win_score = settings.winning_scores[settings.winning_score_index]
 
+        if nx != 0:
+            cy = (obj.y0 + obj.y1) / 2
+            arc = (-1.1, 1.1) if nx == 1 else (2.04, 4.24)
+            self.app.fx.burst(0 if nx == 1 else BASE_W, cy, 18, 64, "blue" if nx == 1 else "red",
+                              speed = (260, 620), arc = arc)
+            self.app.fx.spark(0 if nx == 1 else BASE_W, cy, 40, theme.SPIRIT_BLUE if nx == 1 else theme.EMBER,
+                              speed = 720, life = .9, arc = arc)
+
         if nx == 1:
             self.p2.score += 1
             self.message_text = f"{self.p2.color1} scored!"

@@ -3,6 +3,7 @@ import random
 
 from config import DYNAMIC
 from helpers import lerp
+from render import theme
 from objects.game_object import GameObject
 
 
@@ -32,7 +33,9 @@ class Ball(GameObject):
     def on_contact(self, other, data):
         nx, ny = data["normal"]
         sound_manager = self.game.app.sound_manager
-        
+        fx = self.game.app.fx
+        cx, cy = (self.x0 + self.x1) / 2, (self.y0 + self.y1) / 2
+
         if other.is_paddle:
             paddle = other
             paddle.flash = 1.0   # the renderer fades this out
@@ -42,11 +45,18 @@ class Ball(GameObject):
                 if sound_manager.paddle_hit_sound:
                     sound_manager.play(paddle.sound)
 
+                impact = theme.EMBER if paddle.is_left else theme.SPIRIT_BLUE
+                fx.spark(cx, cy, 22, impact, speed = 520)
+                fx.burst(cx, cy, 2, 40, "red" if paddle.is_left else "blue", life = (.7, 1.1))
+
             self.last_paddle = paddle
 
         if other.is_wall and other.is_goal:
             self.game.on_score(self, data)
             return
+
+        if other.is_wall:
+            fx.spark(cx, cy, 8, theme.FLAME, speed = 300, life = .45)
 
     def reset(self):
         super().reset()

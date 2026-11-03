@@ -1,6 +1,6 @@
 import os, pygame, random
 
-from config import BASE_W, BASE_H, RESOLUTIONS, IMAGE_DIR
+from config import BASE_W, BASE_H, RESOLUTIONS, IMAGE_DIR, DEFAULT_DISPLAY_MODE, BG_OVERSCAN
 from core import save_data
 from core.settings import Settings
 from core.stats import Stats
@@ -8,7 +8,9 @@ from core.sound_manager import SoundManager
 from core.state_manager import StateManager
 from core.states.base_state import State
 from render import theme
+from render.art import Art
 from render.font_manager import FontManager
+from render.fx import Ambience
 from render.renderer import Renderer
 from render.hud import Hud
 from render.ui.layout import UILayout
@@ -28,9 +30,11 @@ class App:
         self.sound_manager = SoundManager(self)
         self.state_manager = StateManager(self)
         self.font_manager = FontManager()
+        self.art = Art(self)
         self.ui_layout = UILayout(self)
         self.renderer = Renderer(self)
         self.hud = Hud(self)
+        self.fx = Ambience(self)
         self.stats = Stats()
         save_data.load(self)
         
@@ -58,7 +62,7 @@ class App:
 
         # ---------- Display & Surfaces ----------
         self.display_modes = ["windowed", "borderless", "fullscreen"]
-        self.display_mode_index = 1
+        self.display_mode_index = DEFAULT_DISPLAY_MODE
         self.display_mode = self.display_modes[self.display_mode_index]
         self.apply_display_mode()
         
@@ -70,11 +74,30 @@ class App:
         self.background_cache = {}
         self.thumbnail_cache = {}
         
+        self.bg_offset = [0.0, 0.0]
+
         display = self.settings.display
-        for bg in display.backgrounds:
+        size = BASE_W + 2 * BG_OVERSCAN[0], BASE_H + 2 * BG_OVERSCAN[1]
+        vignette = self.art.vignette(*size, strength = 120)
+
+        for i, bg in enumerate(display.backgrounds):
+            self.renderer.draw_loading_screen(self.virtual, .75 * i / len(display.backgrounds))
+            self.present()
+            pygame.event.pump()
+
             img = pygame.image.load(IMAGE_DIR / bg).convert()  # opaque -> much faster full-screen blits
-            self.background_cache[bg] = pygame.transform.smoothscale(img, self.base_res)
+            full = pygame.transform.smoothscale(img, size)
+            full.blit(vignette, (0, 0))
+            self.background_cache[bg] = full
             self.thumbnail_cache[bg] = pygame.transform.smoothscale(img, (256, 144))
+
+        jobs = self.renderer.prewarm_jobs()
+        for i, job in enumerate(jobs):
+            job()
+            if i % 12 == 0:
+                self.renderer.draw_loading_screen(self.virtual, .75 + .25 * i / len(jobs))
+                self.present()
+                pygame.event.pump()
 
         bg_init = display.backgrounds[display.background]
         self.bg_current = self.background_cache[bg_init]
@@ -134,6 +157,30 @@ class App:
         my = pos[1] * self.sy
         return mx, my
 
+    def reset_gameplay_settings(self):
+        self.settings.gameplay.reset()
+
+    def reset_display_settings(self):
+        self.settings.display.reset()
+
+        # Only rebuild the window if it actually changes, to avoid a flicker
+        if (self.display_mode_index != DEFAULT_DISPLAY_MODE
+                or self.current_resolution != self.native_res):
+            self.display_mode_index = DEFAULT_DISPLAY_MODE
+            self.display_mode = self.display_modes[self.display_mode_index]
+            self.current_resolution = self.native_res
+            self.res_index = self.resolutions.index(self.current_resolution)
+            self.apply_display_mode()
+
+    def reset_audio_settings(self):
+        self.settings.audio.reset()
+        self.sound_manager.reset()
+
+    def reset_all_settings(self):
+        self.reset_gameplay_settings()
+        self.reset_display_settings()
+        self.reset_audio_settings()
+
     def start_bg_transition(self):
         display = self.settings.display
         new_bg = random.choice(display.backgrounds)
@@ -147,9 +194,23 @@ class App:
         self.bg_transition_active = True
         self.bg_transition_time = 0
 
+    def update_parallax(self):
+        # The picture drifts against the cursor in menus and settles during play
+        target = (0, 0)
+        if self.fx.scene != "game":
+            mx, my = self.window_to_base(pygame.mouse.get_pos())
+            target = ((1 - 2 * mx / BASE_W) * BG_OVERSCAN[0],
+                      (1 - 2 * my / BASE_H) * BG_OVERSCAN[1])
+
+        ease = min(1, 3 * self.dt)
+        self.bg_offset[0] += (target[0] - self.bg_offset[0]) * ease
+        self.bg_offset[1] += (target[1] - self.bg_offset[1]) * ease
+
     def draw_background(self):
-        self.virtual.blit(self.bg_current, (0, 0))
-        
+        self.update_parallax()
+        pos = (self.bg_offset[0] - BG_OVERSCAN[0], self.bg_offset[1] - BG_OVERSCAN[1])
+        self.virtual.blit(self.bg_current, pos)
+
         if self.bg_transition_active:
             self.bg_transition_time += self.dt
             t = self.bg_transition_time / self.bg_transition_duration
@@ -158,7 +219,7 @@ class App:
             
             alpha = int(255 * t)            
             self.bg_next.set_alpha(alpha)
-            self.virtual.blit(self.bg_next, (0, 0))
+            self.virtual.blit(self.bg_next, pos)
 
             if t >= 1:
                 self.bg_next.set_alpha(None)
@@ -230,14 +291,17 @@ class App:
                 self.dim_last = dim
             self.virtual.blit(self.dim_surf, (0, 0))
 
+        self.fx.update(self.dt)
+        self.fx.draw_back(self.virtual)
+
         # ---------- Draw States ----------
-        current_state = self.state_manager.current()
-        
-        if getattr(current_state, "is_overlay", False):
-            for state in self.state_manager.stack[:-1]:
-                state.draw(self.virtual)
-                
-        current_state.draw(self.virtual)
+        stack = self.state_manager.stack
+
+        for state in stack[self.state_manager.screen_index():]:
+            state.draw(self.virtual)
+
+        self.fx.draw_front(self.virtual)
+        self.fx.draw_overlays(self.virtual)
 
         # ---------- Now-playing toast ----------
         self.renderer.draw_toast(self.virtual, self.dt)
@@ -245,12 +309,15 @@ class App:
         # ---------- Show FPS ----------
         if settings.show_fps:
             if not hasattr(self, "fps_font"):
-                self.fps_font = self.font_manager.get("helvetica", int(BASE_H * 0.02), bold=True)
-            fps_surf = self.fps_font.render(f"{self.fps} FPS", True, theme.WHITE)
+                self.fps_font = self.font_manager.get("ui", int(BASE_H * 0.02), bold=True)
+            fps_surf = self.fps_font.render(f"{self.fps} FPS", True, theme.GOLD)
             self.virtual.blit(fps_surf, (BASE_W - 3 * fps_surf.get_width() // 2, BASE_H - 2 * fps_surf.get_height()))
 
+        self.present()
+
+    def present(self):
         # ---------- Scale + Flip ----------
-        pygame.transform.scale(self.virtual, self.current_resolution, self.display)         
+        pygame.transform.scale(self.virtual, self.current_resolution, self.display)
         pygame.display.flip()
 
     def clock_tick(self):

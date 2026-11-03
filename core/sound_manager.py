@@ -3,20 +3,14 @@ from config import SOUND_DIR, MUSIC_DIR
 from helpers import to_mixer_volume
 
 SOUND_CACHE = {}
+DEFAULT_VOLUME = 0.5
 
 class SoundManager:
     def __init__(self, app):
         self.app = app
 
-        # Volume sliders (0-1).  Everything audible goes through volume() so the
-        # mixer's 1/128 resolution is handled in exactly one place.
-        self.master_volume = 0.5
-        self.sfx_volume = 0.5
-        self.music_volume = 0.5
         self.multiplier = 1          # temporary music ducking (e.g. pause menu)
-
-        self.paddle_hit_sound = True
-        self.score_sound = True
+        self.reset()
 
         # Jukebox
         self.fade_out_ms = 1000
@@ -26,6 +20,17 @@ class SoundManager:
         self._pending = None         # track waiting for the current one to finish fading out
 
         self.preload_sounds()
+
+    def reset(self):
+        # Volume sliders (0-1).  Everything audible goes through volume() so the
+        # mixer's 1/128 resolution is handled in exactly one place.
+        self.master_volume = DEFAULT_VOLUME
+        self.sfx_volume = DEFAULT_VOLUME
+        self.music_volume = DEFAULT_VOLUME
+
+        self.paddle_hit_sound = True
+        self.score_sound = True
+        self.update_music_volume()
 
     # ---------------- Volume ----------------
 
