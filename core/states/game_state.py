@@ -65,11 +65,5 @@ class GameState(State):
             mx, my = mouse_pos
             key = self.hit_test(mouse_pos)
 
-            if key == "p1_ai":
-                self.game.p1.ai_enabled = not self.game.p1.ai_enabled
-                    
-            elif key == "p2_ai":
-                self.game.p2.ai_enabled = not self.game.p2.ai_enabled
-                    
-            elif key == "pause":
+            if key == "pause":
                 self.push_state("pause", mute = True)

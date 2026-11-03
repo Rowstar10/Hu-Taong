@@ -32,8 +32,8 @@ class GameBase:
         
         self.running = True
         self.paused = False
-        
-        self.start_countdown(3)
+
+        self.start_countdown(self.app.settings.interface.serve_seconds)
 
     def stop(self):
         self.running = False

@@ -25,6 +25,8 @@ def _val(v):
 # ---------------------------------------------------------------- Nodes
 
 class Node:
+    tip = None          # text (or a callable returning it) shown when the mouse rests here
+
     def __init__(self):
         self.w = self.h = 0
         self.rect = pygame.Rect(0, 0, 0, 0)
@@ -48,13 +50,15 @@ class Space(Node):
 
 class Slot(Node):
     """Empty reserved area that registers a hitbox (e.g. for a thumbnail)."""
-    def __init__(self, key, w, h):
+    def __init__(self, key, w, h, tip=None):
         super().__init__()
         self.key = key
         self.w, self.h = w, h
+        self.tip = tip
 
     def draw(self, ui):
         ui.state.ui_hitboxes[self.key] = self.rect
+        ui.offer_tip(self.rect, self.tip)
 
 
 class Text(Node):
@@ -141,10 +145,10 @@ class Button(Node):
     """Lacquered button.  `colors` may be a callable returning (normal, hover);
     the normal colour picks the finish, and DARK_GRAY means greyed out."""
 
-    def __init__(self, key, text, font, colors, samples=None):
+    def __init__(self, key, text, font, colors, samples=None, tip=None):
         super().__init__()
         self.key, self.text, self.font = key, text, font
-        self.colors, self.samples = colors, samples
+        self.colors, self.samples, self.tip = colors, samples, tip
 
     def measure(self):
         samples = self.samples or [_val(self.text)]
@@ -159,14 +163,16 @@ class Button(Node):
                                  _val(self.text), self.font, theme.finish(normal),
                                  fg=None if enabled else theme.GRAY)
         ui.state.ui_hitboxes[self.key] = self.rect
+        ui.offer_tip(self.rect, self.tip)
 
 
 class Toggle(Node):
     """Dark plaque stamped with a seal that reads on or off."""
 
-    def __init__(self, key, text, font, on, samples):
+    def __init__(self, key, text, font, on, samples, tip=None):
         super().__init__()
         self.key, self.text, self.font, self.on, self.samples = key, text, font, on, samples
+        self.tip = tip
 
     def measure(self):
         self.h = self.font.size("Ag")[1] + 22
@@ -176,14 +182,58 @@ class Toggle(Node):
     def draw(self, ui):
         ui.renderer.draw_toggle(ui.screen, ui.mouse, self.rect, _val(self.text), self.font, _val(self.on))
         ui.state.ui_hitboxes[self.key] = self.rect
+        ui.offer_tip(self.rect, self.tip)
+
+
+class CycleToggle(Node):
+    """A toggle that steps through several settings, one per click, with a seal for each."""
+
+    def __init__(self, key, texts, font, level, glyphs, tip=None):
+        super().__init__()
+        self.key, self.texts, self.font, self.level, self.glyphs = key, texts, font, level, glyphs
+        self.tip = tip
+
+    def measure(self):
+        self.h = self.font.size("Ag")[1] + 22
+        self.w = max(self.font.size(s)[0] for s in self.texts) + self.h + 34
+        return self.w, self.h
+
+    def draw(self, ui):
+        level = _val(self.level)
+        ui.renderer.draw_toggle(ui.screen, ui.mouse, self.rect, self.texts[level], self.font, level > 0,
+                                glyph=self.glyphs[level], hot=level > 1)
+        ui.state.ui_hitboxes[self.key] = self.rect
+        ui.offer_tip(self.rect, self.tip)
+
+
+class KeyButton(Node):
+    """A key binding.  While it waits for a new key it glows and asks for one."""
+
+    def __init__(self, key, text, font, listening, samples, tip=None):
+        super().__init__()
+        self.key, self.text, self.font, self.listening, self.samples = key, text, font, listening, samples
+        self.tip = tip
+
+    def measure(self):
+        self.w = max(self.font.size(s)[0] for s in self.samples) + int(BASE_W * 0.03)
+        self.h = self.font.size("Ag")[1] + int(BASE_H * 0.02)
+        return self.w, self.h
+
+    def draw(self, ui):
+        waiting = _val(self.listening)
+        text = "Press a key" if waiting else _val(self.text)
+        ui.renderer.draw_lacquer(ui.screen, ui.mouse, self.rect, text, self.font, "crimson" if waiting else "ink")
+        ui.state.ui_hitboxes[self.key] = self.rect
+        ui.offer_tip(self.rect, self.tip)
 
 
 class Cycle(Node):
     """[<]  value  [>]  -- the value box is as wide as the widest option."""
 
-    def __init__(self, key, text, font, samples, color=theme.PARCHMENT):
+    def __init__(self, key, text, font, samples, color=theme.PARCHMENT, tip=None):
         super().__init__()
         self.key, self.text, self.font, self.samples, self.color = key, text, font, samples, color
+        self.tip = tip
 
     def measure(self):
         gap = int(BASE_W * 0.007)
@@ -209,15 +259,16 @@ class Cycle(Node):
         for rect, left, suffix in ((self.left, True, "_left"), (self.right, False, "_right")):
             ui.screen.blit(ui.art.chevron(rect.w, left, rect.collidepoint(ui.mouse)), rect)
             ui.state.ui_hitboxes[self.key + suffix] = rect
+        ui.offer_tip(self.rect, self.tip)
 
 
 class Slider(Node):
     """[Reset]  ----o----  label"""
 
     def __init__(self, key, value, color, font, label, label_sample,
-                 reset_key=None, reset_font=None, track_w=None):
+                 reset_key=None, reset_font=None, track_w=None, tip=None):
         super().__init__()
-        self.key, self.value, self.color = key, value, color
+        self.key, self.value, self.color, self.tip = key, value, color, tip
         self.font, self.label, self.label_sample = font, label, label_sample
         self.reset_key, self.reset_font = reset_key, reset_font
         self.track_w = track_w or int(BASE_W * 0.18)
@@ -275,6 +326,10 @@ class Slider(Node):
             ui.state.ui_hitboxes[self.reset_key] = self.reset_rect
 
         ui.state.ui_hitboxes[self.key] = self.grab
+        if self.reset_key and self.reset_rect.collidepoint(ui.mouse):
+            ui.offer_tip(self.reset_rect, "Back to the default value.")
+        else:
+            ui.offer_tip(self.rect, self.tip)
 
 
 # ----------------------------------------------------------- Containers
@@ -475,7 +530,8 @@ class UILayout:
             node.place(0, self.FOOTER_Y - node.h // 2, BASE_W, node.h)
             footer.append(node)
         if reset:
-            node = Button("reset_defaults", reset, self.fnt(0.034), (theme.WHITE, theme.WHITE_HOVER))
+            node = Button("reset_defaults", reset, self.fnt(0.034), (theme.WHITE, theme.WHITE_HOVER),
+                          tip="Put every setting on this screen back to its default.")
             node.measure()
             node.place(p.right - node.w, self.FOOTER_Y - node.h // 2, node.w, node.h)
             footer.append(node)
@@ -501,6 +557,10 @@ class UILayout:
             if (frame.w <= BASE_W * 0.9 and frame.h <= BASE_H * 0.9) or scale == self.SCALES[-1]:
                 frame.place(0, 0, BASE_W, BASE_H)
                 return frame
+
+    def offer_tip(self, rect, tip):
+        if tip and rect.collidepoint(self.mouse):
+            self.renderer.tips.offer(rect, _val(tip))
 
     def _begin(self, state, screen):
         self.screen, self.state = screen, state

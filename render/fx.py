@@ -114,27 +114,29 @@ class Ambience:
         self.fade_total = 1.0
         self.fade_surf = pygame.Surface((BASE_W, BASE_H))
         self.fade_surf.fill((22, 4, 6))
+        self.level = 0          # Settings > Interface > Effects: Full, Reduced, Off
+        self.amount = 1.0
         self.set_scene("title")
 
     # ---------- One-off effects ----------
 
     def burst(self, x, y, count, size=64, tint="red", speed=(180, 460), life=(1.1, 2.2), arc=(0, math.tau)):
         """Butterflies scatter outward from a point."""
-        for _ in range(count):
+        for _ in range(round(count * self.amount)):
             self.burst_flies.append(Butterfly(x, y, size, tint, random.uniform(*arc),
                                               random.uniform(*speed), random.uniform(*life)))
 
     def spark(self, x, y, count, color=theme.EMBER, speed=420, life=.7, arc=(0, math.tau), gravity=260):
         if len(self.sparks) > self.MAX_MOTES:
             return
-        for _ in range(count):
+        for _ in range(round(count * self.amount)):
             a, v = random.uniform(*arc), random.uniform(.25, 1) * speed
             self.sparks.append(Mote(x, y, math.cos(a) * v, math.sin(a) * v, random.uniform(.4, 1) * life,
                                     random.choice((3, 4, 6)), color, gravity))
 
     def swarm(self):
         """A wall of butterflies crosses the screen."""
-        for i in range(46):
+        for i in range(round(46 * self.amount)):
             self.burst_flies.append(Butterfly(random.uniform(-520, -40), random.uniform(0, BASE_H), random.choice((48, 64, 88)),
                                               heading=random.uniform(-.25, .25), speed=random.uniform(900, 1500), life=2.2))
 
@@ -163,7 +165,13 @@ class Ambience:
 
     def set_scene(self, name):
         self.scene = name
-        self.config = self.SCENES[name]
+        self.amount = (1.0, 0.5, 0.0)[self.level]
+        base = self.SCENES[name]
+        self.config = dict(base, **{key: round(base[key] * self.amount) for key in ("flies", "front", "embers", "petals")})
+        if self.level == 2:
+            self.config.update(mist=0, lanterns=(), talismans=(), ghost=False)
+            self.burst_flies.clear()
+            self.sparks.clear()
         tints = ("red", "red", "red", "red", "blue") if name == "title" else ("red",)
 
         self.stock(self.flies, self.config["flies"], self.config["sizes"], tints)
@@ -191,7 +199,9 @@ class Ambience:
         self.time += dt
 
         scene = self.current_scene()
-        if scene != self.scene:
+        level = self.app.settings.interface.effects
+        if scene != self.scene or level != self.level:
+            self.level = level
             self.set_scene(scene)
 
         mouse = self.app.window_to_base(pygame.mouse.get_pos())

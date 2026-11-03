@@ -5,10 +5,15 @@ from pathlib import Path
 # window mode...) is deliberately left at its default on every launch.
 GAMEPLAY = ["paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "ball_speed",
             "winning_score_index", "win_by_two", "ai_difficulty", "adaptive_ai", "chaos_mode",
-            "vs_ai", "play_as_blue"]
+            "vs_ai", "play_as_blue", "middle_wall", "ai_style", "chaos_switch"]
 DISPLAY = ["max_fps", "show_fps", "dim", "rotate_backgrounds", "background"]
 AUDIO = ["loop_music"]
-INDEX_FIELDS = {"winning_score_index", "ai_difficulty", "max_fps", "background"}  # whole numbers only
+INTERFACE = ["tooltips", "ai_banter", "screen_shake", "ball_trail", "auto_pause", "hide_cursor",
+             "hud", "effects", "countdown",
+             "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right"]
+INDEX_FIELDS = {"winning_score_index", "ai_difficulty", "max_fps", "background",
+                "ai_style", "chaos_mode", "chaos_switch", "hud", "effects", "countdown",
+                "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right"}  # whole numbers only
 SOUND = ["master_volume", "sfx_volume", "music_volume", "paddle_hit_sound", "score_sound"]
 
 
@@ -18,11 +23,16 @@ def save_path():
 
 
 def _limits(app):
-    g, d = app.settings.gameplay, app.settings.display
+    g, d, i = app.settings.gameplay, app.settings.display, app.settings.interface
     limits = {name: (getattr(g, name + "_min"), getattr(g, name + "_max"))
               for name in ("paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "ball_speed")}
     limits.update(winning_score_index = (0, len(g.winning_scores) - 1),
                   ai_difficulty = (0, len(g.ai_difficulties) - 1),
+                  ai_style = (0, len(g.ai_styles) - 1),
+                  chaos_mode = (0, 2), chaos_switch = (0, 2),
+                  hud = (0, len(i.hud_options) - 1),
+                  effects = (0, len(i.effects_options) - 1),
+                  countdown = (0, len(i.countdown_options) - 1),
                   max_fps = (0, len(d.max_fps_options) - 1),
                   background = (0, len(d.backgrounds) - 1),
                   dim = (0, 1),
@@ -36,6 +46,7 @@ def collect(app):
             "gameplay": {key: s.gameplay.stored(key) for key in GAMEPLAY},
             "display": {key: getattr(s.display, key) for key in DISPLAY},
             "audio": {key: getattr(s.audio, key) for key in AUDIO},
+            "interface": {key: getattr(s.interface, key) for key in INTERFACE},
             "sound": {key: getattr(app.sound_manager, key) for key in SOUND},
             "stats": app.stats.to_dict()}
 
@@ -84,5 +95,8 @@ def load(app):
     _restore(s.gameplay, data.get("gameplay"), limits)
     _restore(s.display, data.get("display"), limits)
     _restore(s.audio, data.get("audio"), limits)
+    _restore(s.interface, data.get("interface"), limits)
+    if not s.interface.keys_valid():
+        s.interface.reset_keys()   # a missing or doubled-up key would leave a paddle uncontrollable
     _restore(app.sound_manager, data.get("sound"), limits)
     app.stats.load_dict(data.get("stats"))

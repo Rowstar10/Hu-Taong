@@ -61,7 +61,11 @@ class WinState(State):
             screen,
             title=title, header=header, buttons=buttons,
             title_size=0.1, header_size=0.05, btn_size=0.045,
-            title_color=theme.color(self.winner.color1), mark="败" if self.lost else "胜")
+            title_color=theme.color(self.winner.color1), mark="败" if self.lost else "胜",
+            tips={"play_again": "Start a new match with the same setup.",
+                  "continue": "Keep playing this match with no score limit.",
+                  "settings": "Change settings, then come back to this screen.",
+                  "main_menu": "Leave this match."})
         
     def handle_event(self, event):
         super().handle_event(event)

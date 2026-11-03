@@ -96,8 +96,9 @@ class Physics:
                 x_entry = b.x1 - a.x0
                 x_exit  = b.x0 - a.x1
 
-            tx_entry = x_entry / (rvx * dt) if rvx != 0 and dt != 0 else -float('inf')
-            tx_exit  = x_exit  / (rvx * dt) if rvx != 0 and dt != 0 else float('inf')
+            step = rvx * dt     # can round to 0 for a crawling ball even when rvx isn't 0
+            tx_entry = x_entry / step if step != 0 else -float('inf')
+            tx_exit  = x_exit  / step if step != 0 else float('inf')
 
         # ---------------- Y axis ----------------
         if rvy  ==  0:
@@ -114,8 +115,9 @@ class Physics:
                 y_entry = b.y1 - a.y0
                 y_exit  = b.y0 - a.y1
 
-            ty_entry = y_entry / (rvy * dt) if rvy != 0 and dt != 0 else -float('inf')
-            ty_exit  = y_exit  / (rvy * dt) if rvy != 0 and dt != 0 else float('inf')
+            step = rvy * dt
+            ty_entry = y_entry / step if step != 0 else -float('inf')
+            ty_exit  = y_exit  / step if step != 0 else float('inf')
 
         # ---------------- Combine ----------------
         t_entry = max(tx_entry, ty_entry)

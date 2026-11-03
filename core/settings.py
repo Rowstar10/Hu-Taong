@@ -1,6 +1,8 @@
 import random
 from pathlib import Path
 
+import pygame
+
 from config import IMAGE_DIR
 
 def find_backgrounds():
@@ -17,6 +19,7 @@ class Settings:
         self.gameplay = GameplaySettings(app)
         self.display = DisplaySettings(app)
         self.audio = AudioSettings(app)
+        self.interface = InterfaceSettings(app)
 
 class GameplaySettings:
     def __init__(self, app):
@@ -49,6 +52,7 @@ class GameplaySettings:
 
         # AI
         self.ai_difficulties = ["Baby", "Easy", "Normal", "Hard", "Insane"]
+        self.ai_styles = ["Balanced", "Guardian", "Striker", "Trickster"]
 
         self.reset()
 
@@ -65,13 +69,20 @@ class GameplaySettings:
 
         self.winning_score_index = 2
         self.win_by_two = True
+        self.middle_wall = True      # False: paddles may cross the centre line
         self.ai_difficulty = 2
+        self.ai_style = 0
         self.adaptive_ai = False
 
-        # Chaos mode: new random ball/paddle settings every round.  The player's own
-        # values are kept in _chaos_backup and put back when the match ends.
-        self.chaos_mode = False
+        # Chaos mode: 0 off, 1 new random ball/paddle settings every round, 2 (Chaos Mode +)
+        # sizes and speeds drift during play.  For 1 the player's own values are kept in
+        # _chaos_backup and put back when the match ends.
+        self.chaos_mode = 0
         self._chaos_backup = None
+
+        # Chaos switch: 0 off, 1 players swap paddles after every point,
+        # 2 (Chaos Switch +) they swap at random, telegraphed moments mid-rally.
+        self.chaos_switch = 0
 
     CHAOS_KEYS = ("ball_speed", "ball_diameter", "paddle_height", "paddle_width", "paddle_speed")
 
@@ -97,13 +108,18 @@ class GameplaySettings:
                 setattr(self, key, value)
             self._chaos_backup = None
 
-    def ai_level(self, own_score, opponent_score):
-        """AI difficulty to use right now.  With adaptive AI it drops a level for every
-        3 points the AI is ahead, and rises one for every 3 it is behind."""
+    def ai_skill(self, own_score, opponent_score):
+        """AI skill right now, from 0 (Baby) to 4 (Insane).  With adaptive AI it eases
+        off by a level for every 3 points it is ahead and sharpens up when behind,
+        sliding between levels rather than jumping."""
         if not self.adaptive_ai:
-            return self.ai_difficulty
-        level = round(self.ai_difficulty - (own_score - opponent_score) / 3)
-        return max(0, min(len(self.ai_difficulties) - 1, level))
+            return float(self.ai_difficulty)
+        skill = self.ai_difficulty - (own_score - opponent_score) / 3
+        return max(0.0, min(len(self.ai_difficulties) - 1.0, skill))
+
+    def ai_level(self, own_score, opponent_score):
+        """AI difficulty to use right now, as a whole level."""
+        return round(self.ai_skill(own_score, opponent_score))
 
 class DisplaySettings:
     def __init__(self, app):
@@ -195,3 +211,65 @@ class AudioSettings:
     def track_name(track):
         """Display name: file name without its extension."""
         return Path(track).stem if track else ""
+
+def key_name(key):
+    """How a key is shown on screen: W, Up, Left Shift..."""
+    name = pygame.key.name(key)
+    return name.upper() if len(name) == 1 else name.title()
+
+class InterfaceSettings:
+    ACTIONS = ("up", "down", "left", "right")
+    KEY_FIELDS = ("p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right")
+    DEFAULT_KEYS = {"p1_up": pygame.K_w, "p1_down": pygame.K_s, "p1_left": pygame.K_a, "p1_right": pygame.K_d,
+                    "p2_up": pygame.K_UP, "p2_down": pygame.K_DOWN, "p2_left": pygame.K_LEFT, "p2_right": pygame.K_RIGHT}
+
+    def __init__(self, app):
+        self.app = app
+
+        self.hud_options = ["Full", "Minimal"]
+        self.effects_options = ["Full", "Reduced", "Off"]
+        self.countdown_options = [3, 2, 1]
+
+        self.reset()
+
+    def reset(self):
+        self.tooltips = True
+        self.ai_banter = True
+        self.screen_shake = True
+        self.ball_trail = True
+        self.auto_pause = True       # pause a match when the window loses focus
+        self.hide_cursor = True      # hide the mouse during a match until it moves
+
+        self.hud = 0
+        self.effects = 0
+        self.countdown = 0
+        self.reset_keys()
+
+    def reset_keys(self):
+        for field, key in self.DEFAULT_KEYS.items():
+            setattr(self, field, key)
+
+    def keys(self, player):
+        return {action: getattr(self, f"{player}_{action}") for action in self.ACTIONS}
+
+    def keys_label(self, player):
+        keys = self.keys(player)
+        if keys == {a: self.DEFAULT_KEYS[f"p2_{a}"] for a in self.ACTIONS}:
+            return "Arrow Keys"
+        return " ".join(key_name(keys[a]) for a in ("up", "left", "down", "right"))
+
+    def bind(self, field, key):
+        """Give `field` this key.  A binding that already had it swaps, so no key is used twice."""
+        for other in self.KEY_FIELDS:
+            if other != field and getattr(self, other) == key:
+                setattr(self, other, getattr(self, field))
+        setattr(self, field, key)
+
+    def keys_valid(self):
+        keys = [getattr(self, f) for f in self.KEY_FIELDS]
+        named = all(isinstance(k, int) and pygame.key.name(k) for k in keys)
+        return named and len(set(keys)) == len(keys) and pygame.K_ESCAPE not in keys
+
+    @property
+    def serve_seconds(self):
+        return self.countdown_options[self.countdown]

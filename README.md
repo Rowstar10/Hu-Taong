@@ -1,12 +1,8 @@
-# Hu Taong 1.0
+# Hu Taong 1.1
 
-Pong, the Wangsheng Funeral Parlor way. Version 1.0, 3 November 2026.
+Pong, the Wangsheng Funeral Parlor way. Version 1.1, 3 November 2026.
 
-First release.
-
-- Local two-player and vs AI (Baby, Easy, Normal, Hard, Insane), with adaptive AI
-- Chaos mode, endless mode and win-by-two
-- Background gallery, mood-based music, display/audio/gameplay settings and match stats
+AI moved into its own module, and a new Interface settings screen.
 
 ## Play it
 

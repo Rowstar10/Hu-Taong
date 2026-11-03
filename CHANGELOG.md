@@ -2,6 +2,21 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 1.1 — 2026-11-03
+
+AI styles, key rebinding, new Chaos modes and an Interface settings page.
+
+### Added
+- AI styles: Balanced, Guardian, Striker and Trickster.
+- AI Banter: the AI teases you when it scores and grumbles when it doesn't.
+- From the pause menu, hand either paddle to the AI or take it back, and change settings without leaving the match.
+- Restart a match from 0-0.
+- Middle Wall setting: switch it off and the paddles can roam the whole court.
+- Chaos Mode +: sizes and speeds keep drifting during play, separately for each paddle and the ball.
+- Chaos Switch: after every point you take over your opponent's paddle, scores and all. Chaos Switch + makes the swap at random moments mid-rally, with a warning first.
+- Interface settings: tooltips, HUD (Full or Minimal), effects (Full, Reduced or Off), countdown length (3, 2 or 1 seconds), screen shake, a fire trail behind the ball, auto-pause when you click away, and hiding the mouse during a match.
+- Key rebinding: click a key, then press the new one.
+
 ## 1.0 — 2026-11-03
 
 First release, with a new Wangsheng Funeral Parlor look.

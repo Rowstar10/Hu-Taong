@@ -700,17 +700,17 @@ class Art:
         out.blit(art, (margin, margin))
         return out
 
-    def seal(self, size, on):
-        return self.get(("seal", size, on), self._seal, size, on)
+    def seal(self, size, on, glyph=None, hot=False):
+        return self.get(("seal", size, on, glyph, hot), self._seal, size, on, glyph, hot)
 
-    def _seal(self, size, on):
+    def _seal(self, size, on, glyph, hot):
         out = blank(size + 8, size + 8)
-        fill = (196, 34, 34) if on else (72, 58, 54)
+        fill = (214, 122, 26) if hot else (196, 34, 34) if on else (72, 58, 54)
         ink = theme.PAPER if on else (150, 134, 120)
         pygame.draw.rect(out, rgba((0, 0, 0), 120), (5, 6, size, size), border_radius=max(3, size // 8))
         pygame.draw.rect(out, fill, (2, 2, size, size), border_radius=max(3, size // 8))
         pygame.draw.rect(out, ink, (5, 5, size - 6, size - 6), 1, border_radius=max(2, size // 10))
-        mark = self.brush(size * .74).render("开" if on else "关", True, ink)
+        mark = self.brush(size * .74).render(glyph or ("开" if on else "关"), True, ink)
         out.blit(mark, mark.get_rect(center=(2 + size / 2, 2 + size / 2)))
         return out
 
@@ -795,8 +795,15 @@ class Art:
             surf.blit(flower, (w, 0))
         return surf
 
-    def cord(self, h):
+    def cord(self, h, faint=False):
+        if faint:   # the Middle Wall is off: the net is only a marking
+            return self.get(("cord_faint", h), self._faint, self.cord(h), 80)
         return self.get(("cord", h), self._cord, h)
+
+    def _faint(self, sprite, alpha):
+        surf = sprite.copy()
+        surf.fill((255, 255, 255, alpha), special_flags=MULT)
+        return surf
 
     def _cord(self, h):
         """The net: a red cord with knots and gold beads, tiled down the screen."""
@@ -891,10 +898,11 @@ class Art:
         c = s / 2
         surf = blank(s, s)
         pygame.draw.circle(surf, (120, 14, 18), (c, c), c)
-        fill = radial(int(c), (255, 255, 255, 255), (226, 214, 214, 255), 2.2)
+        # The shading is scaled from one master, as every ball size needs it
+        shade = self.get(("ball_shade",), radial, 48, (255, 255, 255, 255), (226, 214, 214, 255), 2.2)
+        fill = pygame.transform.smoothscale(shade, (s, s))
         mask = blank(s, s)
         pygame.draw.circle(mask, (255, 255, 255, 255), (c, c), c * .93)
-        fill = pygame.transform.smoothscale(fill, (s, s))
         fill.blit(mask, (0, 0), special_flags=CUT)
         surf.blit(fill, (0, 0))
 

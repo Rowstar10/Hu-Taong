@@ -26,23 +26,27 @@ class Hud:
         if not p1 or not p2:
             return
 
-        self.draw_score(screen, "p1", p1.score, 5 * BASE_W // 16, "crimson")
-        self.draw_score(screen, "p2", p2.score, 11 * BASE_W // 16, "azure")
+        left, right = 5 * BASE_W // 16, 11 * BASE_W // 16
+        self.draw_score(screen, "p1", p1.score, left, "crimson")
+        self.draw_score(screen, "p2", p2.score, right, "azure")
 
-        # --- Rally and ball speed ----------------------------------------
-        renderer = self.app.renderer
-        rally = getattr(ball, "rally_value", 0) if ball else 0
-        plate = pygame.Rect(BASE_W // 2 - 110, 28, 220, 58)
-        screen.blit(self.art.inset(plate.w, plate.h), plate)
-        renderer.text(screen, f"Rally: {rally}", renderer.fnt(0.036), theme.GOLD_BRIGHT, center=plate.center)
+        # With Chaos Switch the paddles change hands, so say who is playing each side
+        if game.settings.chaos_switch:
+            self.draw_owner(screen, p1, left)
+            self.draw_owner(screen, p2, right)
 
-        spd = int(math.hypot(ball.vx, ball.vy)) if ball else 0
-        renderer.text(screen, f"Ball Speed: {spd} pps", renderer.fnt(0.02, bold=False), theme.PARCHMENT,
-                      center=(BASE_W // 2, plate.bottom + 22))
+        # --- Rally and ball speed (left out on the Minimal HUD) ----------
+        if self.app.settings.interface.hud == 0:
+            renderer = self.app.renderer
+            rally = getattr(ball, "rally_value", 0) if ball else 0
+            plate = pygame.Rect(BASE_W // 2 - 110, 28, 220, 58)
+            screen.blit(self.art.inset(plate.w, plate.h), plate)
+            renderer.text(screen, f"Rally: {rally}", renderer.fnt(0.036), theme.GOLD_BRIGHT, center=plate.center)
 
-        # --- AI buttons and pause button ---------------------------------
-        self.draw_ai_button(state, screen, p1, left=True)
-        self.draw_ai_button(state, screen, p2, left=False)
+            spd = int(math.hypot(ball.vx, ball.vy)) if ball else 0
+            renderer.text(screen, f"Ball Speed: {spd} pps", renderer.fnt(0.02, bold=False), theme.PARCHMENT,
+                          center=(BASE_W // 2, plate.bottom + 22))
+
         self.draw_pause_button(state, screen)
 
     # ------------------------------------------------------------------
@@ -68,6 +72,15 @@ class Hud:
             digits = pygame.transform.smoothscale(digits, (int(digits.get_width() * k), int(digits.get_height() * k)))
         screen.blit(digits, digits.get_rect(center=(cx, 18 + h // 2 - 4)))
 
+    def draw_owner(self, screen, paddle, cx):
+        renderer = self.app.renderer
+        font = renderer.fnt(0.022)
+        text = "AI" if paddle.ai_enabled else paddle.controls_label
+        w = max(110, font.size(text)[0] + 32)
+        plate = pygame.Rect(cx - w // 2, 144, w, 38)
+        screen.blit(self.art.inset(plate.w, plate.h), plate)
+        renderer.text(screen, text, font, theme.GOLD_BRIGHT, center=plate.center)
+
     def draw_pause_button(self, state, screen):
         renderer = self.app.renderer
         mouse_pos = renderer.mouse()
@@ -80,25 +93,4 @@ class Hud:
             pygame.draw.rect(screen, bar, (x, rect.y + 18 + offset, 10, 34), border_radius=3)
 
         state.ui_hitboxes["pause"] = rect
-
-    def draw_ai_button(self, state, screen, paddle, left: bool):
-        renderer = self.app.renderer
-        mouse_pos = renderer.mouse()
-        font = renderer.fnt(0.032)
-
-        label = "AI Enabled" if paddle.ai_enabled else "AI Disabled"
-        w, h = 236, 66
-        x = 60 if left else BASE_W - 60 - w
-        rect = pygame.Rect(x, 32, w, h)
-
-        if paddle.ai_enabled:
-            finish = "crimson" if left else "azure"
-        else:
-            finish = "ink"
-
-        renderer.draw_lacquer(screen, mouse_pos, rect, label, font, finish)
-
-        if left:
-            state.ui_hitboxes["p1_ai"] = rect
-        else:
-            state.ui_hitboxes["p2_ai"] = rect
+        renderer.tips.offer(rect, "Pause the match. (Esc)")

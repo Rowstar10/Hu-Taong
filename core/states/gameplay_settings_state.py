@@ -36,12 +36,21 @@ class GameplaySettingsState(State):
             if key == "cycle_ai_right":
                 audio.ai_difficulty = (audio.ai_difficulty + 1) % len(audio.ai_difficulties)
                 
+            if key == "cycle_ai_style_left":
+                audio.ai_style = (audio.ai_style - 1) % len(audio.ai_styles)
+            if key == "cycle_ai_style_right":
+                audio.ai_style = (audio.ai_style + 1) % len(audio.ai_styles)
+
             if key == "toggle_adaptive_ai":
                 audio.adaptive_ai = not audio.adaptive_ai
-            if key == "toggle_chaos_mode":
-                audio.chaos_mode = not audio.chaos_mode
-                if not audio.chaos_mode:
+            if key == "toggle_middle_wall":
+                audio.middle_wall = not audio.middle_wall
+            if key == "cycle_chaos_mode":
+                audio.chaos_mode = (audio.chaos_mode + 1) % 3
+                if audio.chaos_mode != 1:
                     audio.chaos_restore()
+            if key == "cycle_chaos_switch":
+                audio.chaos_switch = (audio.chaos_switch + 1) % 3
 
             if key == "cycle_win_score_left":
                 audio.winning_score_index = (audio.winning_score_index - 1) % len(audio.winning_scores)

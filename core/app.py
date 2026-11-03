@@ -1,4 +1,4 @@
-import os, pygame, random
+import os, pygame, random, time
 
 from config import BASE_W, BASE_H, RESOLUTIONS, IMAGE_DIR, DEFAULT_DISPLAY_MODE, BG_OVERSCAN
 from core import save_data
@@ -99,6 +99,8 @@ class App:
                 self.present()
                 pygame.event.pump()
 
+        self.idle_jobs = self.renderer.idle_jobs()
+
         bg_init = display.backgrounds[display.background]
         self.bg_current = self.background_cache[bg_init]
         
@@ -119,6 +121,8 @@ class App:
         self.clock_tick()
         self.timer = 0
         self.fps = 0.0
+        self.cursor_idle = 0.0
+        self.cursor_shown = True
         self.running = True
         
         self.state_manager.set_state("main_menu", mute = True)
@@ -176,10 +180,29 @@ class App:
         self.settings.audio.reset()
         self.sound_manager.reset()
 
+    def reset_interface_settings(self):
+        self.settings.interface.reset()
+
     def reset_all_settings(self):
         self.reset_gameplay_settings()
         self.reset_display_settings()
         self.reset_audio_settings()
+        self.reset_interface_settings()
+
+    def in_match(self):
+        """True while a match is on screen with nothing laid over it."""
+        return getattr(self.state_manager.current(), "is_game", False)
+
+    def update_cursor(self, moved):
+        # Out of the way during play; back as soon as the mouse moves
+        if moved or not self.in_match():
+            self.cursor_idle = 0.0
+        else:
+            self.cursor_idle += self.dt
+        show = not (self.settings.interface.hide_cursor and self.in_match() and self.cursor_idle > 1.5)
+        if show != self.cursor_shown:
+            pygame.mouse.set_visible(show)
+            self.cursor_shown = show
 
     def start_bg_transition(self):
         display = self.settings.display
@@ -247,6 +270,7 @@ class App:
             self.timer = 0.1
 
         # ---------- Handle Events ----------
+        moved = False
         for event in pygame.event.get():
             
             # ---------- Essential Events ----------
@@ -263,7 +287,16 @@ class App:
                 self.keys_down.add(event.key)
 
             if event.type == pygame.KEYUP:
-                self.keys_down.discard(event.key) 
+                self.keys_down.discard(event.key)
+
+            if event.type == pygame.MOUSEMOTION:
+                moved = True
+
+            # ---------- Auto-Pause ----------
+            if event.type == pygame.WINDOWFOCUSLOST:
+                self.keys_down.clear()
+                if self.settings.interface.auto_pause and self.in_match():
+                    self.state_manager.push_state("pause", mute = True)
 
             # ---------- Background Rotation ----------
             if event.type == self.BG_FADE:
@@ -275,7 +308,14 @@ class App:
             # ---------- State-Specific Events ----------
             self.state_manager.handle_event(event)
 
+        # ---------- Warm sprites while nobody is playing ----------
+        if self.idle_jobs and not self.in_match():
+            budget = time.perf_counter() + 0.0015
+            while self.idle_jobs and time.perf_counter() < budget:
+                self.idle_jobs.pop()()
+
         # ---------- Update ----------
+        self.update_cursor(moved)
         self.sound_manager.update()
         self.state_manager.update(self.dt)
 
@@ -303,8 +343,9 @@ class App:
         self.fx.draw_front(self.virtual)
         self.fx.draw_overlays(self.virtual)
 
-        # ---------- Now-playing toast ----------
+        # ---------- Now-playing toast, then tooltips over everything ----------
         self.renderer.draw_toast(self.virtual, self.dt)
+        self.renderer.tips.draw(self.virtual, self.dt)
 
         # ---------- Show FPS ----------
         if settings.show_fps:
