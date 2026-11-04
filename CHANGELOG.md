@@ -2,6 +2,33 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 1.2 — 2026-11-04
+
+Power-ups arrive, with more backgrounds and music and a full jukebox.
+
+### Added
+- Power-ups: talismans appear on the court during a match. Touch one with your paddle, or with a ball you hit last, to take it.
+- Boons: Safety Teleport, Giant Paddle, Swift Step and Spirit Fire. Curses: Frostbite, Shrink Curse, Jiangshi Hex and Ghost Ball. Wild: Gravity, Open Court and Soul Swap.
+- A Power-Ups screen showing what each one does, where you choose which can turn up and how often (Rare, Normal, Frequent).
+- Rally rewards: every 20 or 10 hits in one rally, both players earn a Safety Teleport (you can hold two).
+- Game Pace: slows down or speeds up the whole match, including the ball, paddles, AI and Chaos timers.
+- Chaos Switch & +, for both kinds of switch at once.
+- The jukebox: click the track's name for the full list.
+- Ambience: crackling spirit fire and crickets under the music, in the menus only or everywhere.
+- Even Out Volume turns down tracks recorded much louder than the rest.
+- Track Fade (Quick, Smooth, Slow) between songs, and Menu Sounds (clicks and whooshes).
+- Rotate can change the background every 30 to 60 seconds, 2 minutes or 5 minutes.
+- Parallax: the menu background drifts against the mouse, for depth.
+- 5 more backgrounds (34 in all) and 15 more music tracks (58 in all).
+
+### Changed
+- Chaos Switch + now swaps the paddles' places on the court at random moments, with a warning first. Your keys, score and goal stay yours, and it takes the Middle Wall down.
+- Hard hits speed the ball up to at most about 2.4 times its serve speed.
+- Background pictures load while you play instead of all at the start.
+
+### Fixed
+- After a hitch, the game slows for a moment instead of letting the ball jump ahead.
+
 ## 1.1 — 2026-11-03
 
 AI styles, key rebinding, new Chaos modes and an Interface settings page.

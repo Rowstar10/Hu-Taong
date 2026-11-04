@@ -51,7 +51,7 @@ class BackgroundSelectionState(State):
 
             rect = (x,y,thumb_w,thumb_h)
 
-            image = self.app.thumbnail_cache[name]
+            image = self.app.backgrounds.thumb(name)
 
             button = BackgroundThumbnail(rect, image,
                 action = lambda n=i: self.select_background(n), art = self.app.art)
@@ -138,7 +138,7 @@ class BackgroundSelectionState(State):
         settings = self.app.settings.display
         settings.background = index
         new_bg_name = settings.backgrounds[index]
-        self.app.bg_current = self.app.background_cache[new_bg_name]
+        self.app.show_background(new_bg_name)
 
         self.app.state_manager.pop_state(mute = True)
         self.app.sound_manager.play("enter_state.wav")

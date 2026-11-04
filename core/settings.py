@@ -4,6 +4,7 @@ from pathlib import Path
 import pygame
 
 from config import IMAGE_DIR
+from game.powerups import KINDS as POWERUP_KINDS
 
 def find_backgrounds():
     numbered = {}
@@ -47,12 +48,24 @@ class GameplaySettings:
         self.ball_speed_max = 800
         self.ball_speed_range = self.ball_speed_max - self.ball_speed_min
 
+        # Game pace: the whole match runs at this speed (ball, paddles, AI, Chaos timers)
+        self.pace_min = 0.5
+        self.pace_max = 1.5
+        self.pace_range = self.pace_max - self.pace_min
+
         # Match rules
         self.winning_scores = [3, 5, 11, 15, 21, "Endless Mode"]
 
         # AI
         self.ai_difficulties = ["Baby", "Easy", "Normal", "Hard", "Insane"]
         self.ai_styles = ["Balanced", "Guardian", "Striker", "Trickster"]
+
+        # Power-ups
+        self.powerup_rate_options = ["Rare", "Normal", "Frequent"]
+        # Rally Teleports: every so many hits in one rally, both players earn a Safety Teleport.
+        # Every 10 refills saves faster than anyone misses, so long rallies can go on and on.
+        self.rally_reward_options = ["Off", "Every 20 hits", "Every 10 hits"]
+        self.rally_reward_hits = [0, 20, 10]
 
         self.reset()
 
@@ -62,6 +75,7 @@ class GameplaySettings:
         self.paddle_speed = (self.paddle_speed_min + self.paddle_speed_max) // 2
         self.ball_diameter = (self.ball_diameter_min + self.ball_diameter_max) // 2
         self.ball_speed = (self.ball_speed_min + self.ball_speed_max) // 2
+        self.pace = 1.0
 
         # Match setup (chosen on the Match Setup screen)
         self.vs_ai = True            # True: you play one paddle and the AI takes the other.
@@ -80,9 +94,30 @@ class GameplaySettings:
         self.chaos_mode = 0
         self._chaos_backup = None
 
-        # Chaos switch: 0 off, 1 players swap paddles after every point,
-        # 2 (Chaos Switch +) they swap at random, telegraphed moments mid-rally.
+        # Chaos switch: 0 off, 1 players swap paddles after every point (Chaos Switch),
+        # 2 the paddles swap places at random, telegraphed moments mid-rally (Chaos Switch +,
+        # which needs the Middle Wall off), 3 both.
         self.chaos_switch = 0
+
+        self.reset_powerups()
+
+    @property
+    def switch_each_point(self):
+        """Chaos Switch: players take each other's paddles after every point."""
+        return self.chaos_switch in (1, 3)
+
+    @property
+    def switch_mid_rally(self):
+        """Chaos Switch +: the paddles swap places mid-rally."""
+        return self.chaos_switch in (2, 3)
+
+    def reset_powerups(self):
+        """Power-ups on, at the normal rate, every one of them allowed."""
+        self.powerups = True
+        self.powerup_rate = 1
+        self.rally_reward = 1
+        for kind in POWERUP_KINDS:
+            setattr(self, "pu_" + kind.key, True)
 
     CHAOS_KEYS = ("ball_speed", "ball_diameter", "paddle_height", "paddle_width", "paddle_speed")
 
@@ -127,6 +162,14 @@ class DisplaySettings:
 
         self.max_fps_options = [30, 60, 120, 144, 165, 240, "Unlimited"]
 
+        # How far the menu background drifts against the mouse, for a sense of depth
+        self.parallax_options = ["Off", "Gentle", "Full"]
+        self.parallax_strength = [0.0, 0.5, 1.0]
+
+        # How often Rotate fades to a new background: (shortest, longest) wait in seconds
+        self.rotate_options = ["30-60 s", "2 min", "5 min"]
+        self.rotate_waits = [(30, 60), (100, 140), (270, 330)]
+
         self.backgrounds = find_backgrounds()
 
         self.background = self.backgrounds.index(random.choice(self.backgrounds))
@@ -139,6 +182,8 @@ class DisplaySettings:
         self.dim = 0
         self.resolution = (1920, 1080)
         self.rotate_backgrounds = True
+        self.rotate_every = 0
+        self.parallax = 2
 
 class AudioSettings:
     def __init__(self, app):
@@ -162,13 +207,18 @@ class AudioSettings:
                         "Liyan.mp3",
                         "Asian String Suite.mp3",
                         "New Dusks Light.mp3",
-                        "Jade Kings Throne.mp3"],
+                        "Jade Kings Throne.mp3",
+                        "Shenyang.mp3",
+                        "Finding Movement.mp3",
+                        "Eastern Thought.mp3",
+                        "Tea Roots.mp3",
+                        "Senbazuru.mp3",
+                        "Million Elephants.ogg"],
 
             "game":    ["Hillichurl REMIX.mp3",
                         "Epic Conquest.mp3",
                         "Arcade Retro.mp3",
                         "Operation Awesome.mp3",
-                        "Shenyang.mp3",
                         "Big Mojo.mp3",
                         "Mountain Emperor.mp3",
                         "Scheming Weasel.mp3",
@@ -176,14 +226,22 @@ class AudioSettings:
                         "Burnt Spirit.mp3",
                         "Sunrise in the Dynasty.mp3",
                         "Chipnese.ogg",
-                        "Taiko Drums.ogg"],
+                        "Taiko Drums.ogg",
+                        "One-eyed Maestro.mp3",
+                        "Monster Promenade.mp3",
+                        "Waltz of the Carnies.mp3",
+                        "Malicious.mp3",
+                        "Chinese Tales.mp3",
+                        "Drums of Dawn.mp3"],
 
             "victory": ["Triumphant Win.mp3",
                         "Epic Win.mp3",
                         "Winner Winner.mp3",
                         "Our Story Begins.mp3",
-                        "Finding Movement.mp3",
-                        "Ten Fanfares.ogg"],
+                        "Ten Fanfares.ogg",
+                        "Monkeys Spinning Monkeys.mp3",
+                        "Heroic Age.mp3",
+                        "Super Friendly.mp3"],
 
             "defeat":  ["Grand Defeat.mp3",
                         "Sweet Melancholy.mp3",
@@ -192,13 +250,26 @@ class AudioSettings:
                         "On the Shore.mp3",
                         "Nu Flute.mp3",
                         "Asian Duet.mp3",
-                        "Death of a Ninja.mp3"],
+                        "Death of a Ninja.mp3",
+                        "Funeral March for Brass.mp3",
+                        "Decline.mp3"],
         }
+
+        # How long a track takes to fade out and the next to fade in
+        self.fade_options = ["Quick", "Smooth", "Slow"]
+        self.fade_ms = [400, 1000, 2500]
+
+        # Crackling spirit fire and crickets under the music
+        self.ambience_options = ["Off", "Menus", "Everywhere"]
 
         self.reset()
 
     def reset(self):
         self.loop_music = False
+        self.even_volume = True      # quieten tracks recorded much louder than the rest
+        self.fade = 1
+        self.menu_sounds = True      # clicks and whooshes when using the menus
+        self.ambience = 1
 
     @property
     def all_tracks(self):

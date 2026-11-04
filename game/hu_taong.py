@@ -4,6 +4,7 @@ from config import BASE_W, BASE_H
 from render import theme
 from game.game_base import GameBase
 from game.physics import Physics
+from game.powerups import PowerUps
 from objects.wall import Wall
 from objects.ball import Ball
 from objects.paddle import Paddle
@@ -85,9 +86,18 @@ class Hu_Taong(GameBase):
         self.next_switch = self.switch_gap()
         self.switch_warning = None      # seconds until a telegraphed swap, while one is coming
         self.switch_flash = 0.0         # time left on the "Switch!" banner
+        self.switch_banner = "换 Switch!"
         self.switches = 0
 
         self.banter = None              # [text, paddle, time left]
+
+        self.powerups = PowerUps(self)
+
+    @property
+    def wall_up(self):
+        """The Middle Wall is standing: on in Settings, and not taken down by Open Court."""
+        powerups = getattr(self, "powerups", None)
+        return self.settings.middle_wall and not (powerups and powerups.wall_open())
 
     def on_score(self, obj, data):
         self.pause()
@@ -134,11 +144,13 @@ class Hu_Taong(GameBase):
         if sound_manager.score_sound:
             self.app.sound_manager.play("euugh.wav")
 
+        self.powerups.on_point()
+
         self.say_something(self.p2 if nx == 1 else self.p1)
         if self.switch_warning is not None or self.next_switch <= 0:
             self.next_switch = self.switch_gap()   # a point cancels a coming swap; start a fresh wait
         self.switch_warning = None
-        self.switch_after_point = settings.chaos_switch == 1
+        self.switch_after_point = settings.switch_each_point
 
         obj.spawn_vx = nx * obj.speed
         obj.spawn_vy = random.choice([1, -1]) * obj.speed
@@ -170,8 +182,13 @@ class Hu_Taong(GameBase):
     def update(self, dt):
         super().update(dt)
         if self.running and not self.paused and self.countdown is None:
-            self.update_drift(dt)
-            self.update_switch(dt)
+            # Chaos timers keep time with the game pace; messages and the serve countdown don't
+            play_dt = min(dt, self.MAX_STEP) * self.settings.pace
+            self.update_drift(play_dt)
+            self.update_switch(play_dt)
+            self.powerups.update(play_dt)
+        if self.running:
+            self.powerups.update_popups(dt)
 
         if self.switch_flash > 0:
             self.switch_flash -= dt
@@ -209,24 +226,50 @@ class Hu_Taong(GameBase):
             setattr(b, name, first)
         a.ai.reset()
         b.ai.reset()
+        self.powerups.swap_owners()
 
         self.switches += 1
         self.switch_flash = 1.3
+        self.switch_banner = "换 Switch!"
         self.app.sound_manager.play("hmyoop!.wav")
         for paddle, tint in ((a, "blue"), (b, "red")):
             cx, cy = (paddle.x0 + paddle.x1) / 2, (paddle.y0 + paddle.y1) / 2
             self.app.fx.burst(cx, cy, 10, 48, tint, speed = (160, 380), life = (.6, 1.1))
 
+    def swap_positions(self):
+        """Chaos Switch +: the two paddles trade places on the court.  Keys, scores and goals stay
+        with their players, so each one has to scramble back to defend their own end."""
+        a, b = self.p1, self.p2
+        centres = [((p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2) for p in (a, b)]
+        for paddle, (cx, cy) in ((a, centres[1]), (b, centres[0])):
+            paddle.x0, paddle.x1 = cx - paddle.width / 2, cx + paddle.width / 2
+            paddle.y0, paddle.y1 = cy - paddle.height / 2, cy + paddle.height / 2
+            paddle.vx = paddle.vy = 0.0
+            Physics.clamp_to_world(paddle)
+            paddle.ai.reset()
+            self.app.fx.burst(cx, cy, 10, 48, "red" if paddle.is_left else "blue", life = (.6, .9))
+
+        self.switches += 1
+        self.switch_flash = 1.3
+        self.switch_banner = "换 Swap!"
+        self.app.sound_manager.play("hmyoop!.wav")
+
+    def start_swap_warning(self):
+        """The telegraphed countdown before the paddles swap places (Chaos Switch + or Soul Swap)."""
+        if self.switch_warning is None and not self.wall_up:
+            self.switch_warning = self.SWITCH_WARNING
+            self.app.sound_manager.play("countdown_tick.wav")
+
     def update_switch(self, dt):
-        if self.app.settings.gameplay.chaos_switch != 2:
-            self.switch_warning = None
+        if self.wall_up:
+            self.switch_warning = None           # swapping places needs the wall down
             return
 
         if self.switch_warning is None:
-            self.next_switch -= dt
-            if self.next_switch <= 0:
-                self.switch_warning = self.SWITCH_WARNING
-                self.app.sound_manager.play("countdown_tick.wav")
+            if self.app.settings.gameplay.switch_mid_rally:
+                self.next_switch -= dt
+                if self.next_switch <= 0:
+                    self.start_swap_warning()
             return
 
         before = self.switch_warning
@@ -237,7 +280,7 @@ class Hu_Taong(GameBase):
         if self.switch_warning <= 0:
             self.switch_warning = None
             self.next_switch = self.switch_gap()
-            self.switch_sides()
+            self.swap_positions()
 
     # ---------------- Chaos Mode + ----------------
 
@@ -286,6 +329,12 @@ class Hu_Taong(GameBase):
                     obj.speed = s.paddle_speed_min + pace * s.paddle_speed_range
                 else:
                     width, height, obj.speed = s.paddle_width, s.paddle_height, s.paddle_speed
+
+                # Giant Paddle, Shrink Curse, Swift Step and frost act on top of the settings
+                powerups = getattr(self, "powerups", None)
+                if powerups:
+                    height = min(BASE_H * 0.62, height * powerups.size_factor(obj))
+                    obj.speed *= powerups.speed_factor(obj)
 
                 if (width, height) != (obj.width, obj.height):
                     self.resize(obj, width, height)

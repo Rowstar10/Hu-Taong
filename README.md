@@ -1,8 +1,8 @@
-# Hu Taong 1.1
+# Hu Taong 1.2
 
-Pong, the Wangsheng Funeral Parlor way. Version 1.1, 3 November 2026.
+Pong, the Wangsheng Funeral Parlor way. Version 1.2, 4 November 2026.
 
-AI moved into its own module, and a new Interface settings screen.
+Power-ups (with their own settings screen), 5 more backgrounds, 58 music tracks and ambience.
 
 ## Play it
 

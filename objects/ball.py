@@ -42,6 +42,9 @@ class Ball(GameObject):
 
             if self.last_paddle is not paddle:
                 self.rally_value += 1
+                powerups = getattr(self.game, "powerups", None)
+                if powerups:
+                    powerups.on_rally(self.rally_value)
                 if sound_manager.paddle_hit_sound:
                     sound_manager.play(paddle.sound)
 
@@ -50,6 +53,10 @@ class Ball(GameObject):
                 fx.burst(cx, cy, 2, 40, "red" if paddle.is_left else "blue", life = (.7, 1.1))
 
             self.last_paddle = paddle
+
+            powerups = getattr(self.game, "powerups", None)
+            if powerups:
+                powerups.on_hit(self, paddle)
 
         if other.is_wall and other.is_goal:
             self.game.on_score(self, data)

@@ -1,11 +1,13 @@
 import math, random, pygame
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 
 from config import BASE_W, BASE_H
 from helpers import clamp01, lerp
 from render import theme
 from render.art import ADD, blank, mix, scaled
 from core.settings import key_name
+from game.powerups import BY_KEY as POWERUPS, FAMILY_COLOURS, KINDS as POWERUP_KINDS, PowerUps
 from render.ui.layout import (Stack, Grid, Text, Label, Title, Button, Toggle, CycleToggle, KeyButton,
                               Cycle, Slider, Slot, Space)
 
@@ -32,17 +34,27 @@ TIPS = {
     "toggle_adaptive_ai": "The AI eases off while it's ahead and sharpens up when it's behind, to keep matches close.",
     "cycle_win_score": "Points needed to win. Endless Mode never ends.",
     "toggle_win_by_two": "The winner needs a two-point lead.",
-    "toggle_middle_wall": "On: each paddle stays in its own half. Off: paddles can roam the whole court.",
-    "ball_speed_slider": "How fast the ball is served.",
+    "ball_speed_slider": "How fast the ball is served. Hard hits speed it up, to at most about 2.4 times this.",
+    "pace_slider": "Slows down or speeds up the whole match: ball, paddles, AI and the Chaos timers together. "
+                   "Turn it down if the ball gets too quick to follow.",
     "paddle_speed_slider": "How fast the paddles move.",
     "ball_diameter_slider": "How big the ball is.",
     "paddle_size_slider": "How tall and wide the paddles are.",
     "randomise_all": "Random ball and paddle speeds and sizes.",
+    "open_powerups": "Talismans that appear on the court: see what each one does, and choose which can turn up.",
+    "toggle_powerups": "Power-up talismans appear on the court during matches. Touch one with your paddle, "
+                       "or with a ball you hit last, to take it.",
+    "cycle_powerup_rate": "How often a new talisman appears.",
+    "cycle_rally_reward": "Every so many hits in one rally, both players earn a Safety Teleport (you can hold two). "
+                          "Every 10 hits refills saves so often that long rallies can go on and on.",
     "cycle_chaos_mode": "Click to cycle. Chaos Mode: new random sizes and speeds every round. "
                         "Chaos Mode +: sizes and speeds keep drifting during play, separately for each paddle and the ball.",
     "cycle_chaos_switch": "Click to cycle. Chaos Switch: after every point you take over your opponent's paddle "
-                          "and they take yours, scores and all. Chaos Switch +: the swap comes at random moments "
-                          "mid-rally, with a warning first. Best with the Middle Wall off.",
+                          "and they take yours, scores and all. Chaos Switch +: at random moments mid-rally, with "
+                          "a warning first, the two paddles swap places on the court; your keys, score and goal "
+                          "stay yours. Chaos Switch & +: both. Chaos Switch + takes the Middle Wall down.",
+    "toggle_middle_wall": "On: each paddle stays in its own half. Off: paddles can roam the whole court. "
+                          "Turning it on turns Chaos Switch + off.",
 
     # Display
     "cycle_res": "Window size. Press Apply to use it.",
@@ -51,7 +63,9 @@ TIPS = {
     "cycle_max_fps": "Frame-rate cap. Lower saves power; higher is smoother.",
     "toggle_show_fps": "Show the frame rate in the corner.",
     "background_thumb": "Choose the background.",
-    "toggle_rotate_bg": "Fade to a different background every 30 to 60 seconds.",
+    "toggle_rotate_bg": "Fade to a different background every so often.",
+    "cycle_rotate_every": "How often Rotate fades to a new background.",
+    "cycle_parallax": "How far the background drifts against the mouse in the menus, for a sense of depth.",
     "dim_slider": "Darken the background so the ball stands out.",
 
     # Audio
@@ -60,9 +74,16 @@ TIPS = {
     "sfx_volume_slider": "Sound effect volume.",
     "toggle_paddle_sounds": "The sound each paddle makes when it hits the ball.",
     "toggle_score_sounds": "The sound when a point is scored.",
-    "cycle_music": "Skip through tracks that suit the moment: calm in menus, upbeat in matches.",
+    "cycle_music": "Skip through tracks that suit the moment: calm in menus, upbeat in matches. "
+                   "Click the track's name for the whole list.",
     "randomise_music": "Play a random track for this moment.",
     "toggle_loop_music": "Loop repeats the current track. Shuffle plays another when it ends.",
+    "toggle_menu_sounds": "Clicks and whooshes as you move through the menus.",
+    "toggle_even_volume": "Turns down tracks that were recorded much louder than the rest, "
+                          "so the music doesn't jump in volume from one track to the next.",
+    "cycle_fade": "How long one track takes to fade into the next.",
+    "cycle_ambience": "Crackling spirit fire and crickets under the music: off, in the menus only, "
+                      "or in matches too.",
 
     # Interface
     "toggle_tooltips": "Show these explanations when you rest the mouse on a control.",
@@ -85,7 +106,8 @@ STYLE_TIPS = {
     "Guardian": "Guardian: hangs back and defends. Rarely misses, rarely attacks.",
     "Striker": "Striker: steps in to meet the ball and fires sharp angles. "
                "With the Middle Wall off it charges past halfway.",
-    "Trickster": "Trickster: feints one way, goes the other, and aims for the corners.",
+    "Trickster": "Trickster: lines up for one angle and switches at the last moment, "
+                 "and loves a return that banks off the walls.",
 }
 
 
@@ -160,7 +182,9 @@ class Renderer:
         self.app = app
         self.art = app.art
 
-        self._sigil_cache: dict = {}
+        self._sigil_turns: dict = {}
+        self._sigil_shown: dict = {}
+        self.worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sigil")
         self._lift: dict = {}
         self._bubbles: dict = {}
         self.tips = Tooltips(app)
@@ -269,10 +293,8 @@ class Renderer:
     def draw_board(self, screen, rect, mark=None):
         """The lacquered panel, with an optional faint character across it."""
         m = self.art.PANEL_MARGIN
-        screen.blit(self.art.panel(rect.w, rect.h), (rect.x - m, rect.y - m))
-        if mark:
-            sprite = self.art.watermark(mark, min(400, int(rect.h * .8)), 26)
-            screen.blit(sprite, sprite.get_rect(center=rect.center))
+        x, y = rect.x - m, rect.y - m
+        screen.blits([(piece, (x + dx, y + dy)) for piece, (dx, dy) in self.art.board(rect.w, rect.h, mark)], False)
 
     def draw_plaque(self, screen, text, cy):
         """Title board, centred at the top of the screen."""
@@ -289,15 +311,38 @@ class Renderer:
         self.draw_plaque(screen, text, panel.top)
 
     def draw_sigil(self, screen, center, size, alpha, speed=5.0):
-        """Slowly turning seal; re-rotated 10 times a second, as a full rotozoom is costly."""
+        """Slowly turning seal, re-turned 10 times a second.  Each turn is rotated a step ahead
+        on a worker thread, as a full rotozoom is too slow to do mid-frame, and its faintness
+        is baked in (in steps of 15) because a blit with extra transparency is slow too."""
         tick = int(self.app.fx.time * 10)
-        cached = self._sigil_cache.get(size)
-        if cached is None or cached[0] != tick:
-            sprite = pygame.transform.rotozoom(self.art.sigil(size), tick / 10 * speed, 1)
-            cached = self._sigil_cache[size] = (tick, sprite)
-        sprite = cached[1]
-        sprite.set_alpha(alpha)
+        level = max(15, min(255, round(alpha / 15) * 15))
+        turns = self._sigil_turns.setdefault((size, level), {})
+        for t in (tick, tick + 1):
+            if t not in turns:
+                turns[t] = self.worker.submit(pygame.transform.rotozoom, self.art.faint_sigil(size, level),
+                                              t / 10 * speed, 1)
+
+        ready = [t for t, job in turns.items() if t <= tick and job.done()]
+        if ready:
+            newest = max(ready)
+            self._sigil_shown[size] = (level, turns[newest].result())
+            for t in [t for t in turns if t < newest or t > tick + 1]:
+                del turns[t]
+
+        # Until this faintness has a turn ready, the last one shown stands in
+        shown = self._sigil_shown.get(size)
+        if shown is None:
+            shown = self._sigil_shown[size] = (level, turns[tick].result())
+        shown_level, sprite = shown
+        sprite.set_alpha(255 if shown_level == level else min(255, round(255 * alpha / shown_level)))
         screen.blit(sprite, sprite.get_rect(center=center))
+
+        # Faintness levels nobody has drawn for a second are let go
+        for key in [k for k, jobs in self._sigil_turns.items() if not jobs or max(jobs) < tick - 10]:
+            del self._sigil_turns[key]
+
+    def close(self):
+        self.worker.shutdown(wait=True, cancel_futures=True)
 
     # ── Loading ────────────────────────────────────────────────────────────────
 
@@ -321,7 +366,7 @@ class Renderer:
                 lambda: art.plaque(620, 112),
                 lambda: art.plaque(680, 136),
                 lambda: art.panel(panel.w, panel.h),
-                lambda: art.panel(360, 540),
+                lambda: art.board(360, 540),
                 lambda: art.watermark("往", 300, 26),
                 lambda: art.gilded("Red scored!", self.brush(0.085), top=mix(red, white, .6), bottom=red, glow=None),
                 lambda: art.gilded("Blue scored!", self.brush(0.085), top=mix(blue, white, .6), bottom=blue, glow=None)]
@@ -345,6 +390,9 @@ class Renderer:
                     jobs.append(lambda size=size, frame=frame, tint=tint: art.butterfly(size, frame, 0, tint))
 
         jobs.append(lambda: art.ball(self.app.settings.gameplay.ball_diameter))
+        for kind in POWERUPS.values():
+            tint = FAMILY_COLOURS[kind.family]
+            jobs.append(lambda g=kind.glyph, t=tint: (art.charm(76, g, t), art.charm(40, g, t), art.charm(34, g, t)))
         jobs.append(lambda: art.glow(48, (120, 54, 20)))
         return jobs
 
@@ -369,6 +417,16 @@ class Renderer:
                 jobs.append(lambda w=w, h=h, finish=finish: (art.paddle(w, h, finish), art.paddle_glow(w, h, finish)))
         for d in range(g.ball_diameter_min, g.ball_diameter_max + 1, 2):
             jobs.append(lambda d=d: art.ball(d))
+
+        # Your paddle as Giant Paddle and Shrink Curse leave it, with the power-up auras
+        w = max(4, round(g.paddle_width / 2) * 2)
+        for k in (1.0, PowerUps.GIANT, PowerUps.SHRINK, PowerUps.GIANT * PowerUps.SHRINK):
+            h = max(8, round(min(BASE_H * 0.62, g.paddle_height * k) / 4) * 4)
+            for finish in ("red", "blue", "gold", "violet", "jade", "ice"):
+                jobs.append(lambda w=w, h=h, finish=finish: art.paddle_glow(w, h, finish))
+            for finish in ("red", "blue"):
+                jobs.append(lambda w=w, h=h, finish=finish: art.paddle(w, h, finish))
+            jobs.append(lambda w=w, h=h: art.get(("ice_coat", w, h), self._ice_coat, w, h))
 
         jobs.reverse()          # taken from the end, so the goal-burst butterflies come first
         return jobs
@@ -505,7 +563,7 @@ class Renderer:
             halo = self.art.glow(330, scaled((110, 40, 18), rise))
             screen.blit(halo, halo.get_rect(center=(x + w // 2, y + h // 2)), special_flags=ADD)
 
-        screen.blit(self.art.panel(w, h), (x - m, y - m))
+        screen.blits([(piece, (x - m + dx, y - m + dy)) for piece, (dx, dy) in self.art.board(w, h)], False)
         self.draw_sigil(screen, (x + w // 2, y + 230), 330, 80 + int(rise * 90))
 
         top = theme.GOLD_BRIGHT if not hovered else (255, 240, 190)
@@ -593,21 +651,63 @@ class Renderer:
                 "paddle_size_slider", "reset_paddle_size", lambda: g.paddle_height,
                 g.paddle_height_min, g.paddle_height_range,
                 lambda: f"{int(g.paddle_height)} x {int(g.paddle_width)}"))
+            pace = self.section(ui, s, "Game Pace", slider(
+                "pace_slider", "reset_pace", lambda: g.pace,
+                g.pace_min, g.pace_range,
+                lambda: f"{g.pace:.2f}x"))
 
             rand = Button("randomise_all", "Randomise All", sm, (G, theme.GREEN_HOVER), tip=TIPS["randomise_all"])
             chaos = CycleToggle("cycle_chaos_mode", ["Chaos Mode: Off", "Chaos Mode", "Chaos Mode +"], sm,
                                 lambda: g.chaos_mode, "关乱狂", tip=TIPS["cycle_chaos_mode"])
-            switch = CycleToggle("cycle_chaos_switch", ["Chaos Switch: Off", "Chaos Switch", "Chaos Switch +"], sm,
-                                 lambda: g.chaos_switch, "关换狂", tip=TIPS["cycle_chaos_switch"])
-            actions = Stack([rand, chaos, switch], vertical=False, gap=int(BASE_W * 0.02 * s))
+            switch = CycleToggle("cycle_chaos_switch",
+                                 ["Chaos Switch: Off", "Chaos Switch", "Chaos Switch +", "Chaos Switch & +"], sm,
+                                 lambda: g.chaos_switch, "关换狂双", tip=TIPS["cycle_chaos_switch"])
+            powers = Button("open_powerups", "Power-Ups", sm, (theme.ORANGE, theme.ORANGE_HOVER),
+                            tip=TIPS["open_powerups"])
+            actions = Stack([rand, chaos, switch, powers], vertical=False, gap=int(BASE_W * 0.016 * s))
 
             return Grid([[ai, win],
                          [ball_speed, paddle_speed],
                          [ball_size, paddle_size],
+                         [pace],
                          [actions]],
                         gap_x=int(BASE_W * 0.06 * s), gap_y=self.vgap(ui, s, 1.9))
 
         ui.screen_menu(state, screen, build, title="玩法 Gameplay", mark="玩", reset="Reset to Default")
+
+    # ── Power-ups ──────────────────────────────────────────────────────────────
+
+    def draw_powerups_menu(self, state, screen):
+        ui = self.ui
+        g = self.app.settings.gameplay
+
+        def build(s):
+            sm, ty = ui.fnt(0.026, s), ui.fnt(0.021, s)
+            rates = [f"Spawn: {r}" for r in g.powerup_rate_options]
+            rewards = [f"Rally Teleports: {r}" for r in g.rally_reward_options]
+            head = Stack([self.toggle(sm, "toggle_powerups", "Power-Ups", lambda: g.powerups),
+                          Cycle("cycle_powerup_rate", lambda: rates[g.powerup_rate], sm, rates,
+                                tip=TIPS["cycle_powerup_rate"]),
+                          Cycle("cycle_rally_reward", lambda: rewards[g.rally_reward], sm, rewards,
+                                tip=TIPS["cycle_rally_reward"])],
+                         vertical=False, gap=int(BASE_W * 0.025 * s))
+
+            # One row each: its seal and switch, what kind it is, and what it does
+            live = lambda: theme.PARCHMENT if g.powerups else theme.GRAY
+            blurbs = [kind.blurb for kind in POWERUP_KINDS]
+            rows = []
+            for kind in POWERUP_KINDS:
+                name = "pu_" + kind.key
+                rows.append([
+                    CycleToggle("toggle_" + name, [f"{kind.name}: OFF", f"{kind.name}: ON"], sm,
+                                lambda name=name: int(getattr(g, name)), "关" + kind.glyph, tip=kind.about),
+                    Text(kind.family, ty, FAMILY_COLOURS[kind.family], samples=["Boon", "Curse", "Wild"]),
+                    Text(kind.blurb, ty, live, samples=blurbs, align="left")])
+
+            return Stack([head, Grid(rows, gap_x=int(BASE_W * 0.018 * s), gap_y=self.vgap(ui, s, 0.5))],
+                         gap=self.vgap(ui, s, 1.2))
+
+        ui.screen_menu(state, screen, build, title="法宝 Power-Ups", mark="宝", reset="Reset to Default")
 
     # ── Display settings ───────────────────────────────────────────────────────
 
@@ -636,15 +736,22 @@ class Renderer:
                       [str(o) for o in d.max_fps_options], tip=TIPS["cycle_max_fps"]),
                 self.toggle(sm, "toggle_show_fps", "Show FPS", lambda: d.show_fps))
 
+            rotate_texts = [f"Change: {o}" for o in d.rotate_options]
+            parallax_texts = [f"Parallax: {o}" for o in d.parallax_options]
+
             background = self.section(
                 ui, s, "Background",
                 Slot("background_thumb", int(256 * s), int(144 * s), tip=TIPS["background_thumb"]),
-                self.toggle(sm, "toggle_rotate_bg", "Rotate", lambda: d.rotate_backgrounds))
+                self.toggle(sm, "toggle_rotate_bg", "Rotate", lambda: d.rotate_backgrounds),
+                Cycle("cycle_rotate_every", lambda: rotate_texts[d.rotate_every], sm, rotate_texts,
+                      tip=TIPS["cycle_rotate_every"]))
 
             dim = self.section(
                 ui, s, "Dim Overlay",
                 Slider("dim_slider", lambda: d.dim, theme.EMBER, sm, lambda: f"{int(100 * d.dim)}%", "100%",
-                       track_w=int(BASE_W * 0.17 * s), tip=TIPS["dim_slider"]))
+                       track_w=int(BASE_W * 0.17 * s), tip=TIPS["dim_slider"]),
+                Cycle("cycle_parallax", lambda: parallax_texts[d.parallax], sm, parallax_texts,
+                      tip=TIPS["cycle_parallax"]))
 
             return Grid([[resolution, max_fps],
                          [background, dim]],
@@ -702,24 +809,101 @@ class Renderer:
                 volume("Music Volume",  "music_volume",  lambda: sound.music_volume),
                 volume("SFX Volume",    "sfx_volume",    lambda: sound.sfx_volume),
                 Stack([self.toggle(sm, "toggle_paddle_sounds", "Paddle Sounds", lambda: sound.paddle_hit_sound),
-                       self.toggle(sm, "toggle_score_sounds",  "Score Sound",   lambda: sound.score_sound)],
+                       self.toggle(sm, "toggle_score_sounds",  "Score Sound",   lambda: sound.score_sound),
+                       self.toggle(sm, "toggle_menu_sounds",   "Menu Sounds",   lambda: audio.menu_sounds)],
                       vertical=False, gap=int(BASE_W * 0.01 * s))],
                 gap=self.vgap(ui, s, 1.4))
 
+            fades = [f"Track Fade: {o}" for o in audio.fade_options]
+            ambience = [f"Ambience: {o}" for o in audio.ambience_options]
+
             jukebox = self.section(
-                ui, s, "Music",
+                ui, s, "Jukebox",
                 Cycle("cycle_music", lambda: audio.track_name(sound.now_playing), f,
-                      [audio.track_name(t) for t in audio.all_tracks], tip=TIPS["cycle_music"]),
+                      [audio.track_name(t) for t in audio.all_tracks], tip=TIPS["cycle_music"],
+                      pick="cycle_music_value"),
                 Stack([Button("randomise_music", "Randomise Music", sm, (B, theme.BLUE_HOVER),
                               tip=TIPS["randomise_music"]),
                        Toggle("toggle_loop_music", lambda: "Loop" if audio.loop_music else "Shuffle", sm,
                               lambda: audio.loop_music, ["Loop", "Shuffle"], tip=TIPS["toggle_loop_music"])],
                       vertical=False, gap=int(BASE_W * 0.01 * s)),
-                Text(lambda: mood_notes[sound.mood], ty, theme.GOLD, samples=list(mood_notes.values())))
+                Text(lambda: mood_notes[sound.mood], ty, theme.GOLD, samples=list(mood_notes.values())),
+                self.toggle(sm, "toggle_even_volume", "Even Out Volume", lambda: audio.even_volume),
+                Cycle("cycle_fade", lambda: fades[audio.fade], sm, fades, tip=TIPS["cycle_fade"]),
+                Cycle("cycle_ambience", lambda: ambience[audio.ambience], sm, ambience, tip=TIPS["cycle_ambience"]))
 
             return Grid([[volumes, jukebox]], gap_x=int(BASE_W * 0.04 * s))
 
         ui.screen_menu(state, screen, build, title="音频 Audio", mark="音", reset="Reset to Default")
+
+    TRACK_ROWS = 9      # tracks shown at once in the jukebox list; the rest scroll
+
+    def track_list_rect(self, state):
+        """Where the jukebox's track list opens: under the track name, or above it if there's no room."""
+        audio, sound = self.app.settings.audio, self.app.sound_manager
+        anchor = state.ui_hitboxes.get("cycle_music_value")
+        if anchor is None:
+            return None, 0
+        font = self.fnt(0.026, bold=False)
+        row_h = font.get_linesize() + 14
+        rows = min(self.TRACK_ROWS, len(sound.pool))
+        w = max(anchor.w, max(font.size(audio.track_name(t))[0] for t in sound.pool) + 110)
+        rect = pygame.Rect(0, 0, w, rows * row_h + 16)
+        rect.centerx = anchor.centerx
+        rect.top = anchor.bottom + 6
+        if rect.bottom > BASE_H - 20:
+            rect.bottom = anchor.top - 6
+        rect.clamp_ip(pygame.Rect(20, 20, BASE_W - 40, BASE_H - 40))
+        return rect, row_h
+
+    def draw_track_list(self, state, screen):
+        """Every track for this moment, the one playing marked with a blossom."""
+        audio, sound = self.app.settings.audio, self.app.sound_manager
+        rect, row_h = self.track_list_rect(state)
+        if rect is None:
+            return
+        pool = sound.pool
+        mouse = self.mouse()
+        font = self.fnt(0.026, bold=False)
+        bold = self.fnt(0.026)
+
+        shadow = blank(rect.w, rect.h)
+        shadow.fill((0, 0, 0, 120))
+        screen.blit(shadow, rect.move(6, 8))
+        pygame.draw.rect(screen, mix(theme.INK, theme.LACQUER_BOTTOM, .5), rect, border_radius=6)
+        pygame.draw.rect(screen, theme.GOLD_DARK, rect, 2, border_radius=6)
+        state.ui_hitboxes["track_list"] = rect          # clicks on the list's own padding go nowhere
+
+        first = state.track_scroll
+        scrolls = len(pool) > self.TRACK_ROWS
+        text_right = rect.right - (26 if scrolls else 12)
+        for row, index in enumerate(range(first, min(len(pool), first + self.TRACK_ROWS))):
+            track = pool[index]
+            r = pygame.Rect(rect.x + 8, rect.y + 8 + row * row_h, text_right - rect.x - 8, row_h)
+            playing = track == sound.now_playing
+            hot = r.collidepoint(mouse)
+            if hot:
+                glow = blank(r.w, r.h)
+                glow.fill((*theme.EMBER, 70))
+                screen.blit(glow, r)
+            if playing:
+                flower = self.art.blossom(22)
+                screen.blit(flower, flower.get_rect(midleft=(r.x + 10, r.centery)))
+            color = theme.GOLD_BRIGHT if playing or hot else theme.PARCHMENT
+            self.text(screen, audio.track_name(track), bold if playing else font, color,
+                      midleft=(r.x + 44, r.centery))
+            state.ui_hitboxes[f"track_{index}"] = r
+
+        if scrolls:
+            track_rect = pygame.Rect(rect.right - 18, rect.y + 10, 8, rect.h - 20)
+            pygame.draw.rect(screen, theme.INK, track_rect, border_radius=4)
+            h = max(30, track_rect.h * self.TRACK_ROWS // len(pool))
+            y = track_rect.y + (track_rect.h - h) * first // max(1, len(pool) - self.TRACK_ROWS)
+            pygame.draw.rect(screen, theme.GOLD, (track_rect.x, y, track_rect.w, h), border_radius=4)
+
+        # The controls underneath shouldn't explain themselves through the list
+        if rect.collidepoint(mouse):
+            self.tips.offered = None
 
     # ── Stats ──────────────────────────────────────────────────────────────────
 
@@ -889,6 +1073,40 @@ class Renderer:
             sprite = self.art.paddle(rect.w, rect.h, finish)
         screen.blit(sprite, rect)
 
+        powerups = getattr(paddle.game, "powerups", None)
+        if powerups:
+            self.draw_paddle_effects(screen, paddle, rect, powerups)
+
+    # One aura per paddle, the first that applies: boons gold, curses violet, Gravity jade
+    EFFECT_GLOWS = (("giant", "gold"), ("swift", "gold"), ("shrink", "violet"), ("hex", "violet"),
+                    ("gravity", "jade"))
+
+    def draw_paddle_effects(self, screen, paddle, rect, powerups):
+        art = self.art
+        pulse = .65 + .35 * math.sin(self.app.fx.time * 6)
+        for key, finish in self.EFFECT_GLOWS:
+            if powerups.has(paddle, key):
+                halo = art.paddle_glow(rect.w, rect.h, finish)
+                halo.set_alpha(int(255 * pulse))
+                screen.blit(halo, halo.get_rect(center=rect.center), special_flags=ADD)
+                halo.set_alpha(255)
+                break
+        if powerups.frosted(paddle):
+            halo = art.paddle_glow(rect.w, rect.h, "ice")
+            screen.blit(halo, halo.get_rect(center=rect.center), special_flags=ADD)
+            ice = art.get(("ice_coat", rect.w, rect.h), self._ice_coat, rect.w, rect.h)
+            screen.blit(ice, rect)
+        if powerups.flipped(paddle):
+            mark = art.charm(34, "咒", FAMILY_COLOURS["Curse"])
+            screen.blit(mark, mark.get_rect(midbottom=(rect.centerx, rect.top - 6)))
+
+    @staticmethod
+    def _ice_coat(w, h):
+        coat = blank(w, h)
+        pygame.draw.rect(coat, (200, 232, 255, 120), (0, 0, w, h), border_radius=6)
+        pygame.draw.rect(coat, (236, 248, 255, 200), (0, 0, w, h), 2, border_radius=6)
+        return coat
+
     def draw_ball(self, screen, ball, rect, ox, oy):
         cx, cy = (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2
         r = rect.w // 2
@@ -906,9 +1124,23 @@ class Renderer:
         else:
             trail.append((cx, cy))
 
+        # A Ghost Ball fades mid-court, trail and all
+        powerups = getattr(ball.game, "powerups", None)
+        alpha = powerups.ball_alpha() if powerups else 1.0
+        if alpha < 1.0:
+            sprite = self.art.ball(max(8, round(rect.w / 2) * 2))
+            sprite.set_alpha(int(255 * alpha))
+            screen.blit(sprite, sprite.get_rect(center=rect.center))
+            sprite.set_alpha(255)
+            return
+
         # Soul-fire tail in the colour of whoever hit it last, oldest and faintest first
         paddle = getattr(ball, "last_paddle", None)
         fire = (40, 96, 220) if paddle and not paddle.is_left else (200, 60, 22)
+        if getattr(ball, "blazing", False):
+            fire = (255, 116, 30)                  # Spirit Fire
+        elif powerups and powerups.ball_frosted():
+            fire = (120, 190, 240)                 # Frostbite
         count = len(trail)
         for i, (x, y) in enumerate(list(trail)):
             k = (i + 1) / count
@@ -917,15 +1149,60 @@ class Renderer:
             glow = self.art.glow(radius, scaled(fire, (level / 6) ** 2))
             screen.blit(glow, (x + ox - radius, y + oy - radius), special_flags=ADD)
 
-        halo = self.art.glow(max(24, int(r * 2.6) // 4 * 4), scaled(fire, .75))
+        size = 2.6 if not getattr(ball, "blazing", False) else 3.6
+        halo = self.art.glow(max(24, int(r * size) // 4 * 4), scaled(fire, .75))
         screen.blit(halo, halo.get_rect(center=rect.center), special_flags=ADD)
         sprite = self.art.ball(max(8, round(rect.w / 2) * 2))
         screen.blit(sprite, sprite.get_rect(center=rect.center))
+        if powerups and powerups.ball_frosted():
+            ice = self.art.get(("ice_ball", rect.w), self._ice_ball, max(8, round(rect.w / 2) * 2))
+            screen.blit(ice, ice.get_rect(center=rect.center))
+
+    @staticmethod
+    def _ice_ball(d):
+        coat = blank(d + 8, d + 8)
+        pygame.draw.circle(coat, (200, 232, 255, 110), (d // 2 + 4, d // 2 + 4), d // 2 + 2)
+        pygame.draw.circle(coat, (240, 250, 255, 220), (d // 2 + 4, d // 2 + 4), d // 2 + 2, 2)
+        return coat
+
+    def draw_pickups(self, screen, powerups, ox, oy):
+        """Power-up talismans bobbing on the court; they blink before they fade away."""
+        t = self.app.fx.time
+        for item in powerups.pickups:
+            kind = POWERUPS[item["kind"]]
+            tint = FAMILY_COLOURS[kind.family]
+            alpha = min(1.0, item["age"] / 0.3)
+            left = powerups.LIFETIME - item["age"]
+            if left < 2.0 and int(left * 6) % 2:
+                alpha *= 0.35
+            x = item["x"] + ox
+            y = item["y"] + oy + math.sin(t * 2.4 + item["phase"]) * 7
+            level = max(1, round(alpha * 6))
+            glow = self.art.glow(64, scaled(tint, .1 * level))
+            screen.blit(glow, glow.get_rect(center=(x, y)), special_flags=ADD)
+            coin = self.art.charm(2 * powerups.RADIUS - 4, kind.glyph, tint)
+            coin.set_alpha(int(255 * alpha))
+            screen.blit(coin, coin.get_rect(center=(x, y)))
+            coin.set_alpha(255)
+
+    def draw_popups(self, screen, powerups):
+        """The name of a power-up, rising and fading from where it was taken."""
+        for text, x, y, age, tint in powerups.popups:
+            k = age / 1.4
+            surf = self.art.gilded(text, self.brush(0.04), top=mix(tint, (255, 255, 255), .6), bottom=tint, glow=None)
+            surf.set_alpha(int(255 * min(1.0, (1 - k) * 2.5)))
+            rect = surf.get_rect(center=(x, y - 40 - 70 * k))
+            rect.clamp_ip(pygame.Rect(10, 140, BASE_W - 20, BASE_H - 150))
+            screen.blit(surf, rect)
+            surf.set_alpha(255)
 
     def draw_world(self, screen, game):
         W, H = BASE_W, BASE_H
         ox, oy = self._shake_offset()
-        self.draw_arena(screen, ox, oy, game.settings.middle_wall)
+        self.draw_arena(screen, ox, oy, game.wall_up)
+        powerups = getattr(game, "powerups", None)
+        if powerups:
+            self.draw_pickups(screen, powerups, ox, oy)
 
         for obj in game.objects:
             rect = pygame.Rect(int(obj.x0 + ox), int(obj.y0 + oy), int(obj.width), int(obj.height))
@@ -933,6 +1210,9 @@ class Renderer:
                 self.draw_ball(screen, obj, rect, ox, oy)
             elif obj.is_paddle:
                 self.draw_paddle(screen, obj, rect)
+
+        if powerups:
+            self.draw_popups(screen, powerups)
 
         if getattr(game, "switch_warning", None) is not None:
             self.draw_switch_warning(screen, game)
@@ -952,11 +1232,11 @@ class Renderer:
             self.draw_countdown(screen, game.countdown)
 
             # first serve, or just after a Chaos Switch: remind players who has which paddle
-            if game.p1.score + game.p2.score == 0 or game.settings.chaos_switch == 1:
+            if game.p1.score + game.p2.score == 0 or game.settings.switch_each_point:
                 self._draw_controls_hint(screen, game)
 
         if getattr(game, "switch_flash", 0) > 0:
-            self.draw_switch_banner(screen, game.switch_flash)
+            self.draw_switch_banner(screen, game.switch_flash, game.switch_banner)
 
     def draw_switch_warning(self, screen, game):
         """Two seconds of warning before Chaos Switch + swaps the paddles."""
@@ -976,15 +1256,17 @@ class Renderer:
             pygame.draw.circle(screen, theme.FLAME if i < filled else theme.GOLD_DARK, centre, 12)
 
         font = self.fnt(0.024)
-        for paddle, other, glow in ((game.p1, game.p2, "blue"), (game.p2, game.p1, "red")):
+        for paddle, other in ((game.p1, game.p2), (game.p2, game.p1)):
             rect = pygame.Rect(int(paddle.x0), int(paddle.y0), int(paddle.width), int(paddle.height))
-            halo = art.paddle_glow(rect.w, rect.h, glow)
+            halo = art.paddle_glow(rect.w, rect.h, "red" if paddle.is_left else "blue")
             halo.set_alpha(int(255 * pulse))
             screen.blit(halo, halo.get_rect(center=rect.center), special_flags=ADD)
             halo.set_alpha(255)
 
-            # who takes this paddle when the swap happens
-            text = "Next: " + ("AI" if other.ai_enabled else other.controls_label)
+            # where this paddle is about to land
+            target = (int((other.x0 + other.x1) / 2), int((other.y0 + other.y1) / 2))
+            pygame.draw.line(screen, theme.FLAME, rect.center, target, 2)
+            text = "Swapping places"
             tw = font.size(text)[0] + 30
             plate = pygame.Rect(0, 0, tw, 40)
             plate.midbottom = (rect.centerx, rect.top - 14)
@@ -992,12 +1274,12 @@ class Renderer:
             screen.blit(art.inset(plate.w, plate.h), plate)
             self.text(screen, text, font, theme.FLAME, center=plate.center)
 
-    def draw_switch_banner(self, screen, left):
+    def draw_switch_banner(self, screen, left, text="换 Switch!"):
         w, h = 520, 120
         m = self.art.PLAQUE_MARGIN
         y = int(BASE_H * 0.3)
         board = self.art.plaque(w, h)
-        words = self.art.gilded("换 Switch!", self.brush(0.075), glow=None)
+        words = self.art.gilded(text, self.brush(0.075), glow=None)
         alpha = int(255 * min(1.0, left / 0.3))
         board.set_alpha(alpha)
         words.set_alpha(alpha)

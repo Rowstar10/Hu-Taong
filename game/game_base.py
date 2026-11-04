@@ -10,6 +10,8 @@ class Countdown:
     shown_value: int
 
 class GameBase:
+    MAX_STEP = 1 / 30   # a hitch slows the game for a moment instead of letting the ball jump
+
     def __init__(self, app, width=BASE_W, height=BASE_H):
         self.app = app
         self.settings = self.app.settings.gameplay
@@ -68,7 +70,7 @@ class GameBase:
         cd = self.countdown
         if cd is None:
             return
-        cd.remaining -= dt
+        cd.remaining -= min(dt, self.MAX_STEP)     # a slow frame mustn't swallow the countdown
 
         new_shown = int(cd.remaining + 0.999)
         if new_shown != cd.shown_value:
@@ -95,6 +97,6 @@ class GameBase:
 
         if self.paused:
             return
-        
+
         self.apply_gameplay_settings()
-        Physics.step(self, dt)
+        Physics.step(self, min(dt, self.MAX_STEP) * self.settings.pace)

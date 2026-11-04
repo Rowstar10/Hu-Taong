@@ -1,5 +1,5 @@
 import math
-from config import DYNAMIC, KINEMATIC, MAX_BOUNCE_ANGLE
+from config import BASE_H, DYNAMIC, KINEMATIC, MAX_BOUNCE_ANGLE, MAX_BALL_SPEEDUP
 from objects.ai import PaddleAI
 from objects.game_object import GameObject
 
@@ -36,10 +36,35 @@ class Paddle(GameObject):
         self.ai_enabled = False
         self.ai = PaddleAI(self)
 
+    def apply_inputs(self, dt):
+        """Keys or the AI ask for a velocity and the paddle eases towards it.  A Jiangshi Hex
+        flips what's asked for; under Gravity the paddle falls, and Up jumps off the floor."""
+        if self.ai_enabled:
+            dvx, dvy = self.ai_input(dt)
+        else:
+            keys = self.game.app.keys_down
+            dvx = self.speed * ((self.right in keys) - (self.left in keys))
+            dvy = self.speed * ((self.down in keys) - (self.up in keys))
+
+        powerups = getattr(self.game, "powerups", None)
+        if powerups and powerups.flipped(self):
+            dvx, dvy = -dvx, -dvy
+
+        a = 1 - math.exp(-self.soft_control_k * dt)
+        self.vx += (dvx - self.vx) * a
+        if powerups and powerups.gravity(self):
+            # a clean fall and jump: undo the drag the physics step just applied to vy
+            self.vy = self.vy / math.exp(-self.linear_drag * dt) + powerups.PADDLE_GRAVITY * dt
+            if self.y1 >= BASE_H - 0.5 and dvy < -0.3 * self.speed:
+                self.vy = -powerups.JUMP
+        else:
+            self.vy += (dvy - self.vy) * a
+
     def can_collide_with(self, other):
         if getattr(other, "is_separator", False):
-            return self.game.settings.middle_wall
-        return True
+            return self.game.wall_up
+        # Paddles pass through each other, so neither can pin the other away from its goal
+        return not other.is_paddle
 
     def on_contact(self, other, data):
         if other.body_type !=  DYNAMIC:
@@ -47,7 +72,14 @@ class Paddle(GameObject):
 
         nx, ny = data["normal"]
         # A blocked ball loses pace, but never drops below its serve speed, so a rally can't stall
-        speed = max(math.hypot(other.vx, other.vy), getattr(other, "speed", 0))
+        serve = getattr(other, "speed", 0)
+        speed = max(math.hypot(other.vx, other.vy), serve)
+
+        # Hard hits speed it up, but ease off towards a ceiling so it never gets too quick to follow
+        cap = MAX_BALL_SPEEDUP * serve * math.sqrt(2)     # serves go diagonally, at `serve` on each axis
+        knee = 0.7 * cap
+        if serve and speed > knee:
+            speed = knee + (cap - knee) * math.tanh((speed - knee) / (cap - knee))
 
         # -------------- Bouncy Center / Flat Edges --------------
         if nx !=  0:
@@ -61,14 +93,31 @@ class Paddle(GameObject):
             other.vy = speed * math.sin(angle)
 
         if ny !=  0:
-            center = (self.x0 + self.x1) / 2
-            other_center = (other.x0 + other.x1) / 2
-            offset = (other_center - center) / (self.width / 2)
-            offset = max(-1, min(1, offset))
+            # Caught on the paddle's end: still a return, at the steepest angle, rather than
+            # a deflection that drops into the paddle's own goal
+            forward = 1 if self.is_left else -1
+            other.vx = forward * speed * math.cos(MAX_BOUNCE_ANGLE)
+            other.vy = -ny * speed * math.sin(MAX_BOUNCE_ANGLE)
 
-            angle = offset * MAX_BOUNCE_ANGLE
-            other.vx = speed * math.sin(angle)
-            other.vy = -ny * speed * math.cos(angle)
+        # A paddle running into the ball faster than it bounces off would catch it again a few
+        # frames later and carry it along, so the ball always leaves clearly faster than the paddle.
+        # The extra lead stops at the speed ceiling; only a paddle faster than that pushes past it.
+        out_x, out_y = -nx, -ny
+        chasing = self.vx * out_x + self.vy * out_y
+        leaving = other.vx * out_x + other.vy * out_y
+        need = max(chasing + 150, min(chasing * 1.3, cap if serve else math.inf))
+        if chasing > 0 and leaving < need:
+            other.vx += out_x * (need - leaving)
+            other.vy += out_y * (need - leaving)
+
+            # ...and its sideways speed gives way, so the push doesn't take it past the ceiling
+            limit = max(cap, need) if serve else math.inf
+            if math.hypot(other.vx, other.vy) > limit:
+                side_x, side_y = other.vx - out_x * need, other.vy - out_y * need
+                side = math.hypot(side_x, side_y)
+                keep = math.sqrt(max(0.0, limit * limit - need * need)) / side if side else 0.0
+                other.vx = out_x * need + side_x * keep
+                other.vy = out_y * need + side_y * keep
 
     # ------------------------ AI Logic ------------------------
     def ai_input(self, dt):

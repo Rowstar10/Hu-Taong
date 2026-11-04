@@ -228,12 +228,13 @@ class KeyButton(Node):
 
 
 class Cycle(Node):
-    """[<]  value  [>]  -- the value box is as wide as the widest option."""
+    """[<]  value  [>]  -- the value box is as wide as the widest option.  With `pick` the value
+    box itself is clickable too (its hitbox is `pick`), e.g. to open a list of every option."""
 
-    def __init__(self, key, text, font, samples, color=theme.PARCHMENT, tip=None):
+    def __init__(self, key, text, font, samples, color=theme.PARCHMENT, tip=None, pick=None):
         super().__init__()
         self.key, self.text, self.font, self.samples, self.color = key, text, font, samples, color
-        self.tip = tip
+        self.tip, self.pick = tip, pick
 
     def measure(self):
         gap = int(BASE_W * 0.007)
@@ -254,7 +255,16 @@ class Cycle(Node):
 
     def draw(self, ui):
         ui.screen.blit(ui.art.inset(self.plate.w, self.plate.h), self.plate)
-        ui.renderer.text(ui.screen, _val(self.text), self.font, _val(self.color), center=self.plate.center)
+        color = _val(self.color)
+        if self.pick:
+            hot = self.plate.collidepoint(ui.mouse)
+            color = theme.GOLD_BRIGHT if hot else color
+            # a small down-pointing mark says the box opens
+            x, y, s = self.plate.right - self.gap - 10, self.plate.centery + 2, 7
+            pygame.draw.polygon(ui.screen, theme.GOLD_BRIGHT if hot else theme.GOLD,
+                                [(x - s, y - s // 2), (x + s, y - s // 2), (x, y + s // 2 + 1)])
+            ui.state.ui_hitboxes[self.pick] = self.plate
+        ui.renderer.text(ui.screen, _val(self.text), self.font, color, center=self.plate.center)
 
         for rect, left, suffix in ((self.left, True, "_left"), (self.right, False, "_right")):
             ui.screen.blit(ui.art.chevron(rect.w, left, rect.collidepoint(ui.mouse)), rect)

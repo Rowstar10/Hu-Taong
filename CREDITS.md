@@ -30,7 +30,7 @@ Both are under the SIL Open Font License 1.1. The licence texts are in `Resource
 | Asian String Suite.mp3 | menu | Asian String Suite | BossLevelVGM | CC-BY 3.0 | https://opengameart.org/content/asian-string-suite |
 | New Dusks Light.mp3 | menu | New Dusks Light | FoxSynergy | CC-BY 3.0 | https://opengameart.org/content/new-dusks-light |
 | Jade Kings Throne.mp3 | menu | Jade Kings Throne | Hitctrl | CC-BY 3.0 | https://opengameart.org/content/views-from-atop-the-jade-kings-throne |
-| Shenyang.mp3 | game | Shenyang | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Shenyang.mp3 | menu | Shenyang | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Big Mojo.mp3 | game | Big Mojo | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Mountain Emperor.mp3 | game | Mountain Emperor | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Scheming Weasel.mp3 | game | Scheming Weasel (faster version) | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
@@ -41,7 +41,7 @@ Both are under the SIL Open Font License 1.1. The licence texts are in `Resource
 | Taiko Drums.ogg | game | Taiko Drums | congusbongus | CC-BY 3.0 | https://opengameart.org/content/taiko-drums-seamless-loop |
 | Winner Winner.mp3 | win | Winner Winner! | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Our Story Begins.mp3 | win | Our Story Begins | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
-| Finding Movement.mp3 | win | Finding Movement | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Finding Movement.mp3 | menu | Finding Movement | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Ten Fanfares.ogg | win | Ten Fanfares | Spring Spring | CC0 | https://opengameart.org/content/10-fanfares |
 | Ghost Processional.mp3 | lose | Ghost Processional | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Peaceful Desolation.mp3 | lose | Peaceful Desolation | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
@@ -49,6 +49,21 @@ Both are under the SIL Open Font License 1.1. The licence texts are in `Resource
 | Nu Flute.mp3 | lose | Nu Flute | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Asian Duet.mp3 | lose | Asian Duet | elerya | CC-BY 3.0 | https://opengameart.org/content/asian-duet |
 | Death of a Ninja.mp3 | lose | Death of a Ninja | Joth | CC0 | https://opengameart.org/content/death-of-a-ninja-game-over |
+| Eastern Thought.mp3 | menu | Eastern Thought | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Tea Roots.mp3 | menu | Tea Roots | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Senbazuru.mp3 | menu | Senbazuru | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| One-eyed Maestro.mp3 | game | One-eyed Maestro | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Monster Promenade.mp3 | game | Monster Promenade | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Waltz of the Carnies.mp3 | game | Waltz of the Carnies | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Malicious.mp3 | game | Malicious | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Monkeys Spinning Monkeys.mp3 | win | Monkeys Spinning Monkeys | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Heroic Age.mp3 | win | Heroic Age | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Super Friendly.mp3 | win | Super Friendly | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Funeral March for Brass.mp3 | lose | Funeral March for Brass | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Decline.mp3 | lose | Decline | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Million Elephants.ogg | menu | Kingdom of a Million Elephants under a White Parasol | Spring Spring | CC0 | https://opengameart.org/content/kingdom-of-a-million-elephants-under-a-white-parasol |
+| Chinese Tales.mp3 | game | Chinese Tales (PSG version) | Snabisch | CC-BY 3.0 | https://opengameart.org/content/chinese-tales-psg-version |
+| Drums of Dawn.mp3 | game | Drums of Dawn | Magnesus | CC-BY 3.0 | https://opengameart.org/content/drums-of-dawn |
 
 Kevin MacLeod credit line, as his licence asks for it:
 
@@ -69,10 +84,32 @@ Kevin MacLeod credit line, as his licence asks for it:
 - "Peaceful Desolation" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "On the Shore" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Nu Flute" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Eastern Thought" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Tea Roots" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Senbazuru" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "One-eyed Maestro" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Monster Promenade" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Waltz of the Carnies" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Malicious" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Monkeys Spinning Monkeys" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Heroic Age" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Super Friendly" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Funeral March for Brass" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Decline" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+
+## Ambience
+
+`Resources/Sounds/Ambience/`. Both were converted to mono 22 kHz WAV, levelled, and had their loop
+seam crossfaded; CC0 allows this without credit, but credit is given anyway.
+
+| File | Original | Author | Licence | Source |
+| --- | --- | --- | --- | --- |
+| Ambience Fire.wav | Fireplace Sound loop | PagDev | CC0 | https://opengameart.org/content/fireplace-sound-loop |
+| Ambience Crickets.wav | Crickets Ambient Noise - loopable | Wolfgang_ | CC0 | https://opengameart.org/content/crickets-ambient-noise-loopable |
 
 ## Background images
 
-bg13-bg32 are anime fan art and official Genshin Impact art of Hu Tao. Unlike the music, these images
+bg13-bg37 are anime fan art and official Genshin Impact art of Hu Tao. Unlike the music, these images
 are **not** openly licensed: copyright stays with their artists and HoYoverse. They are here for
 personal, non-commercial use, so get permission before sharing the game publicly with them included.
 
@@ -101,6 +138,11 @@ they are comfortable to play over.
 | bg30.jpg | Night mountains with ghost | not listed | https://wallhaven.cc/w/dpd8qo | Yes |
 | bg31.jpg | Sky lantern from above | not listed | https://wallhaven.cc/w/x83g5l | No |
 | bg32.jpg | Peace sign close-up | not listed | https://wallhaven.cc/w/j3wqym | Yes |
+| bg33.jpg | Misty forest with stone lanterns | not listed | https://wallhaven.cc/w/g71wr7 | No |
+| bg34.jpg | Inside Wangsheng Funeral Parlor | not listed | https://wallhaven.cc/w/yx27d7 | No |
+| bg35.jpg | Plum blossom and swallow | https://x.com/cha_hanare/status/1770754834330783828 | https://safebooru.org/index.php?page=post&s=view&id=6707849 | No |
+| bg36.jpg | Halloween night with Xiangling | not listed | https://wallhaven.cc/w/1k2xjw | Yes |
+| bg37.jpg | Lantern Rite with Zhongli | https://twitter.com/cheong1110/status/1884979806850425147 | https://safebooru.org/index.php?page=post&s=view&id=5560143 | Yes |
 
 Licence texts:
 

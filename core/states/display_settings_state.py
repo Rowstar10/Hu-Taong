@@ -37,7 +37,7 @@ class DisplaySettingsState(State):
         mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
 
         self.bg_name = settings.backgrounds[settings.background]
-        self.bg_thumb.image = self.app.thumbnail_cache[self.bg_name]
+        self.bg_thumb.image = self.app.backgrounds.thumb(self.bg_name)
         
         for thumb in self.thumbnails:
             thumb.update(mouse_pos)
@@ -85,6 +85,13 @@ class DisplaySettingsState(State):
 
             if key == "toggle_rotate_bg":
                 settings.rotate_backgrounds = not settings.rotate_backgrounds
+
+            for name, options in (("rotate_every", settings.rotate_options), ("parallax", settings.parallax_options)):
+                for suffix, step in (("_left", -1), ("_right", 1)):
+                    if key == f"cycle_{name}{suffix}":
+                        setattr(settings, name, (getattr(settings, name) + step) % len(options))
+                        if name == "rotate_every":
+                            self.app.restart_bg_timer()
                 
             if key == "cycle_max_fps_left":
                 settings.max_fps = (settings.max_fps - 1) % len(settings.max_fps_options)
@@ -111,6 +118,7 @@ class DisplaySettingsState(State):
 
     def reset_defaults(self):
         self.app.reset_display_settings()
+        self.app.restart_bg_timer()
         self.res_index = self.app.res_index
         self.display_mode_index = self.app.display_mode_index
 

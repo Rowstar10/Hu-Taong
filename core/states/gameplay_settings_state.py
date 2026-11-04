@@ -13,7 +13,13 @@ class GameplaySettingsState(State):
         self.dragging_ball_diameter = False
         self.dragging_paddle_speed = False
         self.dragging_paddle_size = False
-        
+        self.dragging_pace = False
+
+    @staticmethod
+    def pace_from(percent, settings):
+        """Game pace for a slider position, in steps of 0.05 so it reads cleanly."""
+        return round((settings.pace_min + percent * settings.pace_range) * 20) / 20
+
     def draw(self, screen):
         super().draw(screen)
         self.app.renderer.draw_gameplay_settings_menu(self, screen)
@@ -43,14 +49,21 @@ class GameplaySettingsState(State):
 
             if key == "toggle_adaptive_ai":
                 audio.adaptive_ai = not audio.adaptive_ai
+            # The Middle Wall and Chaos Switch + can't both be on: turning one on turns the other off
             if key == "toggle_middle_wall":
                 audio.middle_wall = not audio.middle_wall
+                if audio.middle_wall and audio.switch_mid_rally:
+                    audio.chaos_switch -= 2          # keeps plain Chaos Switch if both were on
+                    self.app.renderer.show_toast("Chaos Switch + is off: it needs the Middle Wall down")
             if key == "cycle_chaos_mode":
                 audio.chaos_mode = (audio.chaos_mode + 1) % 3
                 if audio.chaos_mode != 1:
                     audio.chaos_restore()
             if key == "cycle_chaos_switch":
-                audio.chaos_switch = (audio.chaos_switch + 1) % 3
+                audio.chaos_switch = (audio.chaos_switch + 1) % 4
+                if audio.switch_mid_rally and audio.middle_wall:
+                    audio.middle_wall = False
+                    self.app.renderer.show_toast("Middle Wall is off: Chaos Switch + needs it down")
 
             if key == "cycle_win_score_left":
                 audio.winning_score_index = (audio.winning_score_index - 1) % len(audio.winning_scores)
@@ -71,11 +84,18 @@ class GameplaySettingsState(State):
                 self.dragging_ball_diameter = True
                 percent = self.update_slider_from_mouse("ball_diameter_slider", event)
                 audio.ball_diameter = audio.ball_diameter_min + percent * audio.ball_diameter_range
+            if key == "pace_slider":
+                self.dragging_pace = True
+                percent = self.update_slider_from_mouse("pace_slider", event)
+                audio.pace = self.pace_from(percent, audio)
             if key == "paddle_size_slider":
                 self.dragging_paddle_size = True
                 percent = self.update_slider_from_mouse("paddle_size_slider", event)
                 audio.paddle_height = audio.paddle_height_min + percent * audio.paddle_height_range
                 audio.paddle_width = audio.paddle_width_min + percent * audio.paddle_width_range
+
+            if key == "open_powerups":
+                self.push_state("powerups")
 
             if key == "randomise_all":
                 audio.ball_speed = audio.ball_speed_min + random.random() * audio.ball_speed_range
@@ -93,6 +113,8 @@ class GameplaySettingsState(State):
                 audio.paddle_speed = audio.paddle_speed_min + 0.5 * audio.paddle_speed_range
             if key == "reset_ball_diameter":
                 audio.ball_diameter = audio.ball_diameter_min + 0.5 * audio.ball_diameter_range
+            if key == "reset_pace":
+                audio.pace = 1.0
             if key == "reset_paddle_size":
                 audio.paddle_height = audio.paddle_height_min + 0.5 * audio.paddle_height_range
                 audio.paddle_width = audio.paddle_width_min + 0.5 * audio.paddle_width_range
@@ -108,6 +130,8 @@ class GameplaySettingsState(State):
             self.dragging_paddle_speed = False
         if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.dragging_paddle_size:
             self.dragging_paddle_size = False
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.dragging_pace:
+            self.dragging_pace = False
 
         if event.type == pygame.MOUSEMOTION and self.dragging_ball_speed:
             percent = self.update_slider_from_mouse("ball_speed_slider", event)
@@ -118,6 +142,9 @@ class GameplaySettingsState(State):
         if event.type == pygame.MOUSEMOTION and self.dragging_ball_diameter:
             percent = self.update_slider_from_mouse("ball_diameter_slider", event)
             audio.ball_diameter = audio.ball_diameter_min + percent * audio.ball_diameter_range            
+        if event.type == pygame.MOUSEMOTION and self.dragging_pace:
+            percent = self.update_slider_from_mouse("pace_slider", event)
+            audio.pace = self.pace_from(percent, audio)
         if event.type == pygame.MOUSEMOTION and self.dragging_paddle_size:
             percent = self.update_slider_from_mouse("paddle_size_slider", event)
             audio.paddle_height = audio.paddle_height_min + percent * audio.paddle_height_range

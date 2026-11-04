@@ -58,7 +58,7 @@ class StateManager:
                         
         current_state = self.current()
         if getattr(current_state, "background_img", None):
-            self.app.bg_current = self.app.background_cache[current_state.background_img]
+            self.app.show_background(current_state.background_img)
 
         if self.stack and self.stack[self.screen_index()] is not before:
             self.app.fx.fade()

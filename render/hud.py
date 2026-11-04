@@ -2,6 +2,7 @@ import math
 import pygame
 
 from config import BASE_W, BASE_H
+from game.powerups import BY_KEY as POWERUPS, FAMILY_COLOURS
 from render import theme
 
 
@@ -31,9 +32,21 @@ class Hud:
         self.draw_score(screen, "p2", p2.score, right, "azure")
 
         # With Chaos Switch the paddles change hands, so say who is playing each side
-        if game.settings.chaos_switch:
+        if game.settings.switch_each_point:
             self.draw_owner(screen, p1, left)
             self.draw_owner(screen, p2, right)
+
+        powerups = getattr(game, "powerups", None)
+        if powerups:
+            top = 196 if game.settings.switch_each_point else 150
+            self.draw_effects(screen, powerups, p1, left, top)
+            self.draw_effects(screen, powerups, p2, right, top)
+            if powerups.wall_open():             # Open Court is on everyone, so it sits in the middle
+                kind = POWERUPS["wall"]
+                coin = self.art.charm(40, kind.glyph, FAMILY_COLOURS[kind.family])
+                screen.blit(coin, coin.get_rect(center=(BASE_W // 2, 170)))
+                self.app.renderer.text(screen, f"{math.ceil(powerups.wall_down)}", self.app.renderer.fnt(0.019),
+                                       theme.PARCHMENT, center=(BASE_W // 2, 202))
 
         # --- Rally and ball speed (left out on the Minimal HUD) ----------
         if self.app.settings.interface.hud == 0:
@@ -43,7 +56,7 @@ class Hud:
             screen.blit(self.art.inset(plate.w, plate.h), plate)
             renderer.text(screen, f"Rally: {rally}", renderer.fnt(0.036), theme.GOLD_BRIGHT, center=plate.center)
 
-            spd = int(math.hypot(ball.vx, ball.vy)) if ball else 0
+            spd = int(math.hypot(ball.vx, ball.vy) * game.settings.pace) if ball else 0   # as seen on screen
             renderer.text(screen, f"Ball Speed: {spd} pps", renderer.fnt(0.02, bold=False), theme.PARCHMENT,
                           center=(BASE_W // 2, plate.bottom + 22))
 
@@ -71,6 +84,27 @@ class Hud:
             k = 1 + .45 * pop
             digits = pygame.transform.smoothscale(digits, (int(digits.get_width() * k), int(digits.get_height() * k)))
         screen.blit(digits, digits.get_rect(center=(cx, 18 + h // 2 - 4)))
+
+    def draw_effects(self, screen, powerups, paddle, cx, top):
+        """What's on this player right now: a coin for each power-up, with its seconds or charges."""
+        items = [(key, f"{math.ceil(left)}") for key, left in paddle.effects.items()]
+        if powerups.frosted(paddle):
+            items.append(("frost", "ready" if paddle is powerups.frost["owner"] else f"{math.ceil(powerups.frost['left'])}"))
+        if powerups.ghost and powerups.ghost["owner"] is paddle:
+            items.append(("ghost", f"{math.ceil(powerups.ghost['left'])}"))
+        items += [(key, f"x{count}") for key, count in paddle.charges.items()]
+        if not items:
+            return
+        renderer = self.app.renderer
+        font = renderer.fnt(0.019)
+        step = 64
+        x = cx - step * (len(items) - 1) // 2
+        for key, label in items:
+            kind = POWERUPS[key]
+            coin = self.art.charm(40, kind.glyph, FAMILY_COLOURS[kind.family])
+            screen.blit(coin, coin.get_rect(center=(x, top + 20)))
+            renderer.text(screen, label, font, theme.PARCHMENT, center=(x, top + 52))
+            x += step
 
     def draw_owner(self, screen, paddle, cx):
         renderer = self.app.renderer

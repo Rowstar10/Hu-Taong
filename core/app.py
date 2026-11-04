@@ -2,6 +2,7 @@ import os, pygame, random, time
 
 from config import BASE_W, BASE_H, RESOLUTIONS, IMAGE_DIR, DEFAULT_DISPLAY_MODE, BG_OVERSCAN
 from core import save_data
+from core.backgrounds import Backgrounds
 from core.settings import Settings
 from core.stats import Stats
 from core.sound_manager import SoundManager
@@ -64,52 +65,31 @@ class App:
         self.display_modes = ["windowed", "borderless", "fullscreen"]
         self.display_mode_index = DEFAULT_DISPLAY_MODE
         self.display_mode = self.display_modes[self.display_mode_index]
+        self.canvas = None
         self.apply_display_mode()
-        
-        self.virtual = pygame.Surface(self.base_res).convert()
-        self.dim_surf: pygame.Surface | None = None
-        self.dim_last: float = -1.0
 
-        # ---------- Background Cache ----------
-        self.background_cache = {}
-        self.thumbnail_cache = {}
-        
-        self.bg_offset = [0.0, 0.0]
-
+        # ---------- Backgrounds (loaded on a worker thread as they are needed) ----------
         display = self.settings.display
-        size = BASE_W + 2 * BG_OVERSCAN[0], BASE_H + 2 * BG_OVERSCAN[1]
-        vignette = self.art.vignette(*size, strength = 120)
-
-        for i, bg in enumerate(display.backgrounds):
-            self.renderer.draw_loading_screen(self.virtual, .75 * i / len(display.backgrounds))
-            self.present()
-            pygame.event.pump()
-
-            img = pygame.image.load(IMAGE_DIR / bg).convert()  # opaque -> much faster full-screen blits
-            full = pygame.transform.smoothscale(img, size)
-            full.blit(vignette, (0, 0))
-            self.background_cache[bg] = full
-            self.thumbnail_cache[bg] = pygame.transform.smoothscale(img, (256, 144))
+        self.backgrounds = Backgrounds(self, display.backgrounds)
+        self.bg_offset = [0.0, 0.0]
 
         jobs = self.renderer.prewarm_jobs()
         for i, job in enumerate(jobs):
             job()
             if i % 12 == 0:
-                self.renderer.draw_loading_screen(self.virtual, .75 + .25 * i / len(jobs))
+                self.renderer.draw_loading_screen(self.virtual, i / len(jobs))
                 self.present()
                 pygame.event.pump()
 
         self.idle_jobs = self.renderer.idle_jobs()
 
-        bg_init = display.backgrounds[display.background]
-        self.bg_current = self.background_cache[bg_init]
+        self.bg_current = display.backgrounds[display.background]   # background names
+        self.backgrounds.picture(self.bg_current)
         
         # ---------- Events ----------
         self.keys_down = set()
         self.BG_FADE = pygame.USEREVENT
-        
-        delay = random.randint(30000, 60000)
-        pygame.time.set_timer(self.BG_FADE, delay)
+        self.restart_bg_timer()
         
         self.bg_next = None
         self.bg_transition_active = False
@@ -156,6 +136,15 @@ class App:
         self.sx = BASE_W / w
         self.sy = BASE_H / h
 
+        # At the game's own resolution everything is drawn straight onto the window,
+        # which skips a full-screen scaling copy every frame
+        if (w, h) == self.base_res:
+            self.virtual = self.display
+        else:
+            if self.canvas is None:
+                self.canvas = pygame.Surface(self.base_res).convert()
+            self.virtual = self.canvas
+
     def window_to_base(self, pos):
         mx = pos[0] * self.sx
         my = pos[1] * self.sy
@@ -175,6 +164,12 @@ class App:
             self.current_resolution = self.native_res
             self.res_index = self.resolutions.index(self.current_resolution)
             self.apply_display_mode()
+
+    def restart_bg_timer(self):
+        """Wait a while, as long as the Rotate setting asks, before the next background."""
+        display = self.settings.display
+        shortest, longest = display.rotate_waits[display.rotate_every]
+        pygame.time.set_timer(self.BG_FADE, random.randint(shortest * 1000, longest * 1000))
 
     def reset_audio_settings(self):
         self.settings.audio.reset()
@@ -207,23 +202,34 @@ class App:
     def start_bg_transition(self):
         display = self.settings.display
         new_bg = random.choice(display.backgrounds)
-        self.bg_next = self.background_cache[new_bg]
-        
-        if self.bg_current == self.bg_next:
-            self.bg_next = None
+
+        if self.bg_current == new_bg or self.bg_next:
             return
 
+        # The fade starts once the worker thread has the picture ready
+        self.bg_next = new_bg
+        self.backgrounds.request(new_bg)
         display.background = display.backgrounds.index(new_bg)
-        self.bg_transition_active = True
+        self.bg_transition_active = False
         self.bg_transition_time = 0
+
+    def show_background(self, name):
+        """Switch straight to a background, dropping any fade in progress."""
+        if self.bg_next:
+            self.backgrounds.get(self.bg_next, self.settings.display.dim).set_alpha(None)
+        self.bg_current = name
+        self.bg_next = None
+        self.bg_transition_active = False
 
     def update_parallax(self):
         # The picture drifts against the cursor in menus and settles during play
         target = (0, 0)
         if self.fx.scene != "game":
+            display = self.settings.display
+            strength = display.parallax_strength[display.parallax]
             mx, my = self.window_to_base(pygame.mouse.get_pos())
-            target = ((1 - 2 * mx / BASE_W) * BG_OVERSCAN[0],
-                      (1 - 2 * my / BASE_H) * BG_OVERSCAN[1])
+            target = ((1 - 2 * mx / BASE_W) * BG_OVERSCAN[0] * strength,
+                      (1 - 2 * my / BASE_H) * BG_OVERSCAN[1] * strength)
 
         ease = min(1, 3 * self.dt)
         self.bg_offset[0] += (target[0] - self.bg_offset[0]) * ease
@@ -232,20 +238,25 @@ class App:
     def draw_background(self):
         self.update_parallax()
         pos = (self.bg_offset[0] - BG_OVERSCAN[0], self.bg_offset[1] - BG_OVERSCAN[1])
-        self.virtual.blit(self.bg_current, pos)
+        dim = self.settings.display.dim
+        self.virtual.blit(self.backgrounds.get(self.bg_current, dim), pos)
+
+        if self.bg_next and not self.bg_transition_active and self.backgrounds.ready(self.bg_next):
+            self.bg_transition_active = True
 
         if self.bg_transition_active:
             self.bg_transition_time += self.dt
             t = self.bg_transition_time / self.bg_transition_duration
             t = max(0, min(t, 1))
             t = t * t * (3 - 2 * t)
-            
-            alpha = int(255 * t)            
-            self.bg_next.set_alpha(alpha)
-            self.virtual.blit(self.bg_next, pos)
+
+            alpha = int(255 * t)
+            bg_next = self.backgrounds.get(self.bg_next, dim)
+            bg_next.set_alpha(alpha)
+            self.virtual.blit(bg_next, pos)
 
             if t >= 1:
-                self.bg_next.set_alpha(None)
+                bg_next.set_alpha(None)
                 self.bg_current = self.bg_next
                 self.bg_next = None
                 self.bg_transition_active = False
@@ -257,7 +268,10 @@ class App:
             self.state_manager.process_changes()
             self.loop()
             self.clock_tick()
-            
+
+        # The worker threads stop only now: the frame that called quit() still draws with them
+        self.backgrounds.close()
+        self.renderer.close()
         pygame.quit()
             
     def loop(self):
@@ -302,8 +316,7 @@ class App:
             if event.type == self.BG_FADE:
                 if settings.rotate_backgrounds:
                     self.start_bg_transition()
-                delay = random.randint(30000, 60000)
-                pygame.time.set_timer(self.BG_FADE, delay)
+                self.restart_bg_timer()
 
             # ---------- State-Specific Events ----------
             self.state_manager.handle_event(event)
@@ -319,17 +332,8 @@ class App:
         self.sound_manager.update()
         self.state_manager.update(self.dt)
 
-        # ---------- Draw Background & Dim Overlay ----------
-        self.virtual.fill((0, 0, 0))
+        # ---------- Draw Background (it covers the whole frame, and has the dim baked in) ----------
         self.draw_background()
-
-        dim = settings.dim
-        if dim > 0:
-            if self.dim_surf is None or self.dim_last != dim:
-                self.dim_surf = pygame.Surface(self.base_res, pygame.SRCALPHA)
-                self.dim_surf.fill((0, 0, 0, int(255 * dim)))
-                self.dim_last = dim
-            self.virtual.blit(self.dim_surf, (0, 0))
 
         self.fx.update(self.dt)
         self.fx.draw_back(self.virtual)
@@ -349,16 +353,19 @@ class App:
 
         # ---------- Show FPS ----------
         if settings.show_fps:
-            if not hasattr(self, "fps_font"):
-                self.fps_font = self.font_manager.get("ui", int(BASE_H * 0.02), bold=True)
-            fps_surf = self.fps_font.render(f"{self.fps} FPS", True, theme.GOLD)
+            if getattr(self, "fps_shown", None) != self.fps:
+                font = self.font_manager.get("ui", int(BASE_H * 0.02), bold=True)
+                self.fps_surf = font.render(f"{self.fps} FPS", True, theme.GOLD)
+                self.fps_shown = self.fps
+            fps_surf = self.fps_surf
             self.virtual.blit(fps_surf, (BASE_W - 3 * fps_surf.get_width() // 2, BASE_H - 2 * fps_surf.get_height()))
 
         self.present()
 
     def present(self):
         # ---------- Scale + Flip ----------
-        pygame.transform.scale(self.virtual, self.current_resolution, self.display)
+        if self.virtual is not self.display:
+            pygame.transform.scale(self.virtual, self.display.get_size(), self.display)
         pygame.display.flip()
 
     def clock_tick(self):
@@ -369,8 +376,13 @@ class App:
 
     def quit(self):
         save_data.save(self)
+        self.running = False
+
+        # Let the goodbye sound finish.  The ambience loops forever, so it stops first,
+        # and the wait is capped so nothing still playing can hold the game open.
+        self.sound_manager.stop_ambience()
         self.sound_manager.play("exit_state.wav")
-        while pygame.mixer.get_busy():
+        deadline = time.perf_counter() + 1.5
+        while pygame.mixer.get_busy() and time.perf_counter() < deadline:
             pygame.event.poll()
             pygame.time.wait(10)
-        self.running = False

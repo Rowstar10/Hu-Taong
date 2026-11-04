@@ -33,6 +33,7 @@ BG_OVERSCAN = (30, 17)
 EPSILON = 0.001
 HALF_PI = math.pi / 2
 MAX_BOUNCE_ANGLE = math.radians(60)
+MAX_BALL_SPEEDUP = 2.4  # rallies speed the ball up to at most this many times its serve speed
 MAX_CPF = 5
 MIXER_STEPS = 128  # SDL_mixer volumes are integers 0..128
 

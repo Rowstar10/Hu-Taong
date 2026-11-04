@@ -21,6 +21,9 @@ def mix(a, b, t):
     return tuple(int(x + (y - x) * t) for x, y in zip(a, b))
 
 def scaled(color, k):
+    if len(color) == 3:     # the usual case, spelt out as this runs a few hundred times a frame
+        r, g, b = color
+        return (min(255, int(r * k)), min(255, int(g * k)), min(255, int(b * k)))
     return tuple(min(255, int(c * k)) for c in color)
 
 # ---------- Surface helpers ----------
@@ -93,6 +96,20 @@ def stepped_rect(x, y, w, h, s):
             (r, b - 2*s), (r - s, b - 2*s), (r - s, b - s), (r - 2*s, b - s), (r - 2*s, b),
             (x + 2*s, b), (x + 2*s, b - s), (x + s, b - s), (x + s, b - 2*s), (x, b - 2*s),
             (x, y + 2*s), (x + s, y + 2*s), (x + s, y + s), (x + 2*s, y + s)]
+
+def split(surf, inset):
+    """Cut a sprite into its middle and four edges, as (piece, offset) pairs.  The middle
+    comes out opaque, so it should be one that is (all but) opaque already."""
+    w, h = surf.get_size()
+    if w <= 2 * inset or h <= 2 * inset:
+        return [(surf, (0, 0))]
+    middle = pygame.Surface((w - 2 * inset, h - 2 * inset))
+    middle.blit(surf, (-inset, -inset))
+    pieces = [(middle, (inset, inset))]
+    for rect in ((0, 0, w, inset), (0, h - inset, w, inset),
+                 (0, inset, inset, h - 2 * inset), (w - inset, inset, inset, h - 2 * inset)):
+        pieces.append((surf.subsurface(rect).copy(), rect[:2]))
+    return pieces
 
 def meander_band(w, color, unit=22):
     """A strip of the square-spiral fret pattern (hui wen)."""
@@ -603,6 +620,21 @@ class Art:
     def panel(self, w, h, step=14):
         return self.get(("panel", w, h, step), self._panel, w, h, step)
 
+    def board(self, w, h, mark=None):
+        """A panel with its faint character baked in, cut into pieces (see split).  The lacquer
+        is all but opaque, and an opaque blit costs a third of a blended one."""
+        key = ("board", w, h, mark)
+        pieces = self.cache.get(key)
+        if pieces is None:
+            surf = self.panel(w, h).copy()
+            if mark:
+                m = self.PANEL_MARGIN
+                sprite = self.watermark(mark, min(400, int(h * .8)), 26)
+                surf.blit(sprite, sprite.get_rect(center=(m + w // 2, m + h // 2)))
+            pieces = self.cache[key] = [(self.fast(piece), offset)
+                                        for piece, offset in split(surf, self.PANEL_MARGIN + 3 * 14)]
+        return pieces
+
     def _panel(self, w, h, step):
         margin = self.PANEL_MARGIN
         out = self.shadowed(w, h, step, margin, 14, 190)
@@ -830,12 +862,30 @@ class Art:
     def paddle_glow(self, w, h, finish):
         return self.get(("paddle_glow", w, h, finish), self._paddle_glow, w, h, finish)
 
+    PADDLE_GLOWS = {"red": (140, 42, 22), "blue": (30, 74, 170), "gold": (150, 108, 26),
+                    "violet": (104, 40, 170), "jade": (28, 134, 84), "ice": (96, 160, 214)}
+
     def _paddle_glow(self, w, h, finish):
         pad = 44
-        tint = (140, 42, 22) if finish == "red" else (30, 74, 170)
+        tint = self.PADDLE_GLOWS[finish]
         surf = pygame.Surface((w + 2 * pad, h + 2 * pad))
         pygame.draw.rect(surf, tint, (pad - 6, pad - 6, w + 12, h + 12), border_radius=14)
         return blur(blur(surf, 8), 3)
+
+    def charm(self, size, glyph, tint):
+        """A round talisman coin for a power-up: its character inked on a glowing disc."""
+        return self.get(("charm", size, glyph, tint), self._charm, size, glyph, tint)
+
+    def _charm(self, size, glyph, tint):
+        s = size * 2
+        c = s / 2
+        surf = blank(s, s)
+        pygame.draw.circle(surf, rgba(mix(tint, (0, 0, 0), .78), 238), (c, c), s * .47)
+        pygame.draw.circle(surf, rgba(tint, 255), (c, c), s * .47, max(2, s // 16))
+        pygame.draw.circle(surf, rgba(theme.GOLD, 190), (c, c), s * .37, max(1, s // 44))
+        mark = self.brush(s * .52).render(glyph, True, mix(tint, (255, 255, 255), .6))
+        surf.blit(mark, mark.get_rect(center=(c, c + s * .02)))
+        return shrink(surf, size, size)
 
     # ---------- Game pieces ----------
 
