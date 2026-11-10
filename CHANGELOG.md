@@ -2,6 +2,33 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 1.3 — 2026-11-10
+
+Online play, replays, courts and twelve new power-ups, with an overhaul of settings, assets and the AI.
+
+### Added
+- Online play with a friend: one of you hosts and the other joins with an eight-character code, or lists the game as a public room (with an optional password) for others to find. Uses free public servers, or a server of your own (see ONLINE.md and SERVER.md).
+- Online matches have a lobby, rematch and restart requests, and pausing for both players.
+- Replays: an instant replay after great points, after the match, or both, with slow motion. Save whole matches, clips (Mark In and Mark Out) or highlights, and watch or delete them from Stats.
+- Courts: Classic, Twin Stones, Graveyard, Ferry Gates and Narrow Pass, or a different court every match.
+- New power-ups: Sticky Goo, Blink Ball, Tombstone, Snowball, Twin Balls, Chaos Mode +, Curveball, Double or Nothing, Wind Gust, Firecracker, Lantern Night and Portal Pair.
+- Hold Tab in a match to see every power-up in play.
+- Lantern Night and Curveball can also be switched on for a whole match.
+- A Chaotic power-up rate, and a Court Dim setting (Off, Light, Medium, Strong).
+- Jukebox progress bar: click or drag to jump through a track, plus play and pause.
+- Export and import your stats, to keep them or move them to another computer. Stats now count online matches, online win rate and online win streak.
+
+### Changed
+- Tooltips now show a title, a short description and tips, including keyboard shortcuts.
+- Hard hits can speed the ball up to 4.5 times its serve speed (was 2.4), so you can out-hit the AI again.
+- Spirit Fire now lasts 10 seconds, with every hit a blazing shot.
+- Frostbite's frost now passes back and forth with every hit.
+- Ghost Ball is now a Wild power-up: the ball keeps vanishing and reappearing at random.
+- Gravity now makes both paddles fall, and Open Court and Soul Swap last until the point ends.
+
+### Removed
+- The Jiangshi Hex power-up.
+
 ## 1.2 — 2026-11-04
 
 Power-ups arrive, with more backgrounds and music and a full jukebox.

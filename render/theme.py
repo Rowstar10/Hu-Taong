@@ -35,6 +35,7 @@ ORANGE_RED_HOVER = (255, 120, 60)
 # --- Neutral ---
 DARK_GRAY = (90, 90, 90)
 GRAY = (150, 150, 160)
+OFF_TEXT = (196, 182, 166)      # a switch that's off: plainly readable, just not lit
 GRAY_HOVER = (180, 190, 210)
 
 # --- Misc ---

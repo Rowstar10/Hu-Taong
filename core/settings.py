@@ -4,6 +4,7 @@ from pathlib import Path
 import pygame
 
 from config import IMAGE_DIR
+from game import courts
 from game.powerups import KINDS as POWERUP_KINDS
 
 def find_backgrounds():
@@ -21,6 +22,23 @@ class Settings:
         self.display = DisplaySettings(app)
         self.audio = AudioSettings(app)
         self.interface = InterfaceSettings(app)
+        self.online = OnlineSettings(app)
+
+
+class OnlineSettings:
+    """Which server online games find each other through: the free public ones, or your own
+    (any MQTT broker; see server/hutaong_server.py).  Both players need the same one."""
+
+    def __init__(self, app):
+        self.app = app
+        self.own_server = False
+        self.server_address = ""     # like example.com or 203.0.113.7:1883
+        self.server_user = ""        # if the server asks for a login
+        self.server_password = ""
+
+    def apply(self):
+        from core import rooms
+        rooms.use_server(self.server_address if self.own_server else None, self.server_user, self.server_password)
 
 class GameplaySettings:
     def __init__(self, app):
@@ -61,11 +79,10 @@ class GameplaySettings:
         self.ai_styles = ["Balanced", "Guardian", "Striker", "Trickster"]
 
         # Power-ups
-        self.powerup_rate_options = ["Rare", "Normal", "Frequent"]
-        # Rally Teleports: every so many hits in one rally, both players earn a Safety Teleport.
-        # Every 10 refills saves faster than anyone misses, so long rallies can go on and on.
-        self.rally_reward_options = ["Off", "Every 20 hits", "Every 10 hits"]
-        self.rally_reward_hits = [0, 20, 10]
+        self.powerup_rate_options = ["Rare", "Normal", "Frequent", "Chaotic"]
+
+        # Courts: the stones a match starts with (see game/courts.py); the last one is Random
+        self.court_options = courts.NAMES
 
         self.reset()
 
@@ -98,6 +115,11 @@ class GameplaySettings:
         # 2 the paddles swap places at random, telegraphed moments mid-rally (Chaos Switch +,
         # which needs the Middle Wall off), 3 both.
         self.chaos_switch = 0
+        self.curveball = False       # every hit bends the way the paddle was moving (the Curveball power-up, for good)
+        self.lantern_night = False   # the court is always dark but for lanterns (the Lantern Night power-up, for good)
+
+        self.court = 0               # Classic: an open court
+        self.online_host_blue = False    # online: the host plays Blue and the friend Red
 
         self.reset_powerups()
 
@@ -115,7 +137,6 @@ class GameplaySettings:
         """Power-ups on, at the normal rate, every one of them allowed."""
         self.powerups = True
         self.powerup_rate = 1
-        self.rally_reward = 1
         for kind in POWERUP_KINDS:
             setattr(self, "pu_" + kind.key, True)
 
@@ -166,6 +187,10 @@ class DisplaySettings:
         self.parallax_options = ["Off", "Gentle", "Full"]
         self.parallax_strength = [0.0, 0.5, 1.0]
 
+        # How much the background is darkened during a match, so the ball and paddles stand out
+        self.court_dim_options = ["Off", "Light", "Medium", "Strong"]
+        self.court_dim_levels = [0, 60, 100, 150]
+
         # How often Rotate fades to a new background: (shortest, longest) wait in seconds
         self.rotate_options = ["30-60 s", "2 min", "5 min"]
         self.rotate_waits = [(30, 60), (100, 140), (270, 330)]
@@ -184,6 +209,7 @@ class DisplaySettings:
         self.rotate_backgrounds = True
         self.rotate_every = 0
         self.parallax = 2
+        self.court_dim = 2
 
 class AudioSettings:
     def __init__(self, app):
@@ -265,7 +291,7 @@ class AudioSettings:
         self.reset()
 
     def reset(self):
-        self.loop_music = False
+        self.play_mode = 1           # when a track ends: 0 the next in order, 1 a random one, 2 the same again
         self.even_volume = True      # quieten tracks recorded much louder than the rest
         self.fade = 1
         self.menu_sounds = True      # clicks and whooshes when using the menus
@@ -298,6 +324,8 @@ class InterfaceSettings:
         self.app = app
 
         self.hud_options = ["Full", "Minimal"]
+        # When a match's best moments replay on their own: after a great point, after the match, both
+        self.instant_replay_options = ["Off", "Great Points", "After the Match", "Both"]
         self.effects_options = ["Full", "Reduced", "Off"]
         self.countdown_options = [3, 2, 1]
 
@@ -312,6 +340,7 @@ class InterfaceSettings:
         self.hide_cursor = True      # hide the mouse during a match until it moves
 
         self.hud = 0
+        self.instant_replay = 2      # the highlights after the match
         self.effects = 0
         self.countdown = 0
         self.reset_keys()

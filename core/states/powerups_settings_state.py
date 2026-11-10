@@ -28,11 +28,9 @@ class PowerUpsSettingsState(State):
             if key == "cycle_powerup_rate_right":
                 settings.powerup_rate = (settings.powerup_rate + 1) % count
 
-            rewards = len(settings.rally_reward_options)
-            if key == "cycle_rally_reward_left":
-                settings.rally_reward = (settings.rally_reward - 1) % rewards
-            if key == "cycle_rally_reward_right":
-                settings.rally_reward = (settings.rally_reward + 1) % rewards
+            if key in ("all_pu_on", "all_pu_off"):
+                for name in [attr for attr in vars(settings) if attr.startswith("pu_")]:
+                    setattr(settings, name, key == "all_pu_on")
 
             # each power-up's own switch, e.g. "toggle_pu_frost"
             if key and key.startswith("toggle_pu_"):

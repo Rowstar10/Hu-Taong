@@ -23,18 +23,21 @@ def reflect_in_range(y, lo, hi):
 def lerp(a, b, t):
     return a + (b - a) * t
 
-def to_mixer_volume(gain):
-    """Convert a 0-1 gain into a volume the mixer can actually represent.
+def split_volume(gain):
+    """A 0-1 gain as (sound volume, channel balance level) for the mixer.
 
-    The mixer only has MIXER_STEPS + 1 levels and truncates anything between
-    them, so a small-but-nonzero gain (e.g. master 10% x music 7%) would silently
-    become 0 and cut the audio.  A gain is therefore only ever silent if it is
-    exactly zero (a slider the user dragged to 0); anything else is held at the
-    quietest audible step instead.
+    SDL_mixer keeps a volume as a whole number from 0 to MIXER_STEPS and truncates anything
+    between, so master x music on their own could only ever land on 128 levels: quiet settings
+    snapped to the quietest one, or to silence.  The sound's volume (MIXER_STEPS levels) and the
+    channel's balance (255 levels) multiply, so together they reach any gain to within about 1%,
+    down to roughly -90 dB.  Only a gain of exactly 0 is silent.
     """
     if gain <= 0:
-        return 0.0
-    return clamp(round(gain * MIXER_STEPS), 1, MIXER_STEPS) / MIXER_STEPS
+        return 0.0, 0
+    gain = min(1.0, gain)
+    chunk = max(1, math.ceil(gain * MIXER_STEPS - 1e-9))       # the smallest sound volume that reaches it
+    pan = max(1, min(255, round(gain * MIXER_STEPS / chunk * 255)))
+    return chunk / MIXER_STEPS, pan
 
 _FIT_CACHE = {}
 

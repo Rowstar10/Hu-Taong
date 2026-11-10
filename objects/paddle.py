@@ -1,5 +1,8 @@
-import math
+import math, random
 from config import BASE_H, DYNAMIC, KINEMATIC, MAX_BOUNCE_ANGLE, MAX_BALL_SPEEDUP
+
+FLAT_ANGLE = math.radians(3)    # returns flatter than this get a little spin
+SPEED_KNEE = 0.85               # hard hits only start easing off at this share of the speed ceiling
 from objects.ai import PaddleAI
 from objects.game_object import GameObject
 
@@ -37,34 +40,66 @@ class Paddle(GameObject):
         self.ai = PaddleAI(self)
 
     def apply_inputs(self, dt):
-        """Keys or the AI ask for a velocity and the paddle eases towards it.  A Jiangshi Hex
-        flips what's asked for; under Gravity the paddle falls, and Up jumps off the floor."""
+        """Keys or the AI ask for a velocity and the paddle eases towards it.  Under Gravity
+        the paddle falls, and Up jumps off the floor."""
+        net = getattr(self.game, "net", None)
         if self.ai_enabled:
             dvx, dvy = self.ai_input(dt)
+        elif net and getattr(self, "remote", False):
+            # Online: the friend's keys, as they last sent them
+            x, y = net.keys_for(self)
+            dvx, dvy = self.speed * x, self.speed * y
         else:
             keys = self.game.app.keys_down
             dvx = self.speed * ((self.right in keys) - (self.left in keys))
             dvy = self.speed * ((self.down in keys) - (self.up in keys))
+            if net:                          # online, either set of keys moves your paddle
+                other = self.game.app.settings.interface.keys("p2" if self.up == self.game.app.settings.interface.p1_up else "p1")
+                dvx = dvx or self.speed * ((other["right"] in keys) - (other["left"] in keys))
+                dvy = dvy or self.speed * ((other["down"] in keys) - (other["up"] in keys))
 
         powerups = getattr(self.game, "powerups", None)
-        if powerups and powerups.flipped(self):
-            dvx, dvy = -dvx, -dvy
 
-        a = 1 - math.exp(-self.soft_control_k * dt)
+        self.want_vx = dvx                   # what its player asks for (a Snowball point needs a real shove)
+        k = self.soft_control_k
+        if powerups and getattr(self, "shoved", 0) > powerups.SHOVE_TIME - powerups.SNOW_REELING:
+            k *= powerups.SNOW_GRIP          # reeling from a Snowball's hit: it carries the paddle back
+        a = 1 - math.exp(-k * dt)
         self.vx += (dvx - self.vx) * a
         if powerups and powerups.gravity(self):
-            # a clean fall and jump: undo the drag the physics step just applied to vy
-            self.vy = self.vy / math.exp(-self.linear_drag * dt) + powerups.PADDLE_GRAVITY * dt
-            if self.y1 >= BASE_H - 0.5 and dvy < -0.3 * self.speed:
-                self.vy = -powerups.JUMP
+            self.gravity_jump(dt, dvy < -0.3 * self.speed, powerups)
         else:
+            self.jump_held = None
             self.vy += (dvy - self.vy) * a
+
+    def gravity_jump(self, dt, up, powerups):
+        """Under Gravity the paddle falls, and Up jumps: a tap is a small hop, and the longer Up is
+        held (up to half a second) the higher it goes, right up to the top of the court."""
+        vy = self.vy / math.exp(-self.linear_drag * dt)        # a clean fall: undo the physics' drag
+        g = powerups.PADDLE_GRAVITY
+        held = getattr(self, "jump_held", None)
+        if self.y1 >= BASE_H - 0.5 and up and vy >= -1 and held is None:
+            vy, held = -powerups.JUMP, 0.0                      # off the floor
+        elif held is not None:
+            if up and vy < 0 and held < powerups.JUMP_HOLD:
+                held += dt                                      # still holding: climbs on
+                g *= powerups.HOLD_GRAVITY
+            else:
+                if not up and vy < -powerups.JUMP_CUT:
+                    vy = -powerups.JUMP_CUT                     # let go early: the climb is cut short
+                held = None
+        self.jump_held = held
+        self.vy = vy + g * dt
 
     def can_collide_with(self, other):
         if getattr(other, "is_separator", False):
             return self.game.wall_up
-        # Paddles pass through each other, so neither can pin the other away from its goal
-        return not other.is_paddle
+        if other.is_ball and getattr(self, "remote", False) and getattr(self.game, "net", None):
+            # online, the friend's own screen says when their paddle hits the ball (see
+            # Hu_Taong.apply_claim); Twin Balls' blue ball is played here, on the host
+            return other is not self.game.ball
+        # Paddles pass through each other, and through stones, so nothing can pin one away from its goal
+        return not other.is_paddle and not getattr(other, "is_obstacle", False)
 
     def on_contact(self, other, data):
         if other.body_type !=  DYNAMIC:
@@ -77,7 +112,7 @@ class Paddle(GameObject):
 
         # Hard hits speed it up, but ease off towards a ceiling so it never gets too quick to follow
         cap = MAX_BALL_SPEEDUP * serve * math.sqrt(2)     # serves go diagonally, at `serve` on each axis
-        knee = 0.7 * cap
+        knee = SPEED_KNEE * cap
         if serve and speed > knee:
             speed = knee + (cap - knee) * math.tanh((speed - knee) / (cap - knee))
 
@@ -89,9 +124,15 @@ class Paddle(GameObject):
             offset = max(-1, min(1, offset))
 
             angle = offset * MAX_BOUNCE_ANGLE
+            # A dead-centre hit gets a touch of spin, so two paddles can't trade perfectly flat
+            # returns forever
+            if abs(angle) < FLAT_ANGLE:
+                angle = math.copysign(random.uniform(FLAT_ANGLE, 2 * FLAT_ANGLE),
+                                      angle if angle else random.choice((-1, 1)))
             other.vx = -nx * speed * math.cos(angle)
             other.vy = speed * math.sin(angle)
 
+        pinched = False
         if ny !=  0:
             # Caught on the paddle's end: still a return, at the steepest angle, rather than
             # a deflection that drops into the paddle's own goal
@@ -99,25 +140,46 @@ class Paddle(GameObject):
             other.vx = forward * speed * math.cos(MAX_BOUNCE_ANGLE)
             other.vy = -ny * speed * math.sin(MAX_BOUNCE_ANGLE)
 
+            # No room between the paddle's end and the wall: shoot it out forward along the wall
+            room = self.y0 if ny > 0 else BASE_H - self.y1
+            if room < other.height + 6:
+                pinched = True
+                other.vx = forward * speed
+                other.vy = 0.0
+                # and the paddle can't push it through the wall: it stops until the ball is clear,
+                # or the two would meet again at once, over and over, and the ball would freeze
+                if self.vy * ny < 0:
+                    self.vy = 0.0
+
         # A paddle running into the ball faster than it bounces off would catch it again a few
         # frames later and carry it along, so the ball always leaves clearly faster than the paddle.
         # The extra lead stops at the speed ceiling; only a paddle faster than that pushes past it.
         out_x, out_y = -nx, -ny
         chasing = self.vx * out_x + self.vy * out_y
         leaving = other.vx * out_x + other.vy * out_y
-        need = max(chasing + 150, min(chasing * 1.3, cap if serve else math.inf))
-        if chasing > 0 and leaving < need:
-            other.vx += out_x * (need - leaving)
-            other.vy += out_y * (need - leaving)
-
-            # ...and its sideways speed gives way, so the push doesn't take it past the ceiling
+        need = chasing + 150                                       # the least it must leave at
+        want = max(need, min(chasing * 1.3, cap if serve else math.inf))
+        if chasing > 0 and leaving < want and not pinched:
+            # Speed the whole return up, keeping its angle; at the ceiling the angle flattens
+            # only as far as it must for the ball to get clear
+            total = math.hypot(other.vx, other.vy)
+            share = leaving / total if total and leaving > 0 else 0.0      # cosine of the angle
             limit = max(cap, need) if serve else math.inf
-            if math.hypot(other.vx, other.vy) > limit:
-                side_x, side_y = other.vx - out_x * need, other.vy - out_y * need
-                side = math.hypot(side_x, side_y)
-                keep = math.sqrt(max(0.0, limit * limit - need * need)) / side if side else 0.0
-                other.vx = out_x * need + side_x * keep
-                other.vy = out_y * need + side_y * keep
+            new_speed = min(limit, want / share) if share else need
+            normal = max(need, new_speed * share)
+            new_speed = max(new_speed, normal)
+            side_x, side_y = other.vx - out_x * leaving, other.vy - out_y * leaving
+            side = math.hypot(side_x, side_y)
+            keep = math.sqrt(max(0.0, new_speed * new_speed - normal * normal)) / side if side else 0.0
+            other.vx = out_x * normal + side_x * keep
+            other.vy = out_y * normal + side_y * keep
+
+        # Never leave it going straight up and down: it would bounce there forever, out of reach
+        speed = math.hypot(other.vx, other.vy)
+        if speed and abs(other.vx) < speed * 0.3:
+            forward = 1 if self.is_left else -1
+            other.vx = forward * speed * 0.3
+            other.vy = math.copysign(speed * math.sqrt(1 - 0.09), other.vy or -1)
 
     # ------------------------ AI Logic ------------------------
     def ai_input(self, dt):

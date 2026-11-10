@@ -18,7 +18,9 @@ class Physics:
             obj.spin *=  a_drag
             if obj.has_inputs:
                 obj.apply_inputs(dt)
-                
+
+        Physics.resolve_overlaps(objects)
+
         # Collision Loop
         while remaining > 0 and cpf < MAX_CPF:
             collisions = Physics.detect_collisions(game, objects, remaining)
@@ -43,6 +45,73 @@ class Physics:
             cpf +=  1
     
             Physics.resolve_collision(obj1, obj2, data)
+
+    @staticmethod
+    def resolve_overlaps(objects):
+        """A paddle that grew (Chaos Mode +, Giant Paddle), or a ball that swelled, can begin a step
+        already overlapping the other.  A sweep only sees things that are about to touch, so it
+        would let the ball pass straight through: push the ball out the shallow way instead and
+        let the paddle play it like any other hit."""
+        balls = [obj for obj in objects if obj.is_ball and not getattr(obj, "stuck", None)]
+        only_paddles = [obj for obj in objects if obj.is_paddle
+                        and not (getattr(obj, "remote", False) and getattr(obj.game, "net", None))]
+        stones = [obj for obj in objects if getattr(obj, "is_obstacle", False) and obj.solid]
+        for ball in balls:
+            for stone in stones:
+                if ball.can_collide_with(stone):         # a Ghost Ball is let pass through
+                    Physics.free_from_stone(ball, stone, only_paddles + stones)
+        paddles = only_paddles
+        for ball in balls:
+            for paddle in paddles:
+                ox = min(ball.x1, paddle.x1) - max(ball.x0, paddle.x0)
+                oy = min(ball.y1, paddle.y1) - max(ball.y0, paddle.y0)
+                if ox <= 0 or oy <= 0:
+                    continue
+                # out the shallow way, unless that is into the top or bottom wall (a pinch): then sideways
+                up = ball.y0 + ball.y1 < paddle.y0 + paddle.y1
+                room = paddle.y0 if up else BASE_H - paddle.y1
+                if ox < oy or room < ball.height + 1:
+                    side = 1 if ball.x0 + ball.x1 > paddle.x0 + paddle.x1 else -1
+                    ball.x0 += side * (ox + 0.5)
+                    ball.x1 += side * (ox + 0.5)
+                    normal = (-side, 0)
+                else:
+                    side = 1 if ball.y0 + ball.y1 > paddle.y0 + paddle.y1 else -1
+                    ball.y0 += side * (oy + 0.5)
+                    ball.y1 += side * (oy + 0.5)
+                    normal = (0, -side)
+                Physics.clamp_to_world(ball)
+                Physics.resolve_collision(paddle, ball, {"t": 0.0, "normal": normal})
+
+    @staticmethod
+    def free_from_stone(ball, stone, others):
+        """A stone that rose or drifted onto the ball, or a paddle that pushed the ball into one:
+        move the ball out by the shortest way that doesn't land it in a paddle or another stone,
+        and bounce it off that face."""
+        ox = min(ball.x1, stone.x1) - max(ball.x0, stone.x0)
+        oy = min(ball.y1, stone.y1) - max(ball.y0, stone.y0)
+        if ox <= 0 or oy <= 0:
+            return
+        exits = [(stone.x1 - ball.x0 + 0.5, 0, (1, 0)), (ball.x1 - stone.x0 + 0.5, 0, (-1, 0)),
+                 (stone.y1 - ball.y0 + 0.5, 1, (0, 1)), (ball.y1 - stone.y0 + 0.5, 1, (0, -1))]
+        exits.sort(key = lambda e: e[0])
+        for push, axis, (dx, dy) in exits:
+            x0, y0 = ball.x0 + dx * push, ball.y0 + dy * push
+            x1, y1 = x0 + ball.width, y0 + ball.height
+            if y0 < 0 or y1 > BASE_H:
+                continue
+            if any(o is not stone and min(x1, o.x1) - max(x0, o.x0) > 0 and min(y1, o.y1) - max(y0, o.y0) > 0
+                   for o in others):
+                continue
+            break
+        else:
+            push, axis, (dx, dy) = exits[0]
+        ball.x0 += dx * push
+        ball.x1 += dx * push
+        ball.y0 += dy * push
+        ball.y1 += dy * push
+        Physics.clamp_to_world(ball)
+        Physics.resolve_collision(stone, ball, {"t": 0.0, "normal": (-dx, -dy)})
 
     @staticmethod
     def detect_collisions(game, objects, remaining):
@@ -199,7 +268,15 @@ class Physics:
         call_contacts(a, b)
         
     @staticmethod
-    def clamp_to_world(obj):               
+    def clamp_to_world(obj):
+        if obj.is_ball:
+            # A ball squeezed against the top or bottom (say, pinched by a paddle's end) is
+            # put back inside and bounced away, so it can never slip out through a wall
+            if obj.y0 < 0:
+                (obj.y0, obj.y1, obj.vy) = (0, obj.height, abs(obj.vy))
+            if obj.y1 > BASE_H:
+                (obj.y1, obj.y0, obj.vy) = (BASE_H, BASE_H - obj.height, -abs(obj.vy))
+            return
         if obj.body_type !=  KINEMATIC:
             return
         

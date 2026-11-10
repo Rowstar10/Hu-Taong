@@ -86,7 +86,8 @@ class DisplaySettingsState(State):
             if key == "toggle_rotate_bg":
                 settings.rotate_backgrounds = not settings.rotate_backgrounds
 
-            for name, options in (("rotate_every", settings.rotate_options), ("parallax", settings.parallax_options)):
+            for name, options in (("rotate_every", settings.rotate_options), ("parallax", settings.parallax_options),
+                                  ("court_dim", settings.court_dim_options)):
                 for suffix, step in (("_left", -1), ("_right", 1)):
                     if key == f"cycle_{name}{suffix}":
                         setattr(settings, name, (getattr(settings, name) + step) % len(options))

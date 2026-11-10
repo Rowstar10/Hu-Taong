@@ -1,7 +1,7 @@
 import os, pygame, random, time
 
 from config import BASE_W, BASE_H, RESOLUTIONS, IMAGE_DIR, DEFAULT_DISPLAY_MODE, BG_OVERSCAN
-from core import save_data
+from core import files, save_data
 from core.backgrounds import Backgrounds
 from core.settings import Settings
 from core.stats import Stats
@@ -37,7 +37,10 @@ class App:
         self.hud = Hud(self)
         self.fx = Ambience(self)
         self.stats = Stats()
+        self.choose_file = files.ask      # the Save / Open dialog (tests swap in their own)
+        self.net = None                   # an online session (core/net.py) while hosting or joining
         save_data.load(self)
+        self.settings.online.apply()          # which server online games meet through
         
         self.state_manager.auto_register("core.states", State)
         
@@ -184,6 +187,63 @@ class App:
         self.reset_audio_settings()
         self.reset_interface_settings()
 
+    def leave_online(self):
+        """Close the online session, telling the other side."""
+        if self.net:
+            self.net.close()
+            self.net = None
+
+    def online_requests(self):
+        """Hosting: the friend can pause the match for both, and resume it."""
+        net = self.net
+        if net.role == "guest":
+            # tell the host what's open here, so the match waits while either of us is in a menu
+            stack = self.state_manager.stack
+            names = [getattr(s, "NAME", "") for s in stack]
+            if "guest_match" in names:
+                above = names[names.index("guest_match") + 1:]
+                # only the pause screen, and what's opened from it (settings), hold the match
+                net.menu = 0 if "guest_pause" not in above else 1 if above[-1] == "guest_pause" else 2
+            # the host went back to the lobby: follow them there, still connected
+            if net.status == "waiting" and "guest_match" in names:
+                stack[names.index("guest_match")].back_to_lobby()
+                return
+            # the host has gone: from any of the match's screens, back to the menu
+            if net.status in ("lost", "refused"):
+                name = getattr(self.state_manager.current(), "NAME", "")
+                if name in ("guest_match", "guest_pause", "guest_result", "replay", "confirm_choice"):
+                    self.renderer.show_toast(net.reason or "The online game ended.", important = True)
+                    self.state_manager.set_state("main_menu", mute = True)
+                    self.leave_online()
+            return
+        if net.game is None:
+            return
+        top = self.state_manager.current()
+        name = getattr(top, "NAME", "")
+        if net.request("pause") and name == "game":
+            self.state_manager.push_state("pause", mute = True, by_friend = True)
+        if net.request("resume") and name == "pause":
+            self.state_manager.pop_state(mute = True)
+        if net.guest_menu == 2 and name == "game" and net.connected():
+            self.state_manager.push_state("pause", mute = True, by_friend = True)
+        if net.request("restart"):
+            self.renderer.show_toast("Your friend asks to restart the match from 0-0: Reset Scores, on the pause screen, does it",
+                                     important = True)
+        if net.notice:
+            self.renderer.show_toast(net.notice, important = True)
+            net.notice = None
+
+    def background_dim(self):
+        """How dark the background picture is.  Behind a match (live, a replay, or online) the
+        Court Dim setting darkens it too; it is baked into the picture, so it costs nothing a frame."""
+        display = self.settings.display
+        dim = display.dim
+        stack = self.state_manager.stack
+        if stack and getattr(stack[self.state_manager.screen_index()], "dims_court", False):
+            court = display.court_dim_levels[display.court_dim] / 255
+            dim = 1 - (1 - dim) * (1 - court)
+        return round(dim, 3)
+
     def in_match(self):
         """True while a match is on screen with nothing laid over it."""
         return getattr(self.state_manager.current(), "is_game", False)
@@ -238,7 +298,7 @@ class App:
     def draw_background(self):
         self.update_parallax()
         pos = (self.bg_offset[0] - BG_OVERSCAN[0], self.bg_offset[1] - BG_OVERSCAN[1])
-        dim = self.settings.display.dim
+        dim = self.background_dim()
         self.virtual.blit(self.backgrounds.get(self.bg_current, dim), pos)
 
         if self.bg_next and not self.bg_transition_active and self.backgrounds.ready(self.bg_next):
@@ -272,6 +332,7 @@ class App:
         # The worker threads stop only now: the frame that called quit() still draws with them
         self.backgrounds.close()
         self.renderer.close()
+        self.sound_manager.close()
         pygame.quit()
             
     def loop(self):
@@ -309,7 +370,8 @@ class App:
             # ---------- Auto-Pause ----------
             if event.type == pygame.WINDOWFOCUSLOST:
                 self.keys_down.clear()
-                if self.settings.interface.auto_pause and self.in_match():
+                # online, clicking away (to chat, say) mustn't stop the match for both players
+                if self.settings.interface.auto_pause and self.in_match() and not self.net:
                     self.state_manager.push_state("pause", mute = True)
 
             # ---------- Background Rotation ----------
@@ -330,6 +392,9 @@ class App:
         # ---------- Update ----------
         self.update_cursor(moved)
         self.sound_manager.update()
+        if self.net:
+            self.net.update(self.dt)
+            self.online_requests()
         self.state_manager.update(self.dt)
 
         # ---------- Draw Background (it covers the whole frame, and has the dim baked in) ----------
@@ -337,6 +402,9 @@ class App:
 
         self.fx.update(self.dt)
         self.fx.draw_back(self.virtual)
+        quiet_menus = self.fx.scene == "menu"     # in settings screens nothing drifts over the text
+        if quiet_menus:
+            self.fx.draw_front(self.virtual)
 
         # ---------- Draw States ----------
         stack = self.state_manager.stack
@@ -344,7 +412,8 @@ class App:
         for state in stack[self.state_manager.screen_index():]:
             state.draw(self.virtual)
 
-        self.fx.draw_front(self.virtual)
+        if not quiet_menus:
+            self.fx.draw_front(self.virtual)
         self.fx.draw_overlays(self.virtual)
 
         # ---------- Now-playing toast, then tooltips over everything ----------
@@ -376,13 +445,15 @@ class App:
 
     def quit(self):
         save_data.save(self)
+        self.leave_online()
         self.running = False
 
-        # Let the goodbye sound finish.  The ambience loops forever, so it stops first,
-        # and the wait is capped so nothing still playing can hold the game open.
+        # Let the goodbye sound finish.  The music and ambience would play on forever, so they
+        # stop first, and the wait is capped so nothing still playing can hold the game open.
         self.sound_manager.stop_ambience()
-        self.sound_manager.play("exit_state.wav")
+        self.sound_manager.stop_music()
+        channel = self.sound_manager.play("exit_state.wav")
         deadline = time.perf_counter() + 1.5
-        while pygame.mixer.get_busy() and time.perf_counter() < deadline:
+        while channel and channel.get_busy() and time.perf_counter() < deadline:
             pygame.event.poll()
             pygame.time.wait(10)

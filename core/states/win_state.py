@@ -4,29 +4,42 @@ from config import BASE_W, BASE_H
 from core import save_data
 from render import theme
 from core.states.base_state import State
+from core.states.jukebox import JukeboxControls
 
-class WinState(State):
+class WinState(JukeboxControls, State):
     NAME = "win"
     is_menu = True
     is_overlay = True
-    
+
     def __init__(self, app, p1, p2, winner, loser):
         super().__init__(app)
+        self.init_jukebox()
 
         sound_manager = self.app.sound_manager
-        self.app.stats.record_match(p1, winner, loser)
+        if getattr(winner.game, "net", None):          # online: counted as your own win or loss
+            self.app.stats.record_online(not getattr(winner, "remote", False))
+        else:
+            self.app.stats.record_match(p1, winner, loser)
         save_data.save(self.app)
         if not winner.ai_enabled and loser.ai_enabled:
             sound_manager.play("you_win.wav")
-            sound_manager.set_mood("victory")
-            
         elif not loser.ai_enabled and winner.ai_enabled:
             sound_manager.play("you_lose.wav")
-            sound_manager.set_mood("defeat")
-            
         else:
-            snd = "red_wins.wav" if winner == p1 else "blue_wins.wav"
-            sound_manager.play(snd)
+            sound_manager.play("red_wins.wav" if winner == p1 else "blue_wins.wav")
+        net = getattr(winner.game, "net", None)
+        self.net = net
+        if net:                                    # tell the friend how it ended, and its highlights
+            rec = winner.game.recorder
+            def clock(frame):
+                i = max(0, min(len(rec.frames) - 1, frame - rec.dropped))
+                return round(__import__("struct").unpack_from("<f", rec.frames[i], 0)[0], 3) if rec.frames else 0
+            net.over = {"winner": 1 if winner is p1 else 2, "score": [p1.score, winner.game.p2.score],
+                        "moments": [[m.title, m.score, clock(m.at), clock(m.start), clock(m.end), m.side]
+                                    for m in rec.reel()]}
+        if not loser.ai_enabled and winner.ai_enabled:
+            sound_manager.set_mood("defeat")
+        else:
             sound_manager.set_mood("victory")
 
         self.p1 = p1
@@ -53,8 +66,15 @@ class WinState(State):
         
         buttons = [("play_again", "Play Again?", theme.GREEN, theme.GREEN_HOVER),
                    ("continue", "Endless Mode...", theme.BLUE, theme.BLUE_HOVER),
-                   ("settings", "Settings", theme.ORANGE, theme.ORANGE_HOVER),
+                   ("watch_replay", "Replay", theme.ORANGE, theme.ORANGE_HOVER),
+                   ("highlights", "Highlights", theme.ORANGE, theme.ORANGE_HOVER),
+                   ("settings", "Settings", theme.WHITE, theme.WHITE_HOVER),
                    ("main_menu", "Main Menu", theme.RED, theme.RED_HOVER)]
+        if not self.reel():
+            buttons.remove(buttons[3])
+        if self.net:                               # online: back to the lobby together, or leave
+            buttons.insert(len(buttons) - 1, ("lobby", "Lobby", theme.WHITE, theme.WHITE_HOVER))
+            buttons[-1] = ("main_menu", "Leave", theme.RED, theme.RED_HOVER)
 
         self.app.renderer.draw_overlay(
             self,
@@ -62,19 +82,66 @@ class WinState(State):
             title=title, header=header, buttons=buttons,
             title_size=0.1, header_size=0.05, btn_size=0.045,
             title_color=theme.color(self.winner.color1), mark="败" if self.lost else "胜",
-            tips={"play_again": "Start a new match with the same setup.",
-                  "continue": "Keep playing this match with no score limit.",
-                  "settings": "Change settings, then come back to this screen.",
-                  "main_menu": "Leave this match."})
-        
+            tips={"play_again": "Play Again\nA new match with the same setup.",
+                  "continue": "Endless Mode\nKeep playing this match with no score limit.",
+                  "watch_replay": "Replay\nWatch this match again, and save all or part of it.",
+                  "highlights": "Highlights\nThe best moments of this match.",
+                  "settings": "Settings\nChange settings, then come back here.",
+                  "lobby": "Lobby\nBack to the lobby with your friend, to change the court or sides.\n"
+                           "• They stay connected",
+                  "main_menu": ("Leave\nStop playing. Your friend goes back to their menu." if self.net else
+                                "Main Menu\nLeave this match.")},
+            jukebox=True)
+        self.draw_jukebox_extras(screen)
+
+    # ---------------- Replays ----------------
+
+    def recorder(self):
+        from core.states.game_state import GameState
+        game_state = self.app.state_manager.get_state(GameState)
+        return game_state.game.recorder if game_state and game_state.game else None
+
+    def reel(self):
+        recorder = self.recorder()
+        if recorder is None:
+            return []
+        shift = recorder.dropped
+        from game.replay import Moment
+        return [Moment(m.title, m.score, m.at - shift, max(0, m.start - shift), m.end - shift, m.side)
+                for m in recorder.reel() if m.start >= shift]
+
+    def watch(self, mode):
+        recorder = self.recorder()
+        if recorder is None or not recorder.frames:
+            return
+        moments = self.reel() if mode == "reel" else None
+        if mode == "reel" and not moments:
+            return
+        self.push_state("replay", clip = recorder.clip(), mode = mode, moments = moments, mute = True)
+
+    def update(self, dt):
+        if self.net and self.net.request("rematch"):
+            self.app.renderer.show_toast("Your friend would like a rematch: Play Again starts it")
+        # After the match, its highlights play once on their own (Settings > Interface > Instant Replay)
+        if not getattr(self, "reel_shown", False):
+            self.reel_shown = True
+            if self.app.settings.interface.instant_replay in (2, 3) and self.reel():
+                self.watch("reel")
+
     def handle_event(self, event):
+        if self.track_list:
+            self.handle_track_list(event)
+            return
         super().handle_event(event)
+        key = self.hit_test(self.app.window_to_base(event.pos)) if hasattr(event, "pos") else None
+        if self.handle_jukebox(event, key if event.type == pygame.MOUSEBUTTONDOWN else None):
+            return
 
         gameplay = self.app.settings.gameplay
         sound_manager = self.app.sound_manager
         
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
+            mouse_pos = self.app.window_to_base(event.pos)
             mx, my = mouse_pos
             
             for key, rect in self.ui_hitboxes.items():
@@ -101,6 +168,7 @@ class WinState(State):
                             
                         if game_state:
                             action = lambda: (enter_endless_mode(),
+                                              setattr(self.net, "over", None) if self.net else None,
                                               self.pop_state(mute = True),
                                               self.pop_state(mute = True),
                                               game_state.game.reset_round(),
@@ -109,8 +177,20 @@ class WinState(State):
 
                             self.push_state("confirm_choice", action = action, header = "Enter Endless Mode?", mute = True)
                         
+                    if key == "watch_replay":
+                        self.watch("viewer")
+                    if key == "highlights":
+                        self.watch("reel")
+
                     if key == "settings":
                         self.push_state("settings")
+
+                    if key == "lobby":
+                        from core.states.game_state import GameState
+                        game_state = self.app.state_manager.get_state(GameState)
+                        if game_state:
+                            self.push_state("confirm_choice", action = game_state.back_to_lobby,
+                                            header = "Back to the lobby?", mute = True)
                         
                     if key == "main_menu":
                         action = lambda: (self.app.sound_manager.play("exit_state.wav"), self.set_state("main_menu", mute = True))

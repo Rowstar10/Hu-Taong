@@ -65,15 +65,20 @@ def radial(radius, inner, outer, power=2.0):
             surf.set_at((x, y), mix(inner, outer, t))
     return pygame.transform.smoothscale(surf, (2 * radius, 2 * radius))
 
+_SPECKLE_TILES = {}
+
 def speckle(w, h, low, high, seed=7):
-    """Grain to multiply over paper and lacquer."""
-    rng = random.Random(seed)
+    """Grain to multiply over paper and lacquer.  The 128 px tile is made from random bytes in
+    one go (setting pixels one at a time took long enough to stall a menu on the first hover)."""
     n = 128
-    tile = pygame.Surface((n, n))
-    for y in range(n):
-        for x in range(n):
-            v = rng.randint(low, high)
-            tile.set_at((x, y), (v, v, v))
+    key = (low, high, seed)
+    tile = _SPECKLE_TILES.get(key)
+    if tile is None:
+        table = bytes(low + i * (high - low + 1) // 256 for i in range(256))
+        grey = random.Random(seed).randbytes(n * n).translate(table)
+        rgb = bytearray(3 * n * n)
+        rgb[0::3] = rgb[1::3] = rgb[2::3] = grey
+        tile = _SPECKLE_TILES[key] = pygame.image.frombuffer(bytes(rgb), (n, n), "RGB").copy()
     surf = pygame.Surface((max(1, int(w)), max(1, int(h))))
     for y in range(0, int(h), n):
         for x in range(0, int(w), n):
@@ -134,10 +139,18 @@ class Art:
         return surf
 
     def fast(self, surf):
-        """Match the display's pixel format, so blits skip a conversion."""
+        """Match the display's pixel format, so blits skip a conversion.  Sprites with see-through
+        parts are also run-length encoded: the blit then skips their clear pixels in whole runs,
+        which draws them two to ten times faster, and exactly the same."""
         if pygame.display.get_surface() is None:
             return surf
-        return surf.convert_alpha() if surf.get_flags() & SRCALPHA else surf.convert()
+        if surf.get_flags() & SRCALPHA:
+            # keep the sprite's own see-through level (a tint layer has one); only add the encoding
+            alpha = surf.get_alpha()
+            surf = surf.convert_alpha()
+            surf.set_alpha(255 if alpha is None else alpha, pygame.RLEACCEL)
+            return surf
+        return surf.convert()
 
     def brush(self, size):
         return self.app.font_manager.get("brush", int(size))
@@ -152,7 +165,7 @@ class Art:
         if key not in self.cache:
             if len(self.cache) > 6000:
                 self.cache = {k: v for k, v in self.cache.items() if k[0] != "text"}
-            self.cache[key] = font.render(text, True, color)
+            self.cache[key] = self.fast(font.render(text, True, color))
         return self.cache[key]
 
     def gilded(self, text, font, top=theme.GOLD_BRIGHT, bottom=(204, 130, 58),
@@ -193,11 +206,11 @@ class Art:
         return self.get(key, self._glow, radius, color, power)
 
     def _glow(self, radius, color, power):
-        # Scaled from one master, because the ball's trail can need many of these in a frame
-        surf = pygame.transform.smoothscale(self.get(("glow_master", power), self._glow_master, power),
-                                            (2 * radius, 2 * radius))
-        surf.fill(color, special_flags=pygame.BLEND_RGB_MULT)
-        return surf
+        # Scaled from one small master, tinted before it is scaled up: tinting a big surface
+        # is slow enough to stall the frame that first asks for it
+        small = self.get(("glow_master", power), self._glow_master, power).copy()
+        small.fill(color, special_flags=pygame.BLEND_RGB_MULT)
+        return pygame.transform.smoothscale(small, (2 * radius, 2 * radius))
 
     def _glow_master(self, power):
         surf = pygame.Surface((96, 96))
@@ -964,3 +977,288 @@ class Art:
             surf.blit(eye, eye.get_rect(center=(s * x, s * .4)))
         pygame.draw.polygon(surf, red, [(s * .38, s * .56), (s * .62, s * .56), (s * .57, s * .68), (s * .5, s * .72), (s * .43, s * .68)])
         return shrink(surf, d, d)
+
+    # ---------- Power-up icons ----------
+    # Each power-up has a picture of its own, on a badge whose shape says what kind it is:
+    # boons are round, curses are diamonds, the wild ones hexagons.
+
+    FAMILY_TINTS = {"Boon": (240, 176, 64), "Curse": (178, 96, 255), "Wild": (90, 220, 150)}
+
+    def power_icon(self, size, key, family):
+        return self.get(("power_icon", size, key, family), self._power_icon, size, key, family)
+
+    def _power_icon(self, size, key, family):
+        s = size * 4
+        c = s / 2
+        tint = self.FAMILY_TINTS[family]
+        surf = blank(s, s)
+
+        def badge(r):
+            if family == "Boon":
+                return [(c + r * math.cos(a / 40 * math.tau), c + r * math.sin(a / 40 * math.tau)) for a in range(40)]
+            if family == "Curse":
+                return [(c, c - r * 1.06), (c + r * 1.06, c), (c, c + r * 1.06), (c - r * 1.06, c)]
+            return [(c + r * math.cos(math.radians(a)), c + r * math.sin(math.radians(a))) for a in range(0, 360, 60)]
+
+        R = s * .47 if family != "Curse" else s * .45
+        pygame.draw.polygon(surf, rgba((0, 0, 0), 150), [(x + s * .015, y + s * .03) for x, y in badge(R)])
+        pygame.draw.polygon(surf, rgba(mix(tint, (0, 0, 0), .74), 245), badge(R))
+        pygame.draw.polygon(surf, rgba(tint), badge(R), max(3, s // 15))
+        pygame.draw.polygon(surf, rgba(theme.GOLD, 170), badge(R * .8), max(1, s // 60))
+
+        u = s * (.27 if family != "Curse" else .24)      # the picture's half-size
+        P = lambda x, y: (c + x * u, c + y * u)
+        pale = mix(tint, (255, 255, 255), .78)
+        line = max(2, int(s * .045))
+        getattr(self, "_icon_" + key)(surf, P, u, pale, line)
+        return shrink(surf, size, size)
+
+    @staticmethod
+    def _arrow(surf, colour, P, tip, back, width):
+        """A straight arrow from `back` to `tip`, in picture units."""
+        (tx, ty), (bx, by) = tip, back
+        dx, dy = tx - bx, ty - by
+        n = math.hypot(dx, dy) or 1
+        dx, dy = dx / n, dy / n
+        head = .42
+        pygame.draw.line(surf, colour, P(bx, by), P(tx - dx * head * .6, ty - dy * head * .6), width)
+        left = (tx - dx * head - dy * head * .7, ty - dy * head + dx * head * .7)
+        right = (tx - dx * head + dy * head * .7, ty - dy * head - dx * head * .7)
+        pygame.draw.polygon(surf, colour, [P(tx + dx * .08, ty + dy * .08), P(*left), P(*right)])
+
+    def _icon_teleport(self, surf, P, u, pale, line):
+        # a shield with a spark of light in it: one save
+        shield = [P(-.8, -.85), P(.8, -.85), P(.8, -.1), P(.45, .55), P(0, .95), P(-.45, .55), P(-.8, -.1)]
+        pygame.draw.polygon(surf, (250, 210, 120), shield)
+        pygame.draw.polygon(surf, (120, 70, 20), shield, line)
+        star = [P(0, -.55), P(.14, -.12), P(.55, 0), P(.14, .12), P(0, .55), P(-.14, .12), P(-.55, 0), P(-.14, -.12)]
+        pygame.draw.polygon(surf, (255, 255, 240), star)
+
+    def _icon_giant(self, surf, P, u, pale, line):
+        pygame.draw.rect(surf, (236, 90, 70), (*P(-.24, -.5), .48 * u, 1.0 * u), border_radius=int(.15 * u))
+        for sign in (-1, 1):
+            self._arrow(surf, pale, P, (0, sign * 1.05), (0, sign * .55), line)
+
+    def _icon_swift(self, surf, P, u, pale, line):
+        bolt = [P(.2, -1.0), P(-.55, .12), P(-.05, .12), P(-.25, 1.0), P(.6, -.2), P(.08, -.2), P(.35, -1.0)]
+        pygame.draw.polygon(surf, (255, 226, 90), bolt)
+        pygame.draw.polygon(surf, (150, 96, 10), bolt, max(1, line // 2))
+
+    def _icon_fire(self, surf, P, u, pale, line):
+        outer = bezier(P(0, -1.05), P(.35, -.5), P(.95, -.1), P(.6, .6)) + \
+                bezier(P(.6, .6), P(.35, 1.05), P(-.35, 1.05), P(-.6, .6)) + \
+                bezier(P(-.6, .6), P(-.95, -.1), P(-.2, -.3), P(0, -1.05))
+        pygame.draw.polygon(surf, (255, 110, 30), outer)
+        inner = bezier(P(0, -.35), P(.2, 0), P(.5, .25), P(.3, .62)) + \
+                bezier(P(.3, .62), P(.15, .85), P(-.15, .85), P(-.3, .62)) + \
+                bezier(P(-.3, .62), P(-.5, .25), P(-.1, .1), P(0, -.35))
+        pygame.draw.polygon(surf, (255, 222, 110), inner)
+
+    def _icon_frost(self, surf, P, u, pale, line):
+        ice = (190, 236, 255)
+        for a in range(0, 180, 60):
+            dx, dy = math.cos(math.radians(a + 90)), math.sin(math.radians(a + 90))
+            pygame.draw.line(surf, ice, P(-dx, -dy), P(dx, dy), line)
+            for sign in (-1, 1):
+                bx, by = sign * dx * .6, sign * dy * .6
+                for turn in (-1, 1):
+                    ang = math.atan2(sign * dy, sign * dx) + turn * 2.4
+                    pygame.draw.line(surf, ice, P(bx, by), P(bx + math.cos(ang) * .35, by + math.sin(ang) * .35),
+                                     max(1, line * 3 // 4))
+        pygame.draw.circle(surf, (255, 255, 255), P(0, 0), u * .14)
+
+    def _icon_shrink(self, surf, P, u, pale, line):
+        pygame.draw.rect(surf, (150, 120, 220), (*P(-.24, -.26), .48 * u, .52 * u), border_radius=int(.12 * u))
+        for sign in (-1, 1):
+            self._arrow(surf, pale, P, (0, sign * .36), (0, sign * 1.05), line)
+
+    def _icon_hex(self, surf, P, u, pale, line):
+        # a jiangshi's paper talisman, slapped on askew
+        strip = blank(u * .9, u * 2.0)
+        w, h = strip.get_size()
+        pygame.draw.rect(strip, (248, 214, 96), strip.get_rect(), border_radius=max(2, int(u * .06)))
+        pygame.draw.rect(strip, (150, 30, 24), strip.get_rect(), max(2, line // 2), border_radius=max(2, int(u * .06)))
+        red = (196, 30, 28)
+        pts = [(w * .5, h * .12), (w * .25, h * .3), (w * .72, h * .45), (w * .28, h * .62), (w * .7, h * .78), (w * .5, h * .9)]
+        pygame.draw.lines(strip, red, False, pts, max(2, line * 3 // 4))
+        pygame.draw.circle(strip, red, (w * .5, h * .12), w * .1)
+        strip = pygame.transform.rotate(strip, -16)
+        surf.blit(strip, strip.get_rect(center=P(0, 0)))
+
+    def _icon_ghost(self, surf, P, u, pale, line):
+        sprite = self.ghost(int(u * 1.9))
+        surf.blit(sprite, sprite.get_rect(center=P(0, .05)))
+
+    def _icon_sticky(self, surf, P, u, pale, line):
+        goo = (196, 222, 70)
+        dark = (96, 120, 20)
+        blob = bezier(P(-.85, -.2), P(-.85, -.95), P(.85, -.95), P(.85, -.2))
+        drips = [P(.85, -.2), P(.6, .15), P(.55, .7), P(.4, .72), P(.35, .1), P(.05, 0),
+                 P(0, .95), P(-.2, .97), P(-.25, .05), P(-.5, .1), P(-.55, .45), P(-.72, .45), P(-.85, -.2)]
+        pygame.draw.polygon(surf, goo, blob + drips)
+        pygame.draw.polygon(surf, dark, blob + drips, max(1, line // 2))
+        for x, y in ((.475, .72), (-.1, .97), (-.635, .45)):
+            pygame.draw.circle(surf, goo, P(x, y), u * .1)
+        pygame.draw.circle(surf, (240, 255, 200), P(-.35, -.5), u * .12)
+
+    def _icon_gravity(self, surf, P, u, pale, line):
+        pygame.draw.line(surf, pale, P(-.95, .92), P(.95, .92), line)
+        pygame.draw.circle(surf, (120, 236, 170), P(0, .55), u * .3)
+        self._arrow(surf, pale, P, (0, .1), (0, -1.0), line + 1)
+
+    def _icon_wall(self, surf, P, u, pale, line):
+        stone = (196, 176, 150)
+        pygame.draw.rect(surf, stone, (*P(-.2, -1.0), .4 * u, .62 * u))
+        pygame.draw.rect(surf, stone, (*P(-.2, .38), .4 * u, .62 * u))
+        crack = (90, 70, 56)
+        pygame.draw.lines(surf, crack, False, [P(-.2, -.45), P(0, -.6), P(.2, -.45)], max(1, line // 2))
+        pygame.draw.lines(surf, crack, False, [P(-.2, .45), P(0, .6), P(.2, .45)], max(1, line // 2))
+        self._arrow(surf, (255, 240, 200), P, (1.05, 0), (-1.0, 0), line)
+
+    def _icon_swap(self, surf, P, u, pale, line):
+        self._arrow(surf, (255, 120, 100), P, (1.0, -.4), (-.8, -.4), line + 1)
+        self._arrow(surf, (120, 170, 255), P, (-1.0, .4), (.8, .4), line + 1)
+
+    def _icon_blink(self, surf, P, u, pale, line):
+        for x, a in ((-.75, 80), (-.35, 150)):
+            ring = blank(u * .9, u * .9)
+            pygame.draw.circle(ring, (210, 236, 255, a), (u * .45, u * .45), u * .4, max(1, line // 2))
+            surf.blit(ring, ring.get_rect(center=P(x, .25)))
+        pygame.draw.circle(surf, (240, 248, 255), P(.35, .25), u * .42)
+        pygame.draw.circle(surf, (110, 170, 230), P(.35, .25), u * .42, max(1, line // 2))
+        star = [P(.35, -1.0), P(.48, -.62), P(.85, -.5), P(.48, -.38), P(.35, 0), P(.22, -.38), P(-.15, -.5), P(.22, -.62)]
+        pygame.draw.polygon(surf, (255, 250, 200), star)
+
+    def _icon_tomb(self, surf, P, u, pale, line):
+        stone = (176, 170, 160)
+        body = [P(-.62, 1.0), P(-.62, -.35)] + bezier(P(-.62, -.35), P(-.62, -1.05), P(.62, -1.05), P(.62, -.35)) + [P(.62, 1.0)]
+        pygame.draw.polygon(surf, stone, body)
+        pygame.draw.polygon(surf, (80, 74, 70), body, max(1, line // 2))
+        pygame.draw.line(surf, (96, 88, 82), P(0, -.6), P(0, .45), line)
+        pygame.draw.line(surf, (96, 88, 82), P(-.3, -.25), P(.3, -.25), line)
+        pygame.draw.line(surf, (120, 160, 90), P(-.9, 1.0), P(.9, 1.0), line)
+
+    def _icon_twin(self, surf, P, u, pale, line):
+        # a red ball and a blue ball splitting apart from one spot
+        pygame.draw.line(surf, pale, P(-.1, .05), P(-.55, -.45), max(1, line // 2))
+        pygame.draw.line(surf, pale, P(-.1, .05), P(.45, .5), max(1, line // 2))
+        for (x, y), tint in (((-.5, -.4), (236, 84, 52)), ((.45, .42), (70, 140, 255))):
+            pygame.draw.circle(surf, tint, P(x, y), u * .42)
+            pygame.draw.circle(surf, (255, 255, 255), P(x - .13, y - .13), u * .12)
+
+    def _icon_chaos(self, surf, P, u, pale, line):
+        # a big and a small paddle, and a ball, with drift arrows between them
+        pygame.draw.rect(surf, (236, 170, 90), (*P(-.85, -.75), .28 * u, 1.5 * u), border_radius=int(.1 * u))
+        pygame.draw.rect(surf, (236, 170, 90), (*P(.55, -.3), .28 * u, .6 * u), border_radius=int(.1 * u))
+        pygame.draw.circle(surf, (255, 255, 255), P(0, .35), u * .2)
+        self._arrow(surf, pale, P, (.1, -.75), (-.35, -.4), line)
+        self._arrow(surf, pale, P, (.45, .75), (.0, .55), line)
+
+    def _icon_curve(self, surf, P, u, pale, line):
+        # a ball bending along a curved path
+        pts = [P(-.9 + .18 * i, .7 - .9 * math.sin(i / 9 * math.pi * .9)) for i in range(10)]
+        pygame.draw.lines(surf, pale, False, pts, line)
+        pygame.draw.circle(surf, (255, 255, 255), P(.75, .05), u * .24)
+        pygame.draw.arc(surf, (120, 236, 170), (*P(.5, -.2), .5 * u, .5 * u), 0.5, 4.2, max(2, line // 2))
+
+    def _icon_double(self, surf, P, u, pale, line):
+        # a gold coin marked x2
+        pygame.draw.circle(surf, (226, 176, 52), P(0, 0), u * .85)
+        pygame.draw.circle(surf, (255, 222, 110), P(0, 0), u * .85, max(2, line // 2))
+        pygame.draw.circle(surf, (170, 120, 30), P(0, 0), u * .6, max(1, line // 3))
+        pygame.draw.line(surf, (120, 70, 10), P(-.45, -.25), P(-.05, .25), line)
+        pygame.draw.line(surf, (120, 70, 10), P(-.45, .25), P(-.05, -.25), line)
+        pygame.draw.lines(surf, (120, 70, 10), False, [P(.08, -.2), P(.3, -.32), P(.45, -.15), P(.1, .28), P(.48, .28)], line)
+
+    def _icon_wind(self, surf, P, u, pale, line):
+        # swirling gusts and a leaf
+        for y, length in ((-.45, 1.3), (0.05, 1.6), (.5, 1.1)):
+            x0 = -.85
+            pygame.draw.line(surf, pale, P(x0, y), P(x0 + length, y), line)
+            pygame.draw.arc(surf, pale, (*P(x0 + length - .2, y - .32), .32 * u, .32 * u), -1.6, 1.6, line)
+        leaf = [P(.45, .62), P(.75, .45), P(.95, .7), P(.65, .9)]
+        pygame.draw.polygon(surf, (236, 150, 40), leaf)
+
+    def _icon_cracker(self, surf, P, u, pale, line):
+        # a red firecracker with a fizzing fuse
+        pygame.draw.rect(surf, (200, 34, 38), (*P(-.32, -.35), .64 * u, 1.25 * u), border_radius=int(.12 * u))
+        pygame.draw.rect(surf, (250, 200, 80), (*P(-.32, -.15), .64 * u, .14 * u))
+        pygame.draw.rect(surf, (250, 200, 80), (*P(-.32, .55), .64 * u, .14 * u))
+        pygame.draw.line(surf, (70, 50, 40), P(0, -.35), P(.3, -.75), max(2, line // 2))
+        for a in range(0, 360, 45):
+            dx, dy = math.cos(math.radians(a)), math.sin(math.radians(a))
+            pygame.draw.line(surf, (255, 220, 120), P(.3, -.75), P(.3 + dx * .22, -.75 + dy * .22), max(1, line // 3))
+
+    def _icon_lantern(self, surf, P, u, pale, line):
+        # a glowing paper lantern on a dark sky
+        pygame.draw.circle(surf, (30, 26, 60), P(0, 0), u * .95)
+        pygame.draw.ellipse(surf, (230, 70, 40), (*P(-.5, -.55), 1.0 * u, 1.1 * u))
+        pygame.draw.ellipse(surf, (255, 180, 90), (*P(-.28, -.4), .56 * u, .8 * u))
+        pygame.draw.rect(surf, (226, 176, 52), (*P(-.3, -.7), .6 * u, .18 * u))
+        pygame.draw.rect(surf, (226, 176, 52), (*P(-.3, .52), .6 * u, .18 * u))
+        pygame.draw.line(surf, (226, 176, 52), P(0, .7), P(0, .92), max(2, line // 2))
+
+    def _icon_portal(self, surf, P, u, pale, line):
+        # two linked swirling rings, an arrow from one to the other
+        for x, tint in ((-.5, (170, 120, 255)), (.5, (120, 220, 255))):
+            pygame.draw.circle(surf, (24, 12, 50), P(x, 0), u * .42)
+            pygame.draw.circle(surf, tint, P(x, 0), u * .42, max(2, line // 2))
+            pygame.draw.circle(surf, tint, P(x, 0), u * .22, max(1, line // 3))
+        pygame.draw.arc(surf, pale, (*P(-.5, -.75), 1.0 * u, .6 * u), 0.3, 2.84, max(2, line // 2))
+        self._arrow(surf, pale, P, (.5, -.38), (.35, -.62), max(2, line // 2))
+
+    def _icon_snowball(self, surf, P, u, pale, line):
+        # a big snowball rolling right, a small one behind it, and the track it left
+        pygame.draw.line(surf, pale, P(-1.0, .95), P(.95, .95), line)
+        pygame.draw.circle(surf, (226, 238, 255), P(-.72, .7), u * .24)
+        pygame.draw.circle(surf, (236, 244, 255), P(.18, .2), u * .74)
+        pygame.draw.circle(surf, (255, 255, 255), P(-.08, -.08), u * .26)
+        for x, y in ((.45, .05), (.05, .55), (.5, .55), (-.25, .3)):
+            pygame.draw.circle(surf, (170, 192, 220), P(x, y), max(1, u * .08))
+        pygame.draw.circle(surf, (150, 176, 210), P(.18, .2), u * .74, max(1, line // 2))
+
+    # ---------- Stones on the court ----------
+
+    def stone(self, w, h, style):
+        return self.get(("stone", int(w), int(h), style), self._stone, int(w), int(h), style)
+
+    def _stone(self, w, h, style):
+        s = 3
+        W, H = w * s, h * s
+        surf = blank(W, H)
+        if style == "pillar":
+            body = h_gradient(W, H, [(0, (70, 8, 12, 255)), (.35, (186, 34, 36, 255)), (.5, (236, 104, 80, 255)),
+                                     (.68, (170, 26, 30, 255)), (1, (60, 6, 10, 255))])
+            mask = blank(W, H)
+            pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(), border_radius=int(W * .18))
+            body.blit(mask, (0, 0), special_flags=CUT)
+            band = int(min(H * .12, W * .7))
+            for y in (0, H - band):
+                gold = h_gradient(W, band, [(0, rgba(theme.GOLD_DARK)), (.5, rgba(theme.GOLD_BRIGHT)), (1, rgba(theme.GOLD_DARK))])
+                cut = blank(W, band)
+                pygame.draw.rect(cut, (255, 255, 255, 255), cut.get_rect(), border_radius=int(W * .18))
+                gold.blit(cut, (0, 0), special_flags=CUT)
+                body.blit(gold, (0, y))
+            for y in range(band + s * 18, H - band - s * 10, s * 40):
+                pygame.draw.rect(body, rgba(theme.GOLD, 150), (W * .12, y, W * .76, s * 2))
+            pygame.draw.rect(body, (10, 4, 4, 255), body.get_rect(), s * 2, border_radius=int(W * .18))
+            surf.blit(body, (0, 0))
+        else:
+            top = int(min(W * .5, H * .4))
+            shape = blank(W, H)
+            pygame.draw.rect(shape, (255, 255, 255, 255), (0, top, W, H - top))
+            pygame.draw.ellipse(shape, (255, 255, 255, 255), (0, 0, W, top * 2))
+            body = v_gradient(W, H, [(0, (176, 172, 164, 255)), (.5, (138, 132, 126, 255)), (1, (92, 86, 82, 255))])
+            body.blit(speckle(W, H, 200, 255, seed=W + H), (0, 0), special_flags=MULT)
+            body.blit(shape, (0, 0), special_flags=CUT)
+            surf.blit(body, (0, 0))
+            edge = blank(W, H)
+            pygame.draw.ellipse(edge, (40, 34, 32, 255), (0, 0, W, top * 2), s * 2)
+            pygame.draw.rect(edge, (0, 0, 0, 0), (0, top, W, top))
+            pygame.draw.line(edge, (40, 34, 32, 255), (s, top), (s, H), s * 2)
+            pygame.draw.line(edge, (40, 34, 32, 255), (W - s - 1, top), (W - s - 1, H), s * 2)
+            surf.blit(edge, (0, 0))
+            mark = self.brush(min(W * .55, H * .3)).render("奠", True, (70, 62, 58))
+            surf.blit(mark, mark.get_rect(center=(W / 2, top + (H - top) * .32)))
+            pygame.draw.rect(surf, (84, 120, 60, 255), (0, H - s * 4, W, s * 4))
+        return shrink(surf, w, h)

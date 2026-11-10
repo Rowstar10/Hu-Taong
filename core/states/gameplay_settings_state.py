@@ -47,6 +47,10 @@ class GameplaySettingsState(State):
             if key == "cycle_ai_style_right":
                 audio.ai_style = (audio.ai_style + 1) % len(audio.ai_styles)
 
+            if key == "toggle_curveball":
+                audio.curveball = not audio.curveball
+            if key == "toggle_lantern_night":
+                audio.lantern_night = not audio.lantern_night
             if key == "toggle_adaptive_ai":
                 audio.adaptive_ai = not audio.adaptive_ai
             # The Middle Wall and Chaos Switch + can't both be on: turning one on turns the other off

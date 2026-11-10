@@ -7,7 +7,8 @@ class InterfaceSettingsState(State):
     is_menu = True
 
     TOGGLES = ("tooltips", "ai_banter", "screen_shake", "ball_trail", "auto_pause", "hide_cursor")
-    CYCLES = {"hud": "hud_options", "effects": "effects_options", "countdown": "countdown_options"}
+    CYCLES = {"hud": "hud_options", "effects": "effects_options", "countdown": "countdown_options",
+              "instant_replay": "instant_replay_options"}
 
     def __init__(self, app):
         super().__init__(app)

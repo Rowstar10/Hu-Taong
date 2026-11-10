@@ -107,6 +107,11 @@ seam crossfaded; CC0 allows this without credit, but credit is given anyway.
 | Ambience Fire.wav | Fireplace Sound loop | PagDev | CC0 | https://opengameart.org/content/fireplace-sound-loop |
 | Ambience Crickets.wav | Crickets Ambient Noise - loopable | Wolfgang_ | CC0 | https://opengameart.org/content/crickets-ambient-noise-loopable |
 
+## Sound effects made for the game
+
+`Resources/Sounds/firecracker_bang.wav` (the Firecracker power-up's explosion) was synthesised for Hu Taong
+from noise and a falling tone by a short script; it isn't taken from anywhere, so it needs no credit or licence.
+
 ## Background images
 
 bg13-bg37 are anime fan art and official Genshin Impact art of Hu Tao. Unlike the music, these images

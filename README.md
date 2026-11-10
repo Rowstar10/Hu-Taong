@@ -1,8 +1,11 @@
-# Hu Taong 1.2
+# Hu Taong 1.3
 
-Pong, the Wangsheng Funeral Parlor way. Version 1.2, 4 November 2026.
+Pong, the Wangsheng Funeral Parlor way. Version 1.3, 10 November 2026.
 
-Power-ups (with their own settings screen), 5 more backgrounds, 58 music tracks and ambience.
+Settings, assets, AI and power-up overhaul.
+
+- Online play (see ONLINE.md), with an optional server of your own (SERVER.md)
+- Replays, a jukebox and courts
 
 ## Play it
 
@@ -26,6 +29,6 @@ The .exe appears in `dist`.
 
 ## More
 
-[CHANGELOG.md](CHANGELOG.md) · [CREDITS.md](CREDITS.md)
+[CHANGELOG.md](CHANGELOG.md) · [CREDITS.md](CREDITS.md) · [ONLINE.md](ONLINE.md) · [SERVER.md](SERVER.md)
 
 Every version: [Hu-Taong tags](https://github.com/Rowstar10/Hu-Taong/tags)

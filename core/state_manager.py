@@ -55,6 +55,13 @@ class StateManager:
                         state.exit(**kwargs)
                     else:
                         state.exit(mute = True, **kwargs)
+
+        if not self.stack and getattr(self.app, "running", True):
+            # Nothing left to show (say, a screen closed itself just as the game sent it to the
+            # menu): the main menu, rather than an empty background
+            state = StateManager.create("main_menu", self.app)
+            self.stack.append(state)
+            state.enter(mute = True)
                         
         current_state = self.current()
         if getattr(current_state, "background_img", None):

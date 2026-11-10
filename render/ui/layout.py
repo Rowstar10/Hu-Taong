@@ -48,6 +48,57 @@ class Space(Node):
         self.w, self.h = w, h
 
 
+class Icon(Node):
+    """A power-up's picture badge."""
+    def __init__(self, key, family, size, tip=None):
+        super().__init__()
+        self.key, self.family, self.tip = key, family, tip
+        self.w = self.h = size
+
+    def draw(self, ui):
+        ui.screen.blit(ui.art.power_icon(self.w, self.key, self.family), self.rect)
+        ui.offer_tip(self.rect, self.tip)
+
+
+class TextField(Node):
+    """A box to type into.  `text` is what's typed; `hint` shows while it's empty."""
+    def __init__(self, key, text, font, width, hint="", tip=None, focused=True):
+        super().__init__()
+        self.key, self.text, self.font, self.hint, self.tip = key, text, font, hint, tip
+        self.focused = focused       # only the box being typed into shows its caret
+        self.w, self.h = width, font.size("Ag")[1] + 26
+
+    def draw(self, ui):
+        screen = ui.screen
+        screen.blit(ui.art.inset(self.rect.w, self.rect.h), self.rect)
+        text = _val(self.text)
+        if text:
+            ui.renderer.text(screen, text, self.font, theme.GOLD_BRIGHT, center=self.rect.center)
+        else:
+            ui.renderer.text(screen, self.hint, self.font, theme.OFF_TEXT, center=self.rect.center, shadow=None)
+        focused = _val(self.focused)
+        if focused and int(ui.app.fx.time * 2) % 2 == 0:      # a blinking caret
+            if text:                                          # after the text
+                x = self.rect.centerx + self.font.size(text)[0] // 2 + 4
+            else:                                             # just before the hint, not through it
+                x = self.rect.centerx - self.font.size(self.hint)[0] // 2 - 6
+            pygame.draw.line(screen, theme.FLAME, (x, self.rect.y + 12), (x, self.rect.bottom - 12), 2)
+        pygame.draw.rect(screen, theme.GOLD_BRIGHT if focused else theme.GOLD_DARK, self.rect, 2, border_radius=6)
+        ui.state.ui_hitboxes[self.key] = self.rect
+        ui.offer_tip(self.rect, self.tip)
+
+
+class Picture(Node):
+    """A fixed-size area drawn by a callback: draw(screen, rect)."""
+    def __init__(self, w, h, draw, tip=None):
+        super().__init__()
+        self.w, self.h, self.paint, self.tip = w, h, draw, tip
+
+    def draw(self, ui):
+        self.paint(ui.screen, self.rect)
+        ui.offer_tip(self.rect, self.tip)
+
+
 class Slot(Node):
     """Empty reserved area that registers a hitbox (e.g. for a thumbnail)."""
     def __init__(self, key, w, h, tip=None):
@@ -90,13 +141,13 @@ class Text(Node):
     def draw(self, ui):
         text = _val(self.text)
         parts = text if isinstance(text, list) else [(text, _val(self.color))]
-        total = sum(self.font.size(t)[0] for t, _ in parts)
+        surfs = [(ui.text(self.font, t, col), ui.text(self.font, t, theme.INK)) for t, col in parts]
+        total = sum(surf.get_width() for surf, _ in surfs)        # measured from the cached text, not the font
         x = {"left": self.rect.left, "right": self.rect.right - total}.get(
             self.align, self.rect.centerx - total // 2)
-        for t, col in parts:
-            surf = ui.text(self.font, t, col)
+        for surf, shadow in surfs:
             y = self.rect.centery - surf.get_height() // 2
-            ui.screen.blit(ui.text(self.font, t, theme.INK), (x + 2, y + 2))
+            ui.screen.blit(shadow, (x + 2, y + 2))
             ui.screen.blit(surf, (x, y))
             x += surf.get_width()
 
@@ -195,7 +246,7 @@ class CycleToggle(Node):
 
     def measure(self):
         self.h = self.font.size("Ag")[1] + 22
-        self.w = max(self.font.size(s)[0] for s in self.texts) + self.h + 34
+        self.w = max(self.font.size(s)[0] for s in (getattr(self, "samples", None) or self.texts)) + self.h + 34
         return self.w, self.h
 
     def draw(self, ui):
@@ -337,9 +388,119 @@ class Slider(Node):
 
         ui.state.ui_hitboxes[self.key] = self.grab
         if self.reset_key and self.reset_rect.collidepoint(ui.mouse):
-            ui.offer_tip(self.reset_rect, "Back to the default value.")
+            ui.offer_tip(self.reset_rect, "Reset\nBack to the default value.")
         else:
             ui.offer_tip(self.rect, self.tip)
+
+
+def clock(seconds):
+    seconds = max(0, int(seconds))
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+class TrackBar(Node):
+    """[>]  ====o-----  1:23 / 3:45  -- the jukebox's play/pause and how far through the track it is.
+    Click or drag along the bar to jump.  `drag` gives the bar's position while it is being dragged."""
+
+    def __init__(self, font, position, length, paused, drag, track_w, tip=None, mode=None, mode_tip=None):
+        super().__init__()
+        self.font, self.position, self.length, self.paused, self.drag = font, position, length, paused, drag
+        self.track_w, self.tip = track_w, tip
+        self.mode, self.mode_tip = mode, mode_tip      # what happens when a track ends: 0 next, 1 shuffle, 2 loop
+
+    def measure(self):
+        self.gap = int(BASE_W * 0.01)
+        self.button = self.font.size("Ag")[1] + 16
+        self.track_h = int(BASE_H * 0.014)
+        self.knob_r = int(self.track_h * 1.3)
+        self.label_w = self.font.size("88:88 / 88:88")[0] + 24
+        self.w = 2 * self.button + 2 * self.gap + self.knob_r + self.track_w + self.knob_r + self.gap + self.label_w
+        self.h = max(self.button, 2 * self.knob_r + 2)
+        return self.w, self.h
+
+    def place(self, x, y, w, h):
+        super().place(x, y, w, h)
+        r = self.rect
+        self.play = pygame.Rect(r.left, r.centery - self.button // 2, self.button, self.button)
+        self.order = pygame.Rect(self.play.right + self.gap // 2, self.play.top, self.button, self.button)
+        x0 = self.order.right + self.gap + self.knob_r
+        self.track = pygame.Rect(x0, r.centery - self.track_h // 2, self.track_w, self.track_h)
+        self.grab = pygame.Rect(self.track.left, r.top, self.track.width, r.height)
+        self.plate = pygame.Rect(self.track.right + self.knob_r + self.gap, r.centery - (self.button - 8) // 2,
+                                 self.label_w, self.button - 8)
+
+    def draw(self, ui):
+        screen, art, t = ui.screen, ui.art, self.track
+        length, drag = _val(self.length), _val(self.drag)
+        position = drag * length if drag is not None else _val(self.position)
+        k = max(0.0, min(1.0, position / length)) if length > 0 else 0.0
+
+        # Play / pause
+        offset = ui.renderer.draw_face(screen, ui.mouse, self.play, "ink")
+        hot = self.play.collidepoint(ui.mouse)
+        col = theme.GOLD_BRIGHT if hot else theme.GOLD
+        cx, cy = self.play.centerx, self.play.centery + offset - 2
+        s = self.button // 4
+        if _val(self.paused):
+            pygame.draw.polygon(screen, col, [(cx - s * .7, cy - s), (cx - s * .7, cy + s), (cx + s, cy)])
+        else:
+            for dx in (-s * .75, s * .25):
+                pygame.draw.rect(screen, col, (cx + dx, cy - s, max(3, s // 2), 2 * s), border_radius=2)
+
+        # Progress
+        screen.blit(art.inset(t.w, t.h), t)
+        fill_w = int((t.w - 6) * k)
+        if fill_w > 0:
+            bar = art.slider_fill(t.w - 6, t.h - 6, theme.EMBER)
+            screen.blit(bar, (t.x + 3, t.y + 3), (0, 0, fill_w, t.h - 6))
+        kx, ky = t.x + 3 + fill_w, t.centery
+        near = self.grab.collidepoint(ui.mouse) or drag is not None
+        if near:
+            halo = art.glow(40, (120, 54, 20))
+            screen.blit(halo, halo.get_rect(center=(kx, ky)), special_flags=ADD)
+        knob = art.blossom(2 * self.knob_r + (6 if near else 0), (214, 168, 88), (150, 26, 26))
+        screen.blit(knob, knob.get_rect(center=(kx, ky)))
+
+        screen.blit(art.inset(self.plate.w, self.plate.h), self.plate)
+        label = f"{clock(position)} / {clock(length)}" if length > 0 else "-:-- / -:--"
+        ui.renderer.text(screen, label, self.font, theme.PARCHMENT, center=self.plate.center)
+
+        # What happens when the track ends: on to the next, a random one, or the same again
+        mode = _val(self.mode) or 0
+        offset = ui.renderer.draw_face(screen, ui.mouse, self.order, "ink")
+        hot_mode = self.order.collidepoint(ui.mouse)
+        self.draw_mode_icon(screen, self.order.centerx, self.order.centery + offset - 2, s,
+                            theme.GOLD_BRIGHT if hot_mode else theme.GOLD, mode)
+
+        ui.state.ui_hitboxes["music_pause"] = self.play
+        ui.state.ui_hitboxes["music_mode"] = self.order
+        ui.state.ui_hitboxes["music_seek"] = self.grab
+        if hot:
+            ui.offer_tip(self.play, "Play\nResume the music." if _val(self.paused) else "Pause\nPause the music.")
+        elif hot_mode:
+            ui.offer_tip(self.order, self.mode_tip)
+        else:
+            ui.offer_tip(self.rect, self.tip)
+
+    @staticmethod
+    def draw_mode_icon(screen, cx, cy, s, col, mode):
+        w = max(2, s // 3)
+        if mode == 1:                        # shuffle: two crossing arrows
+            for y0, y1 in ((-s * .8, s * .8), (s * .8, -s * .8)):
+                pygame.draw.line(screen, col, (cx - s * 1.1, cy + y0), (cx + s * .7, cy + y1), w)
+                tip = (cx + s * 1.15, cy + y1)
+                pygame.draw.polygon(screen, col, [tip, (cx + s * .55, cy + y1 - s * .45), (cx + s * .55, cy + y1 + s * .45)])
+        elif mode == 2:                      # loop: an arrow chasing its tail
+            box = pygame.Rect(0, 0, int(s * 2.2), int(s * 2.2))
+            box.center = (cx, cy)
+            pygame.draw.arc(screen, col, box, 0.5, 2 * 3.14159 - 0.2, w)
+            tip = (box.right - 1, cy - s * .15)
+            pygame.draw.polygon(screen, col, [(tip[0] + s * .5, tip[1] - s * .55), (tip[0] - s * .5, tip[1] - s * .55),
+                                              (tip[0], tip[1] + s * .35)])
+        else:                                # in order: on to the next track
+            pygame.draw.line(screen, col, (cx - s * 1.1, cy), (cx + s * .5, cy), w)
+            pygame.draw.polygon(screen, col, [(cx + s * 1.1, cy), (cx + s * .35, cy - s * .7), (cx + s * .35, cy + s * .7)])
+            pygame.draw.line(screen, col, (cx + s * 1.2, cy - s * .8), (cx + s * 1.2, cy + s * .8), w)
 
 
 # ----------------------------------------------------------- Containers
@@ -348,9 +509,10 @@ class Stack(Node):
     """Children in a column (vertical) or a row, centred on the cross axis.
     `uniform` makes every child as large as the largest one."""
 
-    def __init__(self, children, vertical=True, gap=0, uniform=False):
+    def __init__(self, children, vertical=True, gap=0, uniform=False, align="center"):
         super().__init__()
         self.children, self.vertical, self.gap, self.uniform = children, vertical, gap, uniform
+        self.align = align          # "start": children hug the left (or top) instead of centring
 
     def measure(self):
         sizes = [c.measure() for c in self.children]
@@ -372,12 +534,13 @@ class Stack(Node):
         super().place(x, y, w, h)
         r = self.rect
         pos = r.top if self.vertical else r.left
+        start = self.align == "start"
         for c in self.children:
             if self.vertical:
-                c.place(r.left, pos, r.width, c.h)
+                c.place(r.left, pos, c.w if start else r.width, c.h)
                 pos += c.h + self.gap
             else:
-                c.place(pos, r.top, c.w, r.height)
+                c.place(pos, r.top, c.w, c.h if start else r.height)
                 pos += c.w + self.gap
 
     def draw(self, ui):
@@ -494,9 +657,9 @@ class UILayout:
         key = (font, text, color)
         surf = self._text_cache.get(key)
         if surf is None:
-            if len(self._text_cache) > 512:
+            if len(self._text_cache) > 2048:
                 self._text_cache.clear()
-            surf = self._text_cache[key] = font.render(text, True, color)
+            surf = self._text_cache[key] = self.art.fast(font.render(text, True, color))
         return surf
 
     def dim_surf(self):
@@ -541,7 +704,7 @@ class UILayout:
             footer.append(node)
         if reset:
             node = Button("reset_defaults", reset, self.fnt(0.034), (theme.WHITE, theme.WHITE_HOVER),
-                          tip="Put every setting on this screen back to its default.")
+                          tip="Reset to Default\nEvery setting on this screen back to its default.")
             node.measure()
             node.place(p.right - node.w, self.FOOTER_Y - node.h // 2, node.w, node.h)
             footer.append(node)

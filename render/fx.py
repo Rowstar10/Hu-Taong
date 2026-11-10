@@ -57,7 +57,7 @@ class Butterfly:
             # Sprites are shared, so restore it; set_alpha(None) would stop it blending at all
             sprite.set_alpha(int(255 * max(0, self.life) / .5))
             screen.blit(sprite, rect)
-            sprite.set_alpha(255)
+            sprite.set_alpha(255, pygame.RLEACCEL)
         else:
             screen.blit(sprite, rect)
 

@@ -34,12 +34,20 @@ class MatchSetupState(State):
                 gameplay.vs_ai = True
             if key == "opponent_human":
                 gameplay.vs_ai = False
+            if key == "opponent_online":
+                self.push_state("online")
 
             if gameplay.vs_ai:      # the paddle choice only matters against the AI
                 if key == "side_red":
                     gameplay.play_as_blue = False
                 if key == "side_blue":
                     gameplay.play_as_blue = True
+
+            count = len(gameplay.court_options)
+            if key == "cycle_court_left":
+                gameplay.court = (gameplay.court - 1) % count
+            if key == "cycle_court_right":
+                gameplay.court = (gameplay.court + 1) % count
 
             if key == "start_match":
                 self.start_match()
