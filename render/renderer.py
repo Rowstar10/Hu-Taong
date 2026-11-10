@@ -38,7 +38,7 @@ TIPS = {
     # Gameplay
     "toggle_adaptive_ai": "Adaptive AI\nKeeps matches close.\n• Eases off a level for every 3 points it leads\n• Sharpens up when it's behind",
     "toggle_win_by_two": "Win by Two\nThe winner needs a two-point lead.",
-    "ball_speed_slider": "Ball Speed\nHow fast the ball is served.\n• Hard hits speed it up, to about 2.4 times this",
+    "ball_speed_slider": "Ball Speed\nHow fast the ball is served.\n• Hard hits speed it up, to about 4.5 times this",
     "pace_slider": "Game Pace\nSlows down or speeds up the whole match.\n• Ball, paddles, AI and Chaos timers together\n~ Turn it down if the ball is too quick to follow",
     "paddle_speed_slider": "Paddle Speed\nHow fast the paddles move.",
     "ball_diameter_slider": "Ball Size\nHow big the ball is.",

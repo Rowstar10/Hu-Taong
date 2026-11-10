@@ -12,6 +12,7 @@ Fixes for hits off a paddle's ends, and for a friend leaving an online match.
 - Online, when your friend leaves, you're told they left and get the end-of-match screen, with Replay, Highlights (when there are some), Settings and Main Menu but no Play Again. Before, the pause screen said "Your friend is in the settings..." and wouldn't resume.
 - The same happens when the host leaves a guest, or the connection is lost. A match cut short like this doesn't count in your stats.
 - A friend leaving after a match has ended no longer leaves Play Again, Endless Mode or Lobby on the result screen.
+- The Ball Speed tooltip now says hard hits speed the ball up to about 4.5 times its serve speed. It still said 2.4, the limit before 1.3.
 
 ### Added
 - Tests for these fixes, in the tests folder. Run them with: python -m unittest discover -s tests -t .
