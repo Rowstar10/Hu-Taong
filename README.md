@@ -1,11 +1,8 @@
-# Hu Taong 1.3
+# Hu Taong 1.4
 
-Pong, the Wangsheng Funeral Parlor way. Version 1.3, 10 November 2026.
+Pong, the Wangsheng Funeral Parlor way. Version 1.4, 10 November 2026.
 
-Settings, assets, AI and power-up overhaul.
-
-- Online play (see ONLINE.md), with an optional server of your own (SERVER.md)
-- Replays, a jukebox and courts
+Fixes for hits off a paddle's ends, and for a friend leaving an online match.
 
 ## Play it
 
@@ -26,6 +23,15 @@ pyinstaller main.spec
 ```
 
 The .exe appears in `dist`.
+
+## Tests
+
+```
+pip install pygame==2.6.1
+python -m unittest discover -s tests -t .
+```
+
+They run the game with no window or sound, and never touch your own saves.
 
 ## More
 

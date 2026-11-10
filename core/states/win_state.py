@@ -11,9 +11,24 @@ class WinState(JukeboxControls, State):
     is_menu = True
     is_overlay = True
 
-    def __init__(self, app, p1, p2, winner, loser):
+    def __init__(self, app, p1, p2, winner, loser, left = None):
         super().__init__(app)
         self.init_jukebox()
+
+        self.p1 = p1
+        self.p2 = p2
+        self.winner = winner
+        self.loser = loser
+        self.ui_cols = 2
+        # Online, the friend left (or went quiet) mid-match: the match ends where it was, with no
+        # winner, and it doesn't count in the stats
+        self.left = left
+        self.net = getattr(winner.game, "net", None)
+        self.lost = False
+        if left:
+            self.app.sound_manager.play("shutdown.wav")
+            self.app.sound_manager.set_mood("menu")
+            return
 
         sound_manager = self.app.sound_manager
         if getattr(winner.game, "net", None):          # online: counted as your own win or loss
@@ -42,12 +57,7 @@ class WinState(JukeboxControls, State):
         else:
             sound_manager.set_mood("victory")
 
-        self.p1 = p1
-        self.p2 = p2
-        self.winner = winner
-        self.loser = loser
         self.lost = not loser.ai_enabled and winner.ai_enabled
-        self.ui_cols = 2
 
         # Fan out from beside the panel, so the result stays readable
         tint = "red" if winner == p1 else "blue"
@@ -55,10 +65,16 @@ class WinState(JukeboxControls, State):
         self.app.fx.burst(BASE_W / 2 - 430, BASE_H / 2, count, 64, tint, arc = (2.2, 4.1))
         self.app.fx.burst(BASE_W / 2 + 430, BASE_H / 2, count, 64, tint, arc = (-.95, .95))
 
+    def friend_gone(self):
+        """Online, and the friend has left: nobody to play again with, or to go to the lobby with."""
+        return bool(self.left) or (self.net is not None and not self.net.connected())
+
     def draw(self, screen):
         super().draw(screen)
         title = f"{self.winner.color1} Wins!"
-        
+        if self.left:
+            title = "Lost Touch" if "Lost touch" in self.left else "Your Friend Left"
+
         header = [(f"{self.p1.color1}: ", theme.color(self.p1.color1)),
                   (f"{self.p1.score}      ", theme.PARCHMENT),
                   (f"{self.p2.color1}: ", theme.color(self.p2.color1)),
@@ -72,16 +88,24 @@ class WinState(JukeboxControls, State):
                    ("main_menu", "Main Menu", theme.RED, theme.RED_HOVER)]
         if not self.reel():
             buttons.remove(buttons[3])
-        if self.net:                               # online: back to the lobby together, or leave
+        gone = self.friend_gone()
+        if gone:                                   # the friend has left: watch, save, then go
+            buttons = [b for b in buttons if b[0] not in ("play_again", "continue")]
+        elif self.net:                             # online: back to the lobby together, or leave
             buttons.insert(len(buttons) - 1, ("lobby", "Lobby", theme.WHITE, theme.WHITE_HOVER))
             buttons[-1] = ("main_menu", "Leave", theme.RED, theme.RED_HOVER)
+        # the layout is worked out once; redo it if the buttons change (the friend leaving)
+        if getattr(self, "_gone_drawn", None) != gone:
+            self._gone_drawn = gone
+            self._laid = None
 
         self.app.renderer.draw_overlay(
             self,
             screen,
             title=title, header=header, buttons=buttons,
             title_size=0.1, header_size=0.05, btn_size=0.045,
-            title_color=theme.color(self.winner.color1), mark="败" if self.lost else "胜",
+            title_color=theme.PARCHMENT if self.left else theme.color(self.winner.color1),
+            mark="离" if self.left else "败" if self.lost else "胜",
             tips={"play_again": "Play Again\nA new match with the same setup.",
                   "continue": "Endless Mode\nKeep playing this match with no score limit.",
                   "watch_replay": "Replay\nWatch this match again, and save all or part of it.",
@@ -89,8 +113,8 @@ class WinState(JukeboxControls, State):
                   "settings": "Settings\nChange settings, then come back here.",
                   "lobby": "Lobby\nBack to the lobby with your friend, to change the court or sides.\n"
                            "• They stay connected",
-                  "main_menu": ("Leave\nStop playing. Your friend goes back to their menu." if self.net else
-                                "Main Menu\nLeave this match.")},
+                  "main_menu": ("Leave\nStop playing. Your friend goes back to their menu." if self.net and not gone
+                                else "Main Menu\nLeave this match.")},
             jukebox=True)
         self.draw_jukebox_extras(screen)
 
@@ -120,10 +144,11 @@ class WinState(JukeboxControls, State):
         self.push_state("replay", clip = recorder.clip(), mode = mode, moments = moments, mute = True)
 
     def update(self, dt):
-        if self.net and self.net.request("rematch"):
+        if self.net and not self.friend_gone() and self.net.request("rematch"):
             self.app.renderer.show_toast("Your friend would like a rematch: Play Again starts it")
         # After the match, its highlights play once on their own (Settings > Interface > Instant Replay)
-        if not getattr(self, "reel_shown", False):
+        # (not after a friend left: they're there under Highlights)
+        if not getattr(self, "reel_shown", False) and not self.left:
             self.reel_shown = True
             if self.app.settings.interface.instant_replay in (2, 3) and self.reel():
                 self.watch("reel")

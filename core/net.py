@@ -369,6 +369,7 @@ class HostSession:
         self.events_sent = 0
         self.closed = False
         self.notice = None           # something to tell the player (the guest left...)
+        self.friend_left = None      # why the guest went, if they went mid-match: the match ends there
         self.password = ""           # asked of anyone joining, if set
         self.room_name = ""
         self.ad = None               # a public listing of this game (core/rooms.py), while it's public
@@ -464,13 +465,9 @@ class HostSession:
                 if kind == INPUT:
                     self.read_input(payload)
                 elif kind == BYE:
-                    self.guest = None
-                    self.link.peer = None
-                    self.notice = "Your friend left the game."
+                    self.drop_guest("Your friend left the game.", "Your friend left the match.")
         if self.guest is not None and now - self.link.heard > TIMEOUT:
-            self.guest = None
-            self.link.peer = None
-            self.notice = "Lost touch with your friend."
+            self.drop_guest("Lost touch with your friend.", "Lost touch with your friend.")
         if self.game is not None and self.guest is not None and now - self.last_send >= 1 / SEND_RATE:
             self.last_send = now
             self.send_snapshot()
@@ -603,6 +600,17 @@ class HostSession:
         head = pack_json(info)
         self.snap_seq += 1
         self.link.send(SNAP, struct.pack("<IH", self.snap_seq, len(head)) + head + row)
+
+    def drop_guest(self, notice, mid_match):
+        """The guest left, or went quiet for too long.  Whatever they had open (the pause screen,
+        settings) went with them, and so did their keys; a match they were playing ends."""
+        self.guest = None
+        self.link.peer = None
+        self.guest_menu = 0
+        self.guest_keys = 0
+        self.notice = notice
+        if self.game is not None:
+            self.friend_left = mid_match
 
     def take_claims(self):
         claims, self.claims = self.claims, []

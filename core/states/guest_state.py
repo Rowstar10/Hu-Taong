@@ -132,6 +132,8 @@ class GuestMatchState(State):
 
     def update(self, dt):
         net = self.net
+        if net is not None and net.status == "lost" and net.snaps:
+            return                                  # the host left mid-match: the app shows the result screen
         if net is None or net.status in ("lost", "refused"):
             self.app.renderer.show_toast(net.reason if net else "The online game ended.", important = True)
             self.set_state("main_menu", mute = True)
@@ -509,7 +511,8 @@ class GuestMatchState(State):
     @staticmethod
     def bounce_off(paddle, side, normal, bx, by, r, bvx, bvy, pvx, pvy):
         """The ball off your paddle, as the host's game plays a hit (objects/paddle.py): angled by
-        where on the paddle it met, and always leaving faster than the paddle chases it.  Answers
+        where on the paddle it met, and off the face always leaving faster than the paddle chases
+        it (off an end the paddle is held back instead, so the ball keeps its speed).  Answers
         (vx, vy, x, y), the ball just clear of the face it met."""
         speed = max(1.0, math.hypot(bvx, bvy))
         cy = (paddle.y0 + paddle.y1) / 2
@@ -529,7 +532,7 @@ class GuestMatchState(State):
         chasing = pvx * out_x + pvy * out_y
         leaving = vx * out_x + vy * out_y
         need = chasing + 150
-        if chasing > 0 and 0 < leaving < need:
+        if chasing > 0 and 0 < leaving < need and normal[0]:
             vx, vy = vx * need / leaving, vy * need / leaving
         return vx, vy, bx, by
 
@@ -656,7 +659,7 @@ class GuestResultState(JukeboxControls, State):
     is_menu = True
     is_overlay = True
 
-    def __init__(self, app):
+    def __init__(self, app, left = None):
         super().__init__(app)
         self.ui_cols = 2
         self.init_jukebox()
@@ -666,10 +669,26 @@ class GuestResultState(JukeboxControls, State):
         self.won = self.over.get("winner") == self.side
         self.asked = False
         self.reel_shown = False
+        # The host left (or went quiet) mid-match: it ends where it was, with no winner, and
+        # doesn't count in the stats.  The score is the last one this side saw.
+        self.left = left
+        if left:
+            match = app.state_manager.get_state(GuestMatchState)
+            view = match.view if match else None
+            self.over = {"score": [view.p1.score, view.p2.score] if view else [0, 0]}
+
+    def host_gone(self):
+        """The host has left: no rematch to ask for."""
+        net = self.app.net
+        return bool(self.left) or net is None or net.status != "playing"
 
     def enter(self, **kwargs):
         if self.app.net:
             self.app.net.keys = 0
+        if self.left:
+            self.app.sound_manager.play("shutdown.wav")
+            self.app.sound_manager.set_mood("menu")
+            return
         sound = self.app.sound_manager
         sound.play("you_win.wav" if self.won else "you_lose.wav")
         sound.set_mood("victory" if self.won else "defeat")
@@ -710,13 +729,25 @@ class GuestResultState(JukeboxControls, State):
                    ("highlights", "Highlights", theme.ORANGE, theme.ORANGE_HOVER),
                    ("settings", "Settings", theme.WHITE, theme.WHITE_HOVER),
                    ("leave", "Leave", theme.RED, theme.RED_HOVER)]
-        self._laid = None if getattr(self, "_asked_drawn", None) != self.asked else getattr(self, "_laid", None)
-        self._asked_drawn = self.asked
+        gone = self.host_gone()
+        if gone:                                    # nobody to ask for a rematch: watch, save, then go
+            buttons = [b for b in buttons if b[0] != "rematch"]
+            if self.left:                           # highlights come from the host, at the end of a match
+                buttons = [b for b in buttons if b[0] != "highlights"]
+                buttons[-1] = ("leave", "Main Menu", theme.RED, theme.RED_HOVER)
+        drawn = (self.asked, gone)
+        self._laid = None if getattr(self, "_asked_drawn", None) != drawn else getattr(self, "_laid", None)
+        self._asked_drawn = drawn
+        title = "You Win!" if self.won else f"{winner} Wins!"
+        if self.left:
+            title = "Lost Touch" if "Lost touch" in self.left else "Your Friend Left"
         self.app.renderer.draw_overlay(
-            self, screen, title = "You Win!" if self.won else f"{winner} Wins!", header = header, buttons = buttons,
-            title_size = 0.1, title_color = theme.color(winner), mark = "胜" if self.won else "败", jukebox = True,
+            self, screen, title = title, header = header, buttons = buttons,
+            title_size = 0.1, title_color = theme.PARCHMENT if self.left else theme.color(winner),
+            mark = "离" if self.left else "胜" if self.won else "败", jukebox = True,
             tips = {"rematch": "Rematch\nAsk your friend for another match. It starts when they agree.",
-                    "watch_replay": "Replay\nWatch this match again, and save all or part of it.",
+                    "watch_replay": ("Replay\nWatch the match so far, and save all or part of it." if self.left else
+                                     "Replay\nWatch this match again, and save all or part of it."),
                     "highlights": "Highlights\nThe best moments of this match.",
                     "settings": "Settings\nDisplay, sound and interface, then back here.",
                     "leave": "Leave\nStop playing and go back to the menu."})
@@ -732,7 +763,7 @@ class GuestResultState(JukeboxControls, State):
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             net = self.app.net
-            if key == "rematch" and net and not self.asked:
+            if key == "rematch" and net and not self.asked and not self.host_gone():
                 net.request("rematch")
                 self.asked = True
                 self.app.renderer.show_toast("Asked your friend for a rematch")

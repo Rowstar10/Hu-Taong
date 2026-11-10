@@ -3,6 +3,7 @@ from config import BASE_H, DYNAMIC, KINEMATIC, MAX_BOUNCE_ANGLE, MAX_BALL_SPEEDU
 
 FLAT_ANGLE = math.radians(3)    # returns flatter than this get a little spin
 SPEED_KNEE = 0.85               # hard hits only start easing off at this share of the speed ceiling
+HOLD_GAP = 150                  # px/s: after an end hit, the paddle trails the ball by at least this
 from objects.ai import PaddleAI
 from objects.game_object import GameObject
 
@@ -39,6 +40,8 @@ class Paddle(GameObject):
         self.ai_enabled = False
         self.ai = PaddleAI(self)
 
+        self.held = None                     # (ball, out_y) after hitting a ball with an end: see hold_back
+
     def apply_inputs(self, dt):
         """Keys or the AI ask for a velocity and the paddle eases towards it.  Under Gravity
         the paddle falls, and Up jumps off the floor."""
@@ -71,6 +74,28 @@ class Paddle(GameObject):
         else:
             self.jump_held = None
             self.vy += (dvy - self.vy) * a
+        self.hold_back()
+
+    def hold_back(self):
+        """A paddle that hit the ball with its top or bottom end can't run on through it: while the
+        ball is still beside that end, the paddle moves towards it no faster than the ball moves
+        away (and stops if the ball is coming back, say off the wall).  So the ball needn't be sped
+        up to stay ahead of the paddle, and can't be pinned against a wall and pumped faster."""
+        held = self.held
+        if held is None:
+            return
+        if getattr(self, "remote", False) and getattr(self.game, "net", None):
+            self.held = None                 # online, the friend's paddle goes where their keys say
+            return
+        ball, out_y = held
+        beside = ball.x0 < self.x1 and ball.x1 > self.x0
+        past_end = ball.y0 >= self.y1 - 4 if out_y > 0 else ball.y1 <= self.y0 + 4
+        if not beside or not past_end or ball not in self.game.objects:
+            self.held = None
+            return
+        limit = max(0.0, ball.vy * out_y - HOLD_GAP)
+        if self.vy * out_y > limit:
+            self.vy = out_y * limit
 
     def gravity_jump(self, dt, up, powerups):
         """Under Gravity the paddle falls, and Up jumps: a tap is a small hop, and the longer Up is
@@ -109,6 +134,12 @@ class Paddle(GameObject):
         # A blocked ball loses pace, but never drops below its serve speed, so a rally can't stall
         serve = getattr(other, "speed", 0)
         speed = max(math.hypot(other.vx, other.vy), serve)
+        if ny != 0:
+            # Off an end, the ball keeps the speed it came in at: the knock from a paddle sweeping
+            # up or down isn't a hard hit towards the other player (it was, and sent the ball off
+            # at 3 times serve speed)
+            vx, vy = data.get("before", {}).get(other, (other.vx, other.vy))
+            speed = max(math.hypot(vx, vy), serve)
 
         # Hard hits speed it up, but ease off towards a ceiling so it never gets too quick to follow
         cap = MAX_BALL_SPEEDUP * serve * math.sqrt(2)     # serves go diagonally, at `serve` on each axis
@@ -151,15 +182,22 @@ class Paddle(GameObject):
                 if self.vy * ny < 0:
                     self.vy = 0.0
 
+            # The paddle, not the ball, gives way: it can't chase the ball through its end (see
+            # hold_back).  Speeding the ball up to outrun it instead sent end hits off at 3 times
+            # serve speed, and a ball pinned against a wall came out at nearly 4 times.
+            self.held = (other, -ny)
+            self.hold_back()
+
         # A paddle running into the ball faster than it bounces off would catch it again a few
         # frames later and carry it along, so the ball always leaves clearly faster than the paddle.
         # The extra lead stops at the speed ceiling; only a paddle faster than that pushes past it.
+        # (Off the paddle's face only: off an end, the paddle is held back instead.)
         out_x, out_y = -nx, -ny
         chasing = self.vx * out_x + self.vy * out_y
         leaving = other.vx * out_x + other.vy * out_y
         need = chasing + 150                                       # the least it must leave at
         want = max(need, min(chasing * 1.3, cap if serve else math.inf))
-        if chasing > 0 and leaving < want and not pinched:
+        if chasing > 0 and leaving < want and not pinched and ny == 0:
             # Speed the whole return up, keeping its angle; at the ceiling the angle flattens
             # only as far as it must for the ball to get clear
             total = math.hypot(other.vx, other.vy)

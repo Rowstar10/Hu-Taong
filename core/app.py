@@ -193,6 +193,26 @@ class App:
             self.net.close()
             self.net = None
 
+    def match_left(self, reason, match, result):
+        """Online, the other player left (or went quiet) mid-match.  Say so, close whatever is open
+        over the match (pause, settings, a replay), and show the end-of-match screen: no Play Again
+        with nobody to play, but the replay and highlights are there to watch and save before
+        leaving.  If the match had already ended, its result screen is up and just loses its
+        rematch buttons."""
+        self.renderer.show_toast(reason, important = True)
+        sm = self.state_manager
+        names = [getattr(s, "NAME", "") for s in sm.stack]
+        if result in names or match not in names:
+            return
+        for _ in names[names.index(match) + 1:]:
+            sm.pop_state(mute = True)
+        if result == "win":
+            game = sm.stack[names.index(match)].game
+            you, friend = (game.p2, game.p1) if getattr(game.p1, "remote", False) else (game.p1, game.p2)
+            sm.push_state("win", p1 = game.p1, p2 = game.p2, winner = you, loser = friend, left = reason, mute = True)
+        else:
+            sm.push_state("guest_result", left = reason, mute = True)
+
     def online_requests(self):
         """Hosting: the friend can pause the match for both, and resume it."""
         net = self.net
@@ -208,6 +228,14 @@ class App:
             if net.status == "waiting" and "guest_match" in names:
                 stack[names.index("guest_match")].back_to_lobby()
                 return
+            # the host has gone mid-match: say so, and end the match here (see match_left)
+            if net.status == "lost" and "guest_match" in names and net.snaps:
+                if not getattr(net, "left_shown", False):
+                    net.left_shown = True
+                    reason = ("Lost touch with your friend." if "Lost touch" in (net.reason or "")
+                              else "Your friend left the match.")
+                    self.match_left(reason, "guest_match", "guest_result")
+                return
             # the host has gone: from any of the match's screens, back to the menu
             if net.status in ("lost", "refused"):
                 name = getattr(self.state_manager.current(), "NAME", "")
@@ -217,6 +245,10 @@ class App:
                     self.leave_online()
             return
         if net.game is None:
+            return
+        if net.friend_left:
+            reason, net.friend_left, net.notice = net.friend_left, None, None
+            self.match_left(reason, "game", "win")
             return
         top = self.state_manager.current()
         name = getattr(top, "NAME", "")

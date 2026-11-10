@@ -2,6 +2,20 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 1.4 — 2026-11-10
+
+Fixes for hits off a paddle's ends, and for a friend leaving an online match.
+
+### Fixed
+- A ball hit with the top or bottom end of a moving paddle no longer flies off at up to 3 times serve speed. It keeps the speed it came in at, and the paddle can't run on through it.
+- A ball pinned between a paddle's end and the top or bottom wall no longer shoots out along the wall at nearly 4 times serve speed.
+- Online, when your friend leaves, you're told they left and get the end-of-match screen, with Replay, Highlights (when there are some), Settings and Main Menu but no Play Again. Before, the pause screen said "Your friend is in the settings..." and wouldn't resume.
+- The same happens when the host leaves a guest, or the connection is lost. A match cut short like this doesn't count in your stats.
+- A friend leaving after a match has ended no longer leaves Play Again, Endless Mode or Lobby on the result screen.
+
+### Added
+- Tests for these fixes, in the tests folder. Run them with: python -m unittest discover -s tests -t .
+
 ## 1.3 — 2026-11-10
 
 Online play, replays, courts and twelve new power-ups, with an overhaul of settings, assets and the AI.

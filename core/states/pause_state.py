@@ -71,7 +71,7 @@ class PauseState(JukeboxControls, State):
                        ("lobby", "Lobby", theme.WHITE, theme.WHITE_HOVER),
                        ("main_menu", "Leave Match", theme.RED, theme.RED_HOVER)]
             net = self.game_state.game.net
-            header = lambda: ("Your friend is in the settings..." if net.guest_menu == 2 else
+            header = lambda: ("Your friend is in the settings..." if net.guest_menu == 2 and net.connected() else
                               "Your friend paused the match" if self.by_friend else "Paused for both of you")
 
         tips = dict(self.TIPS, main_menu = self.TIPS["leave"]) if online else self.TIPS
@@ -83,7 +83,7 @@ class PauseState(JukeboxControls, State):
     def resume(self):
         """Back to the match; online, not while the friend is still in the settings."""
         game = self.game_state.game if self.game_state else None
-        if game and game.net and game.net.guest_menu == 2:
+        if game and game.net and game.net.guest_menu == 2 and game.net.connected():
             self.app.renderer.show_toast("Your friend is still in the settings", important = True)
             return
         self.pop_state(mute = True)

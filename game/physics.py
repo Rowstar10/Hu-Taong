@@ -212,7 +212,10 @@ class Physics:
 
         if rvn > 0:
             return
-        
+
+        # How each was moving just before the knock (a paddle's end hit plays off the ball's own speed)
+        data["before"] = {a: (a.vx, a.vy), b: (b.vx, b.vy)}
+
         # Restitution & Impulse
         res = (a.restitution + b.restitution) / 2
         im_a, im_b = a.inv_mass, b.inv_mass
