@@ -94,6 +94,9 @@ class App:
                 self.renderer.draw_loading_screen(self.virtual, i / len(jobs))
                 self.present()
                 pygame.event.pump()
+                if i == 0 and ANDROID:
+                    from core import android
+                    android.hide_loading_screen()     # the game's own loading screen is up now
 
         self.idle_jobs = self.renderer.idle_jobs()
 

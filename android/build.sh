@@ -30,7 +30,7 @@ args=(apk
   --version "$VERSION"
   --numeric-version "$((MAJOR * 100 + MINOR))"
   --bootstrap sdl2
-  --requirements python3,pygame,pyjnius,android
+  --requirements python3,pygame,pyjnius
   --local-recipes "$HERE/recipes"
   --orientation landscape
   --icon "$WORK/icon.png"

@@ -71,9 +71,36 @@ def paste_text():
         return ""
 
 
+# ---------------- The start-up picture ----------------
+
+def hide_loading_screen():
+    """Take down Android's start-up picture (once the game's own loading screen is up)."""
+    jni = _jni()
+    if jni:
+        try:
+            jni[1].removeLoadingScreen()          # (it hands itself to Android's UI thread)
+        except Exception:
+            pass
+
+
 # ---------------- The file picker ----------------
 
 REQUEST = 0x4854          # "HT": our activity results
+
+
+def _result_listener(callback):
+    """An ActivityResultListener for the game's Activity, calling `callback(request, result, data)`."""
+    from jnius import PythonJavaClass, java_method
+
+    class Listener(PythonJavaClass):
+        __javainterfaces__ = ["org/kivy/android/PythonActivity$ActivityResultListener"]
+        __javacontext__ = "app"
+
+        @java_method("(IILandroid/content/Intent;)V")
+        def onActivityResult(self, request, result, data):
+            callback(request, result, data)
+
+    return Listener()
 
 
 class PickedFile:
@@ -127,7 +154,6 @@ def ask(save, title, default_name, kinds):
     if not jni:
         return False
     try:
-        from android import activity as events
         autoclass, activity = jni
         Intent = autoclass("android.content.Intent")
         intent = Intent(Intent.ACTION_CREATE_DOCUMENT if save else Intent.ACTION_OPEN_DOCUMENT)
@@ -145,7 +171,8 @@ def ask(save, title, default_name, kinds):
             picked["uri"] = data.getData() if result == -1 and data is not None else None
             done.set()
 
-        events.bind(on_activity_result = on_result)
+        listener = _result_listener(on_result)
+        activity.registerActivityResultListener(listener)
         try:
             activity.startActivityForResult(intent, REQUEST)
             # The game waits behind the picker.  It mustn't pump SDL's events meanwhile: paused,
@@ -154,7 +181,7 @@ def ask(save, title, default_name, kinds):
             while not done.is_set() and time.monotonic() < deadline:
                 done.wait(0.05)
         finally:
-            events.unbind(on_activity_result = on_result)
+            activity.unregisterActivityResultListener(listener)
         uri = picked.get("uri")
         if uri is None:
             return None
