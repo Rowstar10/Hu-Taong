@@ -74,13 +74,13 @@ jobs:
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "Hu Taong $v"
 
-      # python-for-android's finished build of Python, SDL and pygame, so later runs only pack the game
+      # python-for-android's downloads (its finished build can't be kept: it points into build
+      # folders that are far too big to cache)
       - uses: actions/cache@v4
         with:
-          path: |
-            /home/runner/p4a/dists
-            /home/runner/p4a/packages
-          key: p4a-${{ env.P4A_VERSION }}-${{ env.NDK_VERSION }}-${{ steps.version.outputs.version }}-${{ hashFiles('android/recipes/**', 'android/build.sh') }}
+          path: /home/runner/p4a/packages
+          key: p4a-downloads-${{ env.P4A_VERSION }}-${{ hashFiles('android/recipes/**') }}
+          restore-keys: p4a-downloads-${{ env.P4A_VERSION }}-
 
       - name: Signing key
         env:
