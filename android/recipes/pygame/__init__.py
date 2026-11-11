@@ -24,7 +24,7 @@ class Pygame261Recipe(Pygame2Recipe):
             if os.path.exists(marker):
                 return
             info("Making pygame's Cython parts afresh for this Python")
-            self.install_hostpython_prerequisites(packages=["cython>=3.1"])
+            self.install_hostpython_prerequisites(packages=["setuptools", "cython>=3.1"])
             generated = glob.glob("src_c/_sdl2/*.c") + ["src_c/_sprite.c", "src_c/pypm.c"]
             for path in generated:
                 if os.path.exists(path):
