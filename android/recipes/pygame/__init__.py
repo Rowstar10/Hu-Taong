@@ -31,10 +31,11 @@ class Pygame261Recipe(Pygame2Recipe):
             # (Cython 3.1 and 3.2 understand the Python in the APK; 3.3 refuses pygame 2.6.1's _sprite.pyx)
             info("Making pygame's Cython parts afresh for this Python")
             self.install_hostpython_prerequisites(packages=["setuptools", "cython>=3.1,<3.3"])
-            generated = glob.glob("src_c/_sdl2/*.c") + ["src_c/_sprite.c", "src_c/pypm.c"]
-            for path in generated:
-                if os.path.exists(path):
-                    os.remove(path)
+            # only the C that Cython made (src_c/_sdl2/touch.c, for one, is written by hand)
+            for pyx in glob.glob("src_c/cython/pygame/**/*.pyx", recursive=True):
+                made = os.path.join("src_c", os.path.relpath(pyx, "src_c/cython/pygame"))[:-len(".pyx")] + ".c"
+                if os.path.exists(made):
+                    os.remove(made)
             env = self.get_hostrecipe_env(arch)
             shprint(sh.Command(self.real_hostpython_location), "setup.py", "cython_only", _env=env)
             open(marker, "w").close()
