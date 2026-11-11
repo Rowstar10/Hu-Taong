@@ -5,8 +5,8 @@ icon, files the game doesn't load), with two changes for a phone:
 
 - The music is re-encoded at a phone's bitrate (about 112 kbps, from up to 320).  It's about
   half of a 250 MB game, and a phone unpacks the game once more on first launch, so this
-  keeps the APK and the space it takes small.  It needs ffmpeg; without it the music goes in as
-  it is.
+  keeps the APK and the space it takes small.  It needs ffmpeg (on the PATH, or pip's
+  imageio-ffmpeg); without it the music goes in as it is.
 - A start-up picture (presplash.jpg) and an icon (icon.png) for Android, beside the folder.
 
     python android/stage.py <out folder>
@@ -37,14 +37,28 @@ def copy_code(out):
             shutil.copy2(src, out / name)
 
 
+def ffmpeg():
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return None
+
+
+FFMPEG = ffmpeg()
+
+
 def shrink(src, dst):
     """A track at a phone's bitrate; True if ffmpeg made it smaller."""
-    if not shutil.which("ffmpeg"):
+    if not FFMPEG:
         return False
     tmp = dst.with_name(dst.stem + ".tmp" + dst.suffix)
     codec = ["-c:a", "libmp3lame", "-b:a", f"{MUSIC_KBPS}k"] if src.suffix == ".mp3" else \
             ["-c:a", "libvorbis", "-b:a", f"{MUSIC_KBPS}k"]
-    done = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-map", "0:a", "-map_metadata", "-1",
+    done = subprocess.run([FFMPEG, "-v", "error", "-y", "-i", str(src), "-map", "0:a", "-map_metadata", "-1",
                            *codec, str(tmp)], capture_output = True)
     if done.returncode != 0 or not tmp.exists() or tmp.stat().st_size >= src.stat().st_size:
         tmp.unlink(missing_ok = True)

@@ -11,6 +11,11 @@ on:
 permissions:
   contents: write
 
+# A newer push to the same branch replaces a build still running
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   P4A_VERSION: "2026.5.9"
   NDK_VERSION: "28.2.13676358"
@@ -34,9 +39,10 @@ jobs:
       - name: Tools
         timeout-minutes: 20
         run: |
-          sudo apt-get update -q
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends ffmpeg autoconf automake libtool libltdl-dev pkg-config zip unzip lld
-          pip install -q "python-for-android==$P4A_VERSION" "cython>=3.1" setuptools pygame==2.6.1
+          # (no apt: the runner has the build tools, and its package mirror can be very slow;
+          # ffmpeg for the music comes from PyPI, as imageio-ffmpeg)
+          for tool in autoconf automake libtoolize pkg-config zip unzip; do command -v $tool > /dev/null || echo "::warning::$tool is missing"; done
+          pip install -q "python-for-android==$P4A_VERSION" "cython>=3.1" setuptools pygame==2.6.1 imageio-ffmpeg
           sdkmanager="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           (yes || true) | "$sdkmanager" --licenses > /dev/null
           (yes || true) | "$sdkmanager" --install "ndk;$NDK_VERSION" "platforms;android-35" "build-tools;35.0.0" | grep -v "^\[" | tail -5
