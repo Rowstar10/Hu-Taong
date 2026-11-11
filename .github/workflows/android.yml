@@ -32,12 +32,14 @@ jobs:
           java-version: "17"
 
       - name: Tools
+        timeout-minutes: 20
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q ffmpeg autoconf automake libtool libltdl-dev pkg-config zip unzip lld
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends ffmpeg autoconf automake libtool libltdl-dev pkg-config zip unzip lld
           pip install -q "python-for-android==$P4A_VERSION" "cython>=3.1" setuptools pygame==2.6.1
-          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
-          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" "platforms;android-35" "build-tools;35.0.0" > /dev/null
+          sdkmanager="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          (yes || true) | "$sdkmanager" --licenses > /dev/null
+          (yes || true) | "$sdkmanager" --install "ndk;$NDK_VERSION" "platforms;android-35" "build-tools;35.0.0" | grep -v "^\[" | tail -5
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
 
       - name: Tests (the PC game, and the phone's controls on a PC)
