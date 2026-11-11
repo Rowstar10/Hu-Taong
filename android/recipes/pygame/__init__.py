@@ -23,8 +23,9 @@ class Pygame261Recipe(Pygame2Recipe):
             marker = ".cython-regenerated"
             if os.path.exists(marker):
                 return
+            # (Cython 3.1 and 3.2 understand the Python in the APK; 3.3 refuses pygame 2.6.1's _sprite.pyx)
             info("Making pygame's Cython parts afresh for this Python")
-            self.install_hostpython_prerequisites(packages=["setuptools", "cython>=3.1"])
+            self.install_hostpython_prerequisites(packages=["setuptools", "cython>=3.1,<3.3"])
             generated = glob.glob("src_c/_sdl2/*.c") + ["src_c/_sprite.c", "src_c/pypm.c"]
             for path in generated:
                 if os.path.exists(path):
