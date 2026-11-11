@@ -17,8 +17,13 @@ class Pygame261Recipe(Pygame2Recipe):
     url = "https://files.pythonhosted.org/packages/source/p/pygame/pygame-{version}.tar.gz"
     sha512sum = "67ae07be50822dac5b2ce4b04a04920dc22ac4d43c348e2a95646c7646ca82b822a1fd7b89a295406581969303235831e00aeec4ea29e975a80f8013170eee5d"
 
-    def prebuild_arch(self, arch):
-        super().prebuild_arch(arch)
+    def build_arch(self, arch):
+        # (here, not in prebuild_arch: p4a prebuilds every recipe before it builds any, so the
+        # build machine's Python, which Cython runs in, isn't there yet then)
+        self.make_cython_parts(arch)
+        super().build_arch(arch)
+
+    def make_cython_parts(self, arch):
         with current_directory(self.get_build_dir(arch.arch)):
             marker = ".cython-regenerated"
             if os.path.exists(marker):
