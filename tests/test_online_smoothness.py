@@ -53,6 +53,9 @@ class SendRate(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         self.addCleanup(self.net.close)
+        # the friend was last heard from on the fake clock too (on the real one, a computer that
+        # started less than a minute and a half ago had them silent for longer than TIMEOUT)
+        self.net.link.heard = self.clock.now
 
     def run_frames(self, seconds, fps, jitter = 0.0):
         rng = random.Random(5)
