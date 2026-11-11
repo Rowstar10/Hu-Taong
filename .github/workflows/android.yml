@@ -39,11 +39,17 @@ jobs:
       - name: Tools
         timeout-minutes: 20
         run: |
-          # The runner has the build tools but libltdl-dev (libffi needs its libtool macros). Its
-          # package mirror can be very slow, so just that one package, with short timeouts, and
-          # ffmpeg for the music comes from PyPI (imageio-ffmpeg) instead
-          apt="sudo apt-get install -y -q --no-install-recommends -o Acquire::http::Timeout=15 -o Acquire::Retries=2 libltdl-dev"
-          timeout 300 $apt || { timeout 420 sudo apt-get update -q -o Acquire::http::Timeout=15 || true; timeout 300 $apt; }
+          # The runner has the build tools but libltdl-dev, whose libtool macros (ltdl.m4) libffi
+          # needs. Ubuntu's package mirror can be slow or unreachable from the runners, so the
+          # macros come from libtool's own source instead (2.4.7, the runner's libtool); ffmpeg
+          # for the music comes from PyPI (imageio-ffmpeg)
+          if [[ ! -f /usr/share/aclocal/ltdl.m4 ]]; then
+            for site in https://ftpmirror.gnu.org https://ftp.gnu.org/gnu; do
+              curl -fsSL --retry 3 --max-time 120 "$site/libtool/libtool-2.4.7.tar.gz" \
+                | tar xz -C "$RUNNER_TEMP" libtool-2.4.7/m4/ltdl.m4 && break
+            done
+            sudo cp "$RUNNER_TEMP/libtool-2.4.7/m4/ltdl.m4" /usr/share/aclocal/
+          fi
           for tool in autoconf automake libtoolize pkg-config zip unzip; do command -v $tool > /dev/null || echo "::warning::$tool is missing"; done
           pip install -q "python-for-android==$P4A_VERSION" "cython>=3.1" setuptools pygame==2.6.1 imageio-ffmpeg
           sdkmanager="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
