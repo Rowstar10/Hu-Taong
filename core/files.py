@@ -2,13 +2,19 @@
 
 Both use Windows itself, through ctypes: the same Save and Open dialogs every Windows program
 has, and the system clipboard.  Nothing extra has to be bundled with the game for them.  If a
-dialog can't be shown, files go to a Hu Taong folder in Documents instead.
+dialog can't be shown, files go to a Hu Taong folder in Documents instead.  On a phone, Android's
+own file picker and clipboard do it (core/android.py).
 """
 import os, sys
 from pathlib import Path
 
+from core.platform import ANDROID
+
 
 def documents_folder():
+    if ANDROID:
+        from core.platform import data_dir
+        return data_dir() / "Exports"          # (only if Android's picker couldn't open)
     home = Path.home()
     for name in ("Documents", "My Documents"):
         if (home / name).is_dir():
@@ -28,6 +34,9 @@ def _window():
 def ask(save, title, default_name, kinds):
     """Show a Save or Open dialog; returns a path, None if it was cancelled, or False if no
     dialog could be shown.  `kinds` is [(label, "*.ext"), ...]."""
+    if ANDROID:
+        from core import android
+        return android.ask(save, title, default_name, kinds)
     if sys.platform != "win32":
         return False
     try:
@@ -111,6 +120,9 @@ def _clipboard():
 
 def copy_text(text):
     """Put `text` on the clipboard; True if it worked."""
+    if ANDROID:
+        from core import android
+        return android.copy_text(text)
     if sys.platform != "win32":
         return False
     try:
@@ -133,6 +145,9 @@ def copy_text(text):
 
 def paste_text():
     """The clipboard's text, or "" if there's none."""
+    if ANDROID:
+        from core import android
+        return android.paste_text()
     if sys.platform != "win32":
         return ""
     try:

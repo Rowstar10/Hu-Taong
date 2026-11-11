@@ -737,4 +737,4 @@ class UILayout:
 
     def _begin(self, state, screen):
         self.screen, self.state = screen, state
-        self.mouse = self.app.window_to_base(pygame.mouse.get_pos())
+        self.mouse = self.app.pointer()

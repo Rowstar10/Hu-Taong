@@ -8,6 +8,7 @@ from render import theme
 from render.art import ADD, blank, mix, scaled, v_gradient
 from core.settings import key_name
 from core import net as netcode
+from core.platform import ANDROID
 from core import rooms
 from game import courts
 from game.powerups import BY_KEY as POWERUPS, FAMILY_COLOURS, FAMILY_NOTES, KINDS as POWERUP_KINDS, PowerUps
@@ -83,6 +84,7 @@ TIPS = {
     "toggle_ball_trail": "Ball Trail\nA fire trail behind the ball.",
     "toggle_auto_pause": "Auto-Pause\nPause the match if you click away from the game.",
     "toggle_hide_cursor": "Hide Mouse\nHide the mouse in a match until you move it.",
+    "toggle_vibration": "Vibration\nA little buzz when your paddle hits the ball, and a bigger one at each point.",
     "key": "Key\nClick, then press the new key.\n• A key that's already used swaps over\n~ Esc cancels",
 
     # Stats
@@ -170,8 +172,22 @@ def options_tip(title, intro, options, current=None, hint=None):
     return "\n".join(lines)
 
 
+KEY_HINTS = ("Esc", "Enter", "Space", "Ctrl", "Tab", "Keys:", "Mouse wheel", "Left / Right", "Hold Tab")
+
+
+def touch_tip(text):
+    """A tip as a phone shows it: no keyboard shortcuts, and controls are tapped, not clicked."""
+    lines = []
+    for line in text.split("\n"):
+        hint = line[2:] if line.startswith("~ ") else None
+        if hint is not None and (hint.startswith(KEY_HINTS) or (len(hint) == 1 and hint.isupper())):
+            continue
+        lines.append(line.replace("click away", "switch away").replace("Click", "Tap").replace("click", "tap"))
+    return "\n".join(lines)
+
+
 class Tooltips:
-    """Short explanations that appear when the mouse rests on a control.
+    """Short explanations that appear when the mouse rests on a control (on a phone, a finger).
 
     A tip is a few lines: the first is its title and the rest explain it.  A line starting with
     "• " is a bullet, "» " the bullet for the option in use, and "~ " a quiet hint (a shortcut,
@@ -189,7 +205,11 @@ class Tooltips:
 
     def offer(self, rect, text):
         if text and rect.collidepoint(self.app.renderer.mouse()):
-            self.offered = text
+            self.offered = touch_tip(text) if ANDROID else text
+
+    def showing(self):
+        """A tip is up (on a phone, a finger resting on a control asked for it)."""
+        return self.text is not None and self.rest >= self.DELAY
 
     def wrap(self, font, text, width):
         lines, line = [], ""
@@ -276,6 +296,12 @@ class Tooltips:
         surf.set_alpha(int(255 * min(1.0, (self.rest - self.DELAY) / 0.15)))
         mx, my = self.app.renderer.mouse()
         x, y = mx + 20, my + 28
+        if ANDROID:
+            # above the finger, which would hide anything under it
+            x, y = mx - surf.get_width() // 2, my - surf.get_height() - 90
+            if y < 8:
+                y = my + 110
+            x = min(x, BASE_W - 8 - surf.get_width())
         if x + surf.get_width() > BASE_W - 8:
             x = mx - surf.get_width() - 12
         if y + surf.get_height() > BASE_H - 8:
@@ -347,7 +373,7 @@ class Renderer:
         return manager.get(name, 12, bold=True)
 
     def mouse(self):
-        return self.app.window_to_base(pygame.mouse.get_pos())
+        return self.app.pointer()
 
     def lift(self, key, active):
         """Eases towards 1 while `active`, so hovered things rise smoothly."""
@@ -370,7 +396,7 @@ class Renderer:
     def draw_face(self, screen, mouse_pos, rect, finish):
         """Draw a lacquered button face; return the press offset for its contents."""
         hovered = rect.collidepoint(mouse_pos)
-        down = hovered and pygame.mouse.get_pressed()[0]
+        down = hovered and self.app.pointer_down()
         offset = 3 if down else 0
         m = self.art.BUTTON_MARGIN
         screen.blit(self.art.button(rect.w, rect.h, finish, hovered, down), (rect.x - m, rect.y - m + offset))
@@ -605,7 +631,8 @@ class Renderer:
                 self.app.fx.spark(edge, top + random.uniform(0, h), 2, speed=120, life=.8,
                                   arc=(-2.2, -.9), gravity=-120)
 
-        self.text(screen, "Enter to play   ·   Esc to quit", self.fnt(0.024, bold=False),
+        self.text(screen, "Tap Play Game to begin   ·   Back to quit" if ANDROID else "Enter to play   ·   Esc to quit",
+                  self.fnt(0.024, bold=False),
                   theme.GOLD, center=(cx, 944))
 
     # ── Match setup ────────────────────────────────────────────────────────────
@@ -1201,6 +1228,9 @@ class Renderer:
                 Cycle("cycle_parallax", lambda: parallax_texts[d.parallax], sm, parallax_texts,
                       tip=TIPS["cycle_parallax"]))
 
+            if ANDROID:                        # a phone's screen has one size, and is always full
+                return Grid([[background, dim], [max_fps]],
+                            gap_x=int(BASE_W * 0.08 * s), gap_y=self.vgap(ui, s, 2.2))
             return Grid([[resolution, max_fps],
                          [background, dim]],
                         gap_x=int(BASE_W * 0.08 * s), gap_y=self.vgap(ui, s, 2.2))
@@ -1452,6 +1482,9 @@ class Renderer:
         font = self.fnt(0.022)
         hint = "Space: next highlight      S: save this one      Esc: stop" if state.mode == "reel" else \
                "Space: skip      S: save this moment      Esc: back to the match"
+        if ANDROID:                     # a phone has the buttons, and Back
+            hint = "Save keeps this one      Skip or Back stops the highlights" if state.mode == "reel" else \
+                   "Save keeps this moment      Skip or Back returns to the match"
         plate = pygame.Rect(0, 0, font.size(hint)[0] + 50, 44)
         plate.midbottom = (BASE_W // 2, BASE_H - 20)
         screen.blit(self.glass(plate.w, plate.h), plate)
@@ -1635,9 +1668,10 @@ class Renderer:
             def flag(name, attr):
                 return self.toggle(sm, f"toggle_{attr}", name, lambda: getattr(i, attr))
 
+            last = flag("Vibration", "vibration") if ANDROID else flag("Hide Mouse", "hide_cursor")
             toggles = Grid([[flag("Tooltips", "tooltips"), flag("AI Banter", "ai_banter")],
                             [flag("Screen Shake", "screen_shake"), flag("Ball Trail", "ball_trail")],
-                            [flag("Auto-Pause", "auto_pause"), flag("Hide Mouse", "hide_cursor")]],
+                            [flag("Auto-Pause", "auto_pause"), last]],
                            gap_x=int(BASE_W * 0.012 * s), gap_y=int(ui.gap * 0.8 * s), uniform=True)
 
             notes = {"hud": ("HUD", "What the match shows besides the scores.",
@@ -1667,6 +1701,9 @@ class Renderer:
 
             left = self.section(ui, s, "Interface", toggles, cycles)
 
+            if ANDROID:
+                return Grid([[left, self.touch_section(ui, s, state)]], gap_x=int(BASE_W * 0.06 * s))
+
             samples = ["Press a key", "Right Shift", "Backspace"]
             def bind(field):
                 return KeyButton(f"key_{field}", lambda: key_name(getattr(i, field)), sm,
@@ -1683,6 +1720,29 @@ class Renderer:
             return Grid([[left, keys]], gap_x=int(BASE_W * 0.06 * s))
 
         ui.screen_menu(state, screen, build, title="界面 Interface", mark="界", reset="Reset to Default")
+
+    def touch_section(self, ui, s, state):
+        """On a phone, the Interface screen's Touch section, in place of the keys."""
+        i = self.app.settings.interface
+        f, sm, ty = ui.fnt(0.032, s), ui.fnt(0.028, s), ui.fnt(0.02, s)
+        steer, feel = i.touch_steer_options, i.touch_sensitivity_options
+        steer_tip = lambda: options_tip("Steering", "How a finger moves your paddle.",
+                                        [("Drag", "it moves as your finger moves, from wherever you touch"),
+                                         ("Follow", "it heads for the point under your finger")],
+                                        i.touch_steer)
+        feel_tip = lambda: options_tip("Sensitivity", "How far Drag moves the paddle for each move of your finger.",
+                                       [(name, "") for name in feel], i.touch_sensitivity,
+                                       "Follow always goes to your finger")
+        rows = Grid([[Text("Steering", sm, theme.GOLD, align="right"),
+                      Cycle("cycle_touch_steer", lambda: steer[i.touch_steer], f, steer, tip=steer_tip)],
+                     [Text("Sensitivity", sm, theme.GOLD, align="right"),
+                      Cycle("cycle_touch_sensitivity", lambda: feel[i.touch_sensitivity], f, feel, tip=feel_tip)]],
+                    gap_x=int(BASE_W * 0.012 * s), gap_y=int(ui.gap * 0.8 * s))
+        notes = Stack([Text("Against the AI or online, the whole screen steers your paddle.", ty, theme.PARCHMENT),
+                       Text("Two players on one phone: each has their own half.", ty, theme.PARCHMENT),
+                       Text("Back, or the button at the bottom, pauses a match.", ty, theme.PARCHMENT)],
+                      gap=int(ui.gap * 0.4 * s))
+        return self.section(ui, s, "Touch", rows, notes)
 
     # ── Game feel (purely visual) ──────────────────────────────────────────────
 
@@ -2436,7 +2496,7 @@ class Renderer:
             rect.center = (int(cx), int(BASE_H * 0.74))
             screen.blit(self.art.inset(rect.w, rect.h), rect)
             self.text(screen, text, font, theme.GOLD_BRIGHT, center=rect.center)
-        if game.settings.powerups and game.p1.score + game.p2.score == 0:
+        if game.settings.powerups and game.p1.score + game.p2.score == 0 and not ANDROID:   # (no Tab on a phone)
             font = self.fnt(0.024)
             text = "Hold Tab to see every power-up in play"
             plate = pygame.Rect(0, 0, font.size(text)[0] + 50, 50)

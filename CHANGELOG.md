@@ -18,6 +18,7 @@ Smoother online play.
 
 ### Added
 - Tests for these online fixes, in the tests folder.
+- Android: 1.5 also plays on phones and tablets (Toki Hub for Android installs it). Slide a finger to steer your paddle, two players each get half the screen, menus work by touch, and Back pauses. It plays online with 1.5 on a PC.
 
 ## 1.4 — 2026-11-10
 

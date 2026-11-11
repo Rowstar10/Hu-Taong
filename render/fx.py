@@ -204,7 +204,7 @@ class Ambience:
             self.level = level
             self.set_scene(scene)
 
-        mouse = self.app.window_to_base(pygame.mouse.get_pos())
+        mouse = self.app.pointer()
         for fly in self.flies + self.front_flies:
             fly.update(dt, mouse)
 

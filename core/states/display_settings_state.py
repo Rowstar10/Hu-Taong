@@ -34,7 +34,7 @@ class DisplaySettingsState(State):
         self.app.renderer.draw_display_settings_menu(self, screen)
         self.bg_thumb.rect = self.ui_hitboxes["background_thumb"]
         
-        mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
+        mouse_pos = self.app.pointer()
 
         self.bg_name = settings.backgrounds[settings.background]
         self.bg_thumb.image = self.app.backgrounds.thumb(self.bg_name)

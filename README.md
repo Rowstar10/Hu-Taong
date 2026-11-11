@@ -24,6 +24,15 @@ pyinstaller main.spec
 
 The .exe appears in `dist`.
 
+## Android
+
+Hu Taong also plays on Android phones and tablets, with touch controls: Toki Hub for Android
+installs it, or get the APK from a `v1.5-android` style release. It plays online with the PC
+version of the same number.
+
+The APK is built by GitHub (`.github/workflows/android.yml`), with `android/build.sh`
+(python-for-android). The phone's controls live in `core/touch.py`.
+
 ## Tests
 
 ```
