@@ -428,6 +428,8 @@ class App:
             self.net.update(self.dt)
             self.online_requests()
         self.state_manager.update(self.dt)
+        if self.net:
+            self.net.send_due()               # online: this frame's news goes out now, not next frame
 
         # ---------- Draw Background (it covers the whole frame, and has the dim baked in) ----------
         self.draw_background()

@@ -1,8 +1,8 @@
-# Hu Taong 1.4
+# Hu Taong 1.5
 
-Pong, the Wangsheng Funeral Parlor way. Version 1.4, 10 November 2026.
+Pong, the Wangsheng Funeral Parlor way. Version 1.5, 11 November 2026.
 
-Fixes for hits off a paddle's ends, and for a friend leaving an online match.
+Smoother online play.
 
 ## Play it
 

@@ -19,13 +19,14 @@ network, so whichever way works, wins.  An address typed as 1.2.3.4:5678 is trie
 """
 import ipaddress, json, os, random, re, socket, struct, threading, time
 import urllib.request
+from collections import deque
 from array import array
 from xml.etree import ElementTree
 
 from core import rooms
 
 PORT = 47620
-PROTOCOL = 7                  # raised whenever the messages change, so old and new builds turn each other away clearly
+PROTOCOL = 8                  # raised whenever the messages change, so old and new builds turn each other away clearly
 MAGIC = b"HT"
 TIMEOUT = 6.0                 # seconds of silence before the other side is taken as gone
 SEND_RATE = 60                # packets a second each way
@@ -352,7 +353,8 @@ class HostSession:
         self.lan = lan_address()
         self.guest = None            # the guest's address once it has said hello
         self.guest_keys = 0
-        self.guest_seq = 0           # the last input it sent that the host has used
+        self.guest_seq = 0           # the last input it sent that the host has read
+        self.applied_seq = 0         # the last input whose keys the match has moved the friend's paddle with
         self.guest_requests = {}     # request counters seen from the guest: pause, resume, rematch
         self.guest_menu = 0          # what the guest has open: 0 nothing, 1 the pause screen, 2 deeper (settings)
         self.claims = []             # saves the guest saw on its own screen, waiting to be checked
@@ -468,10 +470,7 @@ class HostSession:
                     self.drop_guest("Your friend left the game.", "Your friend left the match.")
         if self.guest is not None and now - self.link.heard > TIMEOUT:
             self.drop_guest("Lost touch with your friend.", "Lost touch with your friend.")
-        if self.game is not None and self.guest is not None and now - self.last_send >= 1 / SEND_RATE:
-            self.last_send = now
-            self.send_snapshot()
-        elif self.game is None and self.guest is not None and now - self.last_send >= 0.5:
+        if self.game is None and self.guest is not None and now - self.last_send >= 0.5:
             # waiting in the lobby: keep in touch, and keep the friend up to date with the rules
             self.last_send = now
             self.link.send(WELCOME, self.welcome())
@@ -498,6 +497,19 @@ class HostSession:
             self.punching = {a: until for a, until in self.punching.items() if until > now and not self.connected()}
             for address in self.punching:
                 self.link.send(PUNCH, b"", address)
+
+    def send_due(self):
+        """Called by App.loop after this frame's update: the snapshot goes out with what this frame
+        worked out (sent from update(), at the start of the frame, it was a frame old)."""
+        if self.closed:
+            return
+        now = time.perf_counter()
+        if self.game is not None and self.guest is not None and now - self.last_send >= 1 / SEND_RATE:
+            # a steady SEND_RATE: the schedule steps on by one period rather than restarting from
+            # now (which lost the part of a frame past the period, every time), and never runs
+            # more than one period behind, so a hitch doesn't bank up a burst
+            self.last_send = max(self.last_send + 1 / SEND_RATE, now - 1 / SEND_RATE)
+            self.send_snapshot()
 
     # ---------------- Public listing ----------------
 
@@ -547,8 +559,11 @@ class HostSession:
             self.guest_seq, self.guest_keys = seq, keys
         self.guest_clock = clock
         extra = unpack_json(payload[13:]) or {}
-        echo = extra.get("echo")
-        if isinstance(echo, (int, float)):
+        # the round trip, by this game's own clock: the time it put in a snapshot, as the guest
+        # sends it back.  (The guest's "echo" is the guest's own clock, which on another computer
+        # has nothing to do with this one's: subtracting it read 0, or hours.)
+        echo = extra.get("hecho")
+        if isinstance(echo, (int, float)) and echo > 0:
             self.ping = max(0.0, time.perf_counter() - echo)
         menu = extra.get("menu")
         if isinstance(menu, int):
@@ -587,7 +602,10 @@ class HostSession:
         # win screen, which the guest has its own of
         paused = name not in ("game", "win") and self.over is None
         host_menu = 0 if not paused else 1 if name == "pause" else 2
-        info = {"seq": self.guest_seq, "echo": self.guest_clock, "paused": paused, "host_menu": host_menu,
+        # "seq": the input the paddle in this picture has been moved with (one read this frame
+        # hasn't moved it yet), so the guest compares like with like
+        info = {"seq": self.applied_seq, "echo": self.guest_clock, "hclock": time.perf_counter(),
+                "paused": paused, "host_menu": host_menu,
                 "events": [[first + i, *e[1:]] for i, e in enumerate(events)],
                 "speed": [game.p1.speed, game.p2.speed],
                 "guest": 1 if getattr(game.p1, "remote", False) else 2,
@@ -619,6 +637,7 @@ class HostSession:
     def keys_for(self, paddle):
         """The guest's held keys as (dvx, dvy) for its paddle."""
         k = self.guest_keys
+        self.applied_seq = self.guest_seq
         return (((k & RIGHT) > 0) - ((k & LEFT) > 0), ((k & DOWN) > 0) - ((k & UP) > 0))
 
     def close(self):
@@ -640,7 +659,8 @@ class HostSession:
 class GuestSession:
     """Joins a friend's game: sends keys, keeps the latest pictures of the court."""
     role = "guest"
-    BUFFER = 0.05                # seconds the picture is held back, so it can be smoothed
+    BUFFER = 0.05                # seconds the picture is held back, so it can be smoothed (to start with:
+    BUFFER_MIN, BUFFER_MAX = 0.03, 0.10      # it then follows how unevenly the pictures arrive)
 
     def __init__(self, app, address = None, password = "", room = None):
         self.app = app
@@ -678,6 +698,10 @@ class GuestSession:
         self.frames = []             # every row, for the highlights afterwards
         self.closed = False
         self.notice = None
+        self.BUFFER = GuestSession.BUFFER
+        self.lateness = deque(maxlen = 180)  # for the last pictures: when each got here, less the host time it shows
+        self.gaps = deque(maxlen = 60)       # host time between pictures
+        self.tuned = 0
 
     def update(self, dt):
         if self.closed:
@@ -744,9 +768,16 @@ class GuestSession:
             if now - self.link.heard > TIMEOUT:
                 self.status = "lost"
                 self.reason = "Lost touch with the host."
-            elif now - self.last_send >= 1 / SEND_RATE:
-                self.last_send = now
-                self.send_input()
+
+    def send_due(self):
+        """Called by App.loop after this frame's update: the keys go out as this frame read them
+        (sent from update(), at the start of the frame, they were a frame old)."""
+        if self.closed or self.status not in ("waiting", "playing"):
+            return
+        now = time.perf_counter()
+        if now - self.last_send >= 1 / SEND_RATE:
+            self.last_send = max(self.last_send + 1 / SEND_RATE, now - 1 / SEND_RATE)     # steady, as the host's
+            self.send_input()
 
     def send_input(self):
         self.seq += 1
@@ -756,6 +787,8 @@ class GuestSession:
             extra["claims"] = self.claims[-4:]
         if self.snaps:
             extra["echo"] = self.snaps[-1][2].get("echo")
+            if "hclock" in self.snaps[-1][2]:
+                extra["hecho"] = self.snaps[-1][2]["hclock"]      # the host's own time, back to it
         payload = struct.pack("<IBd", self.seq, self.keys, time.perf_counter()) + pack_json(extra)
         self.link.send(INPUT, payload)
 
@@ -779,12 +812,33 @@ class GuestSession:
             if isinstance(pair, list) and len(pair) == 2 and isinstance(pair[0], int):
                 self.acks[pair[0]] = pair[1]
         self.claims = [c for c in self.claims if c["id"] not in self.acks]
+        prev = self.snaps[-1][0] if self.snaps else None
         self.snaps.append((clock, row, info, time.perf_counter()))
         del self.snaps[:-40]
+        if prev is not None and 0 < clock - prev < 0.25:          # (not while the host's match stands paused)
+            self.gaps.append(clock - prev)
+            self.tune_buffer(time.perf_counter() - clock)
         if not self.frames or self.frames[-1] != row:
             self.frames.append(row)
             if len(self.frames) > 60 * 60 * 30:
                 del self.frames[:60 * 60]
+
+    def tune_buffer(self, late):
+        """Hold the picture back by as much as the pictures' arrival varies (the trip, its jitter,
+        either game's frames), so the picture rarely catches up with the newest one and stops:
+        little on a steady link, more on a bad one.  It grows at once and eases back down."""
+        if self.lateness and abs(late - sorted(self.lateness)[len(self.lateness) // 2]) > 0.3:
+            self.lateness.clear()                  # the host paused (its clock stood still), or a new match
+        self.lateness.append(late)
+        self.tuned += 1
+        if len(self.lateness) < 30 or self.tuned % 6:
+            return
+        d = sorted(self.lateness)
+        mean = sum(d) / len(d)
+        high = d[int(0.90 * (len(d) - 1))]       # (the rarer, longer holdups the guest's clock runs through)
+        gap = sorted(self.gaps)[len(self.gaps) // 2]
+        want = max(self.BUFFER_MIN, min(self.BUFFER_MAX, high - mean + gap / 2 + 0.005))
+        self.BUFFER = want if want > self.BUFFER else self.BUFFER + (want - self.BUFFER) * 0.1
 
     def request(self, name):
         self.requests[name] += 1

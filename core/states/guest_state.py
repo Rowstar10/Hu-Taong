@@ -25,6 +25,7 @@ from render import theme
 WARP_IN = 0.4            # seconds after a serve over which the sliding clock eases in
 GLIDE = 0.07             # how quickly a corrected ball glides to where it should be
 SNAP = 160               # a correction bigger than this is a jump (a Blink, a serve), not a glide
+RUN_ON = 0.1             # seconds the picture clock may run on past the newest picture when they stop coming
 BALL_EVENTS = ("hit", "wall", "stone")     # heard when the ball is drawn there, not by the pictures' clock
 
 
@@ -149,7 +150,11 @@ class GuestMatchState(State):
             self.clock = target
         self.clock += dt
         self.clock += (target - self.clock) * min(1.0, 4 * dt)
-        self.clock = min(self.clock, newest)
+        # When pictures are late (a lost one, a spike), the clock runs on a moment past the newest
+        # instead of stopping on it: the host's side holds its last picture, but the ball's own
+        # clock (which leads this one) keeps it flying on instead of freezing in mid-air.  Once
+        # pictures come again the clock is ahead of its target and eases back, running a touch slow.
+        self.clock = min(self.clock, newest + RUN_ON)
 
         side = info.get("guest", 2)                 # Chaos Switch can hand you the other paddle
         self.view.p1.controls_label = "You" if side == 1 else "Friend"
@@ -230,6 +235,14 @@ class GuestMatchState(State):
             self.pred = [auth[0], auth[1], 0.0, 0.0]
             self.history.clear()
             return
+        # Where the paddle was when the last input went out: those are the keys that input
+        # carries, so that is where the host's game will have it once it has used them.  (Noted
+        # after this frame's move, it was a frame ahead of the host, so every correction pulled
+        # the paddle back while it moved, and on again after it stopped.)
+        if net.seq != self.last_seq:
+            self.last_seq = net.seq
+            self.history.append((net.seq, self.pred[0], self.pred[1]))
+            del self.history[:-120]
         # A newer word from the host: compare it with where we thought we'd be by then
         if net.last_snap != self.last_snap:
             self.last_snap = net.last_snap
@@ -265,10 +278,6 @@ class GuestMatchState(State):
                 p[0] = min(p[0], BASE_W / 2 - w)
             else:
                 p[0] = max(p[0], BASE_W / 2)
-        if net.seq != self.last_seq:
-            self.last_seq = net.seq
-            self.history.append((net.seq, p[0], p[1]))
-            del self.history[:-120]
 
     # ---------------- Drawing ----------------
 

@@ -2,6 +2,23 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 1.5 — 2026-11-11
+
+Smoother online play.
+
+### Fixed
+- Online, on the screen of the player who joined, the ball no longer stops in mid-air when an update from the host comes late. It flies on for up to a tenth of a second while the next one arrives.
+- Online, both games now send 60 updates a second, as they were meant to, and each one carries the frame just worked out. Before, it was about 40 to 50 a second, each a frame old.
+- Online, the player who joined sees the court held back only as much as their connection needs: less on a steady link, more on an uneven one (0.03 to 0.1 seconds; it was always 0.05).
+- Online, the joining player's own paddle is no longer nudged back while it moves and on again when it stops.
+- The host's lobby shows the real ping to your friend. Between two computers it showed 0 ms or a huge number.
+
+### Changed
+- Online play needs both players on 1.5: it won't connect to 1.4 or earlier, and their rooms show "Other version".
+
+### Added
+- Tests for these online fixes, in the tests folder.
+
 ## 1.4 — 2026-11-10
 
 Fixes for hits off a paddle's ends, and for a friend leaving an online match.
