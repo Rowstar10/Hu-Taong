@@ -1,6 +1,9 @@
 import pygame
 
 from core.states.base_state import State
+from core.platform import ANDROID
+
+QUIT = "Quit Hu Taong?" if ANDROID else "Quit to desktop?"
 
 class MainMenuState(State):
     NAME = "main_menu"
@@ -25,7 +28,7 @@ class MainMenuState(State):
             self.push_state("match_setup")
             
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.push_state("confirm_choice", action = lambda: self.app.quit(), header = "Quit to desktop?", mute = True)
+            self.push_state("confirm_choice", action = lambda: self.app.quit(), header = QUIT, mute = True)
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = self.app.window_to_base(event.pos)
@@ -37,4 +40,4 @@ class MainMenuState(State):
             if key == "settings":
                 self.push_state("settings")
             if key == "prompt_quit":
-                self.push_state("confirm_choice", action = lambda: self.app.quit(), header = "Quit to desktop?", mute = True)
+                self.push_state("confirm_choice", action = lambda: self.app.quit(), header = QUIT, mute = True)

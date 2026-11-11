@@ -223,5 +223,6 @@ class Hud:
         for x in (rect.centerx - 15, rect.centerx + 5):
             pygame.draw.rect(screen, bar, (x, rect.y + 18 + offset, 10, 34), border_radius=3)
 
-        state.ui_hitboxes["pause"] = rect
+        # a fingertip is bigger than a mouse pointer, so on a phone it has a little room around it
+        state.ui_hitboxes["pause"] = rect.inflate(40, 34) if self.app.touch else rect
         renderer.tips.offer(rect, "Pause\nPause the match.\n~ Esc")

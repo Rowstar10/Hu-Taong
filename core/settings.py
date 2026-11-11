@@ -4,6 +4,7 @@ from pathlib import Path
 import pygame
 
 from config import IMAGE_DIR
+from core.platform import ANDROID
 from game import courts
 from game.powerups import KINDS as POWERUP_KINDS
 
@@ -202,7 +203,7 @@ class DisplaySettings:
         self.reset()
 
     def reset(self):
-        self.max_fps = 2
+        self.max_fps = 1 if ANDROID else 2          # a phone: 60, which its battery thanks it for
         self.show_fps = True
         self.dim = 0
         self.resolution = (1920, 1080)
@@ -328,6 +329,9 @@ class InterfaceSettings:
         self.instant_replay_options = ["Off", "Great Points", "After the Match", "Both"]
         self.effects_options = ["Full", "Reduced", "Off"]
         self.countdown_options = [3, 2, 1]
+        # On a phone (core/touch.py): how a finger steers, and how far Drag moves the paddle
+        self.touch_steer_options = ["Drag", "Follow"]
+        self.touch_sensitivity_options = ["Low", "Normal", "High", "Very High"]
 
         self.reset()
 
@@ -338,6 +342,9 @@ class InterfaceSettings:
         self.ball_trail = True
         self.auto_pause = True       # pause a match when the window loses focus
         self.hide_cursor = True      # hide the mouse during a match until it moves
+        self.touch_steer = 0         # (a phone) Drag
+        self.touch_sensitivity = 1   # (a phone) Normal
+        self.vibration = True        # (a phone) a buzz when your paddle hits the ball, and at each point
 
         self.hud = 0
         self.instant_replay = 2      # the highlights after the match

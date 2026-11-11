@@ -60,6 +60,10 @@ class Paddle(GameObject):
                 other = self.game.app.settings.interface.keys("p2" if self.up == self.game.app.settings.interface.p1_up else "p1")
                 dvx = dvx or self.speed * ((other["right"] in keys) - (other["left"] in keys))
                 dvy = dvy or self.speed * ((other["down"] in keys) - (other["up"] in keys))
+            touch = getattr(self.game.app, "touch", None)     # on a phone, a finger on this paddle (core/touch.py)
+            steer = touch.steer_paddle(self) if touch else None
+            if steer is not None:
+                dvx, dvy = steer
 
         powerups = getattr(self.game, "powerups", None)
 
@@ -129,6 +133,9 @@ class Paddle(GameObject):
     def on_contact(self, other, data):
         if other.body_type !=  DYNAMIC:
             return
+        touch = getattr(self.game.app, "touch", None)
+        if touch:
+            touch.felt_hit(self)                    # a phone buzzes as your paddle hits the ball
 
         nx, ny = data["normal"]
         # A blocked ball loses pace, but never drops below its serve speed, so a rally can't stall

@@ -77,6 +77,8 @@ class GameState(State):
             if total > self.last_total_score:
                 self.app.stats.points += total - self.last_total_score
                 self.app.renderer.shake(14, 0.3)
+                if self.app.touch:
+                    self.app.touch.buzz(40, 170)
             self.last_total_score = total
             
     def draw(self, screen):

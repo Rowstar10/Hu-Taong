@@ -67,7 +67,7 @@ class BackgroundSelectionState(State):
     def update(self, dt):
         super().update(dt)
         display = self.app.settings.display
-        mouse_pos = self.app.window_to_base(pygame.mouse.get_pos())
+        mouse_pos = self.app.pointer()
         in_view = self.view.collidepoint(mouse_pos)
 
         self.scroll += (self.scroll_target - self.scroll) * min(1, 16 * dt)

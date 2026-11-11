@@ -1,6 +1,7 @@
 import json, os
 from pathlib import Path
 
+from core.platform import ANDROID, data_dir
 from game.powerups import KINDS as POWERUP_KINDS
 
 # Which attributes are written to disk.  Anything not listed here (resolution,
@@ -14,18 +15,20 @@ AUDIO = ["play_mode", "even_volume", "fade", "menu_sounds", "ambience"]
 INTERFACE = ["tooltips", "ai_banter", "screen_shake", "ball_trail", "auto_pause", "hide_cursor",
              "hud", "effects", "countdown", "instant_replay",
              "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right"]
+if ANDROID:
+    INTERFACE += ["touch_steer", "touch_sensitivity", "vibration"]
 INDEX_FIELDS = {"winning_score_index", "ai_difficulty", "max_fps", "background",
                 "ai_style", "chaos_mode", "chaos_switch", "hud", "effects", "countdown", "fade", "ambience",
                 "instant_replay",
                 "rotate_every", "parallax", "powerup_rate", "play_mode", "court", "court_dim",
-                "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right"}  # whole numbers only
+                "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right",
+                "touch_steer", "touch_sensitivity"}  # whole numbers only
 SOUND = ["master_volume", "sfx_volume", "music_volume", "paddle_hit_sound", "score_sound"]
 ONLINE = ["own_server", "server_address", "server_user", "server_password"]
 
 
 def save_path():
-    base = os.environ.get("APPDATA") or (Path.home() / ".local" / "share")
-    return Path(base) / "HuTaong" / "save.json"
+    return data_dir() / "save.json"
 
 
 def _limits(app):
@@ -42,6 +45,8 @@ def _limits(app):
                   instant_replay = (0, len(i.instant_replay_options) - 1),
                   effects = (0, len(i.effects_options) - 1),
                   countdown = (0, len(i.countdown_options) - 1),
+                  touch_steer = (0, len(i.touch_steer_options) - 1),
+                  touch_sensitivity = (0, len(i.touch_sensitivity_options) - 1),
                   fade = (0, len(a.fade_options) - 1),
                   play_mode = (0, 2),
                   ambience = (0, len(a.ambience_options) - 1),

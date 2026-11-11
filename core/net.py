@@ -684,6 +684,8 @@ class GuestSession:
         self.last_send = 0.0
         self.seq = 0
         self.keys = 0
+        self.axis = None             # on a phone: a finger's share of full speed, (x, y) from -1 to 1
+        self.owed = [0.0, 0.0]
         self.history = []            # (seq, x, y) the guest's paddle was predicted at
         self.requests = {"pause": 0, "resume": 0, "rematch": 0, "restart": 0}
         self.menu = 0                # what's open over the match here: 0 nothing, 1 pause, 2 deeper
@@ -789,8 +791,24 @@ class GuestSession:
             extra["echo"] = self.snaps[-1][2].get("echo")
             if "hclock" in self.snaps[-1][2]:
                 extra["hecho"] = self.snaps[-1][2]["hclock"]      # the host's own time, back to it
-        payload = struct.pack("<IBd", self.seq, self.keys, time.perf_counter()) + pack_json(extra)
+        payload = struct.pack("<IBd", self.seq, self.sent_keys(), time.perf_counter()) + pack_json(extra)
         self.link.send(INPUT, payload)
+
+    def sent_keys(self):
+        """The keys this input carries.  A phone's finger asks for part of full speed, and every
+        game reads only keys held or not: so the keys go out held for that share of the inputs,
+        carrying what's left over to the next, and the host's paddle averages back to the finger's
+        speed (any host, a PC's too)."""
+        if self.axis is None:
+            self.owed = [0.0, 0.0]
+            return self.keys
+        keys = 0
+        for i, (minus, plus) in enumerate(((LEFT, RIGHT), (UP, DOWN))):
+            owed = self.owed[i] + max(-1.0, min(1.0, self.axis[i]))
+            step = 1 if owed >= 0.5 else -1 if owed <= -0.5 else 0
+            self.owed[i] = owed - step
+            keys |= plus if step > 0 else minus if step < 0 else 0
+        return keys
 
     def read_snapshot(self, payload):
         try:

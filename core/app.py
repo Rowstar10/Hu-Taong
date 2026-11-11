@@ -1,13 +1,15 @@
 import os, pygame, random, time
 
 from config import BASE_W, BASE_H, RESOLUTIONS, IMAGE_DIR, DEFAULT_DISPLAY_MODE, BG_OVERSCAN
-from core import files, save_data
+from core import files, platform, save_data
+from core.platform import ANDROID
 from core.backgrounds import Backgrounds
 from core.settings import Settings
 from core.stats import Stats
 from core.sound_manager import SoundManager
 from core.state_manager import StateManager
 from core.states.base_state import State
+from core.touch import OFF, TouchControls
 from render import theme
 from render.art import Art
 from render.font_manager import FontManager
@@ -20,6 +22,8 @@ from render.ui.layout import UILayout
 class App:
     def __init__(self):
         # ---------- Initialise Pygame ----------
+        platform.prepare()                # (on a phone: fingers, the Back button, scaling)
+        self.touch = TouchControls(self) if ANDROID else None
         pygame.init()
         pygame.mixer.init()
         os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
@@ -51,6 +55,11 @@ class App:
         self.native_res = info.current_w, info.current_h
         self.native_w, self.native_h = self.native_res
         
+        if ANDROID:
+            # A phone has one screen size: the game draws at its own and the GPU scales it to fit
+            self.native_res = self.native_w, self.native_h = BASE_W, BASE_H
+            self.resolutions = []
+
         if self.native_res not in self.resolutions:
             self.resolutions.append(self.native_res)
             
@@ -67,6 +76,8 @@ class App:
         # ---------- Display & Surfaces ----------
         self.display_modes = ["windowed", "borderless", "fullscreen"]
         self.display_mode_index = DEFAULT_DISPLAY_MODE
+        if ANDROID:
+            self.display_modes, self.display_mode_index = ["fullscreen"], 0
         self.display_mode = self.display_modes[self.display_mode_index]
         self.canvas = None
         self.apply_display_mode()
@@ -120,6 +131,11 @@ class App:
             return
 
     def apply_display_mode(self):
+        if ANDROID:
+            self.display = self.phone_display()
+            self.update_scale()
+            return
+
         if self.display_mode == "windowed":
             flags = pygame.RESIZABLE
 
@@ -133,6 +149,18 @@ class App:
 
         self.display = pygame.display.set_mode(self.current_resolution, flags)
         self.update_scale()
+
+    def phone_display(self):
+        """The whole screen, drawn at 1920 x 1080 and scaled to the phone's own screen by the GPU
+        (in step with its refresh, so nothing tears)."""
+        flags = pygame.FULLSCREEN | getattr(pygame, "SCALED", 0)
+        for kwargs in ({"vsync": 1}, {}):
+            try:
+                return pygame.display.set_mode(self.base_res if hasattr(self, "base_res") else (BASE_W, BASE_H),
+                                               flags, **kwargs)
+            except (pygame.error, TypeError):
+                continue
+        return pygame.display.set_mode((BASE_W, BASE_H))
 
     def update_scale(self):
         w, h = self.display.get_size()
@@ -148,6 +176,18 @@ class App:
                 self.canvas = pygame.Surface(self.base_res).convert()
             self.virtual = self.canvas
 
+    def pointer(self):
+        """Where the mouse is, in the game's own 1920 x 1080.  On a phone, the finger working
+        the menus, or nowhere when no finger is down."""
+        if self.touch:
+            return self.touch.pointer
+        return self.window_to_base(pygame.mouse.get_pos())
+
+    def pointer_down(self):
+        if self.touch:
+            return self.touch.menu_finger is not None and self.touch.pointer != OFF
+        return pygame.mouse.get_pressed()[0]
+
     def window_to_base(self, pos):
         mx = pos[0] * self.sx
         my = pos[1] * self.sy
@@ -160,6 +200,8 @@ class App:
         self.settings.display.reset()
 
         # Only rebuild the window if it actually changes, to avoid a flicker
+        if ANDROID:
+            return
         if (self.display_mode_index != DEFAULT_DISPLAY_MODE
                 or self.current_resolution != self.native_res):
             self.display_mode_index = DEFAULT_DISPLAY_MODE
@@ -282,6 +324,8 @@ class App:
 
     def update_cursor(self, moved):
         # Out of the way during play; back as soon as the mouse moves
+        if self.touch:
+            return                        # a phone has no pointer to show
         if moved or not self.in_match():
             self.cursor_idle = 0.0
         else:
@@ -319,9 +363,13 @@ class App:
         if self.fx.scene != "game":
             display = self.settings.display
             strength = display.parallax_strength[display.parallax]
-            mx, my = self.window_to_base(pygame.mouse.get_pos())
-            target = ((1 - 2 * mx / BASE_W) * BG_OVERSCAN[0] * strength,
-                      (1 - 2 * my / BASE_H) * BG_OVERSCAN[1] * strength)
+            if self.touch:
+                tx, ty = self.touch.tilt(self.dt)    # a phone tilts the picture instead
+                target = (-tx * BG_OVERSCAN[0] * strength, -ty * BG_OVERSCAN[1] * strength)
+            else:
+                mx, my = self.window_to_base(pygame.mouse.get_pos())
+                target = ((1 - 2 * mx / BASE_W) * BG_OVERSCAN[0] * strength,
+                          (1 - 2 * my / BASE_H) * BG_OVERSCAN[1] * strength)
 
         ease = min(1, 3 * self.dt)
         self.bg_offset[0] += (target[0] - self.bg_offset[0]) * ease
@@ -378,7 +426,10 @@ class App:
 
         # ---------- Handle Events ----------
         moved = False
-        for event in pygame.event.get():
+        events = pygame.event.get()
+        if self.touch:                    # fingers become steering, or the menus' mouse
+            events = self.touch.flush() + [e for raw in events for e in self.touch.translate(raw)]
+        for event in events:
             
             # ---------- Essential Events ----------
             if event.type == pygame.QUIT:
@@ -400,7 +451,11 @@ class App:
                 moved = True
 
             # ---------- Auto-Pause ----------
+            if self.touch and event.type == pygame.APP_WILLENTERBACKGROUND:
+                save_data.save(self)          # a phone may close a game in the background unasked
             if event.type == pygame.WINDOWFOCUSLOST:
+                if self.touch:
+                    self.touch.reset()
                 self.keys_down.clear()
                 # online, clicking away (to chat, say) mustn't stop the match for both players
                 if self.settings.interface.auto_pause and self.in_match() and not self.net:
@@ -428,6 +483,8 @@ class App:
             self.net.update(self.dt)
             self.online_requests()
         self.state_manager.update(self.dt)
+        if self.touch:
+            self.touch.update(self.dt)
         if self.net:
             self.net.send_due()               # online: this frame's news goes out now, not next frame
 
@@ -449,6 +506,9 @@ class App:
         if not quiet_menus:
             self.fx.draw_front(self.virtual)
         self.fx.draw_overlays(self.virtual)
+        if self.touch:
+            self.touch.draw(self.virtual)
+            self.touch.draw_typing(self.virtual, self.renderer)
 
         # ---------- Now-playing toast, then tooltips over everything ----------
         self.renderer.draw_toast(self.virtual, self.dt)

@@ -140,6 +140,9 @@ class GuestMatchState(State):
             self.set_state("main_menu", mute = True)
             return
         net.keys = held_keys(self.app) if self.app.state_manager.current() is self else 0
+        touch = self.app.touch        # on a phone, a finger on your paddle (core/touch.py)
+        net.axis = (touch.guest_axis(self, getattr(self, "own_speed", 1500))
+                    if touch and self.app.state_manager.current() is self else None)
         if not net.snaps:
             return
         newest, row, info, _ = net.snaps[-1]
@@ -231,6 +234,8 @@ class GuestMatchState(State):
         state = int(a[19])
         frozen = a[20] >= 0 or a[22] != 0 or info.get("paused")    # countdown, a goal, or paused
         effects = [k for k, _, _ in self.view.powerups.effect_list(self.view.p1 if side == 1 else self.view.p2)]
+        self.own_box = (auth[0], auth[1], w, h)
+        self.own_speed = info.get("speed", [1500, 1500])[side - 1]
         if frozen or "gravity" in effects or self.pred is None:
             self.pred = [auth[0], auth[1], 0.0, 0.0]
             self.history.clear()
@@ -263,6 +268,8 @@ class GuestMatchState(State):
         keys = net.keys
         dx = ((keys & netcode.RIGHT) > 0) - ((keys & netcode.LEFT) > 0)
         dy = ((keys & netcode.DOWN) > 0) - ((keys & netcode.UP) > 0)
+        if net.axis is not None:
+            dx, dy = net.axis                                # a finger: what the host's paddle averages to
         step = min(dt, 1 / 30) * pace
         p = self.pred
         drag = math.exp(-step)
@@ -273,6 +280,7 @@ class GuestMatchState(State):
         p[3] += (speed * dy - p[3]) * k
         p[0] = max(0.0, min(BASE_W - w, p[0] + p[2] * step))
         p[1] = max(0.0, min(BASE_H - h, p[1] + p[3] * step))
+        self.own_box = (p[0], p[1], w, h)
         if state & 1:                                        # the Middle Wall keeps it in its half
             if side == 1:
                 p[0] = min(p[0], BASE_W / 2 - w)

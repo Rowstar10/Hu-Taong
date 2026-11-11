@@ -6,9 +6,10 @@ class InterfaceSettingsState(State):
     NAME = "interface"
     is_menu = True
 
-    TOGGLES = ("tooltips", "ai_banter", "screen_shake", "ball_trail", "auto_pause", "hide_cursor")
+    TOGGLES = ("tooltips", "ai_banter", "screen_shake", "ball_trail", "auto_pause", "hide_cursor", "vibration")
     CYCLES = {"hud": "hud_options", "effects": "effects_options", "countdown": "countdown_options",
-              "instant_replay": "instant_replay_options"}
+              "instant_replay": "instant_replay_options",
+              "touch_steer": "touch_steer_options", "touch_sensitivity": "touch_sensitivity_options"}     # (a phone's)
 
     def __init__(self, app):
         super().__init__(app)
