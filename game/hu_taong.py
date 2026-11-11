@@ -95,6 +95,8 @@ class Hu_Taong(GameBase):
             you.controls_label, friend.controls_label = "You", "Friend"
             net.game = self
             net.over = None
+            net.guest_clear_tau = None
+            net.guest_tells_tau = False
 
         self.ball = Ball(self, diameter = settings.ball_diameter, x = (BASE_W - settings.ball_diameter) / 2, y = (BASE_H - settings.ball_diameter) / 2, speed = settings.ball_speed, color = "white")
 
@@ -187,7 +189,9 @@ class Hu_Taong(GameBase):
         Word of a save on your friend's screen takes a moment to get here.  So as the ball nears
         their paddle it is drawn that moment in the past (from the ball's recent path), easing back
         to the present as it comes back to you.  It reaches their paddle on this screen just as
-        word of their save arrives, and bounces off, instead of sailing through and jumping back."""
+        word of their save arrives, and bounces off, instead of sailing through and jumping back.
+        When word is later than usual, the ball waits at their paddle's face until it comes (or
+        the goal is given), rather than going in and coming back out through the paddle."""
         ball, g = self.ball, self.guest_paddle()
         if g is None or not self.history:
             return None
@@ -210,8 +214,10 @@ class Hu_Taong(GameBase):
         tau = now - self.claim_delay() * reach * self.warp
         if self.shown:
             tau = max(tau, self.shown[0])               # the ball never runs backwards
+            tau = min(tau, self.shown[0] + 1.5 * dt)    # nor races more than half as fast again to catch up
         tau = min(tau, now)
         h = self.history
+        vx = h[-1][3]
         if tau >= h[-1][0]:
             x, y = h[-1][1], h[-1][2]
         else:
@@ -224,8 +230,17 @@ class Hu_Taong(GameBase):
             if abs(b[1] - a[1]) > 150 or abs(b[2] - a[2]) > 150:
                 k = 0.0 if k < 0.5 else 1.0
             x, y = a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k
-        self.shown = (tau, x, y)
+            vx = a[3]
         r = ball.width / 2
+        # Word of your friend's save may still be on its way: rather than draw the ball on through
+        # their paddle (and jump it back when word comes), it waits at the paddle's face
+        face = their_face - way * (r + 0.5)
+        if self.shown is not None and way * (x - face) > 0:
+            if abs(self.shown[1] - face) < 0.01:
+                tau, x, y = self.shown                  # waiting there already: until word comes, or the goal
+            elif way * (self.shown[1] - face) < 0 and way * vx > 0 and g.y0 - r < y < g.y1 + r:
+                x = face
+        self.shown = (tau, x, y)
         return x - r, y - r
 
     def rewrite_flight(self, t, cx, cy, vx, vy):
@@ -309,6 +324,8 @@ class Hu_Taong(GameBase):
             self.claim_note = ("paddle", round(px - gx), round(py - gy))
             return -1                                    # nor could the paddle have been
         keep = (g.x0, g.y0, g.vx, g.vy)
+        # the ball as it is now, to put back if the save doesn't stand
+        ball_was = (ball.x0, ball.y0, ball.x1, ball.y1, ball.vx, ball.vy, ball.last_paddle, ball.rally_value)
         g.x0, g.y0, g.x1, g.y1 = px, py, px + g.width, py + g.height
         g.vx, g.vy = pvx, pvy
         r = ball.width / 2
@@ -328,16 +345,24 @@ class Hu_Taong(GameBase):
         # it hit if the ball now leaves the face it met (the same paddle may hit twice running,
         # say after the ball came back off a stone)
         hit = ball.last_paddle is g and (ball.vx * nx + ball.vy * ny) < 0
+        if ball.last_paddle is g and ny and not hit:
+            # off an end with no room by the wall, the ball is shot out along the wall
+            # (Paddle.on_contact, "pinched"): that's a hit too
+            forward = 1 if g.is_left else -1
+            hit = ball.vx * forward > 0
         try:
             cvx, cvy = float(claim["vx"]), float(claim["vy"])
         except (KeyError, TypeError, ValueError):
             cvx = cvy = None
         if hit and cvx is not None and not getattr(ball, "stuck", None):
-            # The friend's screen has already sent the ball off on its way: if that's close to how
-            # this game plays the hit, keep theirs, so the two screens agree exactly
+            # The friend's screen has already sent the ball off on its way: if that's how this game
+            # plays the hit (their screen works it out the same way, so it should be, give or take
+            # a dead-centre hit's touch of spin), keep theirs, so the two screens agree exactly.
+            # (Up to a third faster used to stand, so their returns could beat the physics.)
             mine, theirs = math.hypot(ball.vx, ball.vy), math.hypot(cvx, cvy)
             turn = abs(math.atan2(ball.vx * cvy - ball.vy * cvx, ball.vx * cvx + ball.vy * cvy))
-            if mine > 0 and 0.75 < theirs / mine < 1.33 and turn < math.radians(12):
+            low, high = (0.95, 1.05) if claim.get("rule") == 2 else (0.75, 1.33)     # (an earlier 1.5's own rule)
+            if mine > 0 and low < theirs / mine < high and turn < math.radians(12):
                 ball.vx, ball.vy = cvx, cvy
         g.x0, g.y0, g.vx, g.vy = keep[0], keep[1], keep[2], keep[3]
         g.x1, g.y1 = g.x0 + g.width, g.y0 + g.height
@@ -346,6 +371,8 @@ class Hu_Taong(GameBase):
         if not hit:
             self.claim_note = ("no contact", nx, ny, round(hvx), round(pvx), before[0] is g, before[1], ball.rally_value,
                                ball.last_paddle is g, round(ball.vx))
+            # put the ball back as it was (the check moved it to the claimed moment and knocked it)
+            (ball.x0, ball.y0, ball.x1, ball.y1, ball.vx, ball.vy, ball.last_paddle, ball.rally_value) = ball_was
             return -1
         self.pending_goal = None                         # it was saved after all
         if self.paused and self.countdown is None and not self.message_text:
@@ -370,7 +397,10 @@ class Hu_Taong(GameBase):
         for claim in net.take_claims():
             net.acks[claim["id"]] = self.apply_claim(claim)
         goal = self.pending_goal
-        if goal is not None and self.recorder.clock >= goal["until"]:
+        clear = getattr(net, "guest_clear_tau", None)
+        # the friend's screen has shown the ball reach the goal and sent no save: let it go now
+        heard = goal is not None and clear is not None and goal["clock"] <= clear <= self.recorder.clock + 0.2
+        if goal is not None and (heard or self.recorder.clock >= goal["until"]):
             self.pending_goal = None
             self.on_score(goal["obj"], goal["data"], held = True)
 
@@ -381,7 +411,11 @@ class Hu_Taong(GameBase):
             if self.into_guest_goal(data):
                 # In on this screen, but the friend may have just saved it on theirs: hold it a
                 # moment for word of the save
-                self.pending_goal = {"until": self.recorder.clock + self.net_grace(), "obj": obj, "data": data}
+                # (up to 0.8 s, as their game says when it has shown the ball go in; a 1.5 from before
+                # it did keeps the shorter wait)
+                wait = max(0.8, self.net_grace()) if getattr(self.net, "guest_tells_tau", False) else self.net_grace()
+                self.pending_goal = {"until": self.recorder.clock + wait, "obj": obj, "data": data,
+                                     "clock": self.recorder.clock}
                 obj.vx = obj.vy = 0.0
                 return
         self.last_goal_clock = self.recorder.clock

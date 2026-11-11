@@ -4,7 +4,7 @@ Every version of Hu Taong, newest first. Toki Hub shows each version's section o
 
 ## 1.5 — 2026-11-11
 
-Smoother online play.
+Smoother online play, and hits off the joining player's paddle that look the same on both screens.
 
 ### Fixed
 - Online, on the screen of the player who joined, the ball no longer stops in mid-air when an update from the host comes late. It flies on for up to a tenth of a second while the next one arrives.
@@ -12,9 +12,16 @@ Smoother online play.
 - Online, the player who joined sees the court held back only as much as their connection needs: less on a steady link, more on an uneven one (0.03 to 0.1 seconds; it was always 0.05).
 - Online, the joining player's own paddle is no longer nudged back while it moves and on again when it stops.
 - The host's lobby shows the real ping to your friend. Between two computers it showed 0 ms or a huge number.
+- Online, on the host's screen, a save whose word comes late no longer shows the ball going into the friend's paddle and back out through it. The ball waits at the paddle's face until word comes.
+- Online, the joining player's returns leave at the speed the host's game plays them, so the ball no longer slips back a moment after they hit it (it did on about 4 in 10 returns, and on nearly every smash). Their returns also can't come out faster than the physics allows any more.
+- Online, a quick ball, or any ball after the game stutters, no longer passes straight through the joining player's paddle. Their game now follows the ball's whole path between frames, not just where it ends up.
+- Online, a save made as the connection stalls no longer turns into a goal: the host waits up to 0.8 seconds for word of it. A real miss counts as soon as the joining player's game has shown the ball go in, usually sooner than before.
+- Online, a save off the paddle's end with the ball pinned against the wall now counts, and a save the host turns down no longer moves the ball back in time.
+- Online, right after a lag spike, the joining player's saves are no longer turned down as too early and then taken back.
 
 ### Changed
 - Online play needs both players on 1.5: it won't connect to 1.4 or earlier, and their rooms show "Other version".
+- 1.5 was updated the same day with the hit fixes above. To get them, uninstall 1.5 and install it again, both of you: a copy installed before still plays online with an updated one, but without the fixes.
 
 ### Added
 - Tests for these online fixes, in the tests folder.

@@ -10,6 +10,7 @@ when it meets your paddle here; your game tells the host's at once, and the host
 from that moment.  Here the ball flies on from your paddle until the host's pictures include it."""
 import bisect, math, struct, time
 from array import array
+from types import SimpleNamespace
 
 import pygame
 
@@ -172,6 +173,9 @@ class GuestMatchState(State):
         if self.show(dt):
             self.play_due_events(side)
             self.watch_for_save(side, info)
+            # tell the host how far on the ball is shown here, so a goal it holds for word of a
+            # save can be let go as soon as this screen has shown the ball reach the goal without one
+            net.ball_clock = self.tau if self.tau is not None else self.clock
 
         top = self.app.state_manager.current()
         if top is self:
@@ -323,10 +327,11 @@ class GuestMatchState(State):
 
     def lead(self):
         """How far the host's present is ahead of its pictures here: the hold-back for smoothing,
-        plus the trip here."""
+        plus the trip here (the quickest of late: a stall shouldn't send the ball on ahead)."""
         net = self.net
-        if net.ping is not None:
-            self.rtt = net.ping if self.rtt is None else self.rtt + (net.ping - self.rtt) * 0.05
+        trip = net.quick_trip()
+        if trip is not None:
+            self.rtt = trip if self.rtt is None else self.rtt + (trip - self.rtt) * 0.05
         rtt = self.rtt if self.rtt is not None else 0.1
         return max(0.03, min(0.35, net.BUFFER + rtt / 2 + 0.004))
 
@@ -482,42 +487,57 @@ class GuestMatchState(State):
         paddle = view.p1 if side == 1 else view.p2
         r = ball.width / 2
         bx, by = (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2
-        last, self.last_ball = self.last_ball, (bx, by)
+        w, h = paddle.width, paddle.height
+        last, self.last_ball = self.last_ball, (bx, by, self.tau, paddle.x0, paddle.y0)
         if self.bounce or self.claim_rest > 0 or view.countdown is not None or view.message_text or ball.stuck:
             return
         if self.pred is None or self.tau is None:
             return
         pvx, pvy = self.pred[2], self.pred[3]
-        overlap = (ball.x1 > paddle.x0 and ball.x0 < paddle.x1 and ball.y1 > paddle.y0 and ball.y0 < paddle.y1)
-        if not overlap and last is not None:
-            # a quick ball can skip right over the paddle between frames: did it cross a face?
-            for face in (paddle.x0 - r, paddle.x1 + r):
-                if (last[0] - face) * (bx - face) < 0:
-                    t = (face - last[0]) / (bx - last[0])
-                    y = last[1] + (by - last[1]) * t
-                    if paddle.y0 - r < y < paddle.y1 + r:
-                        overlap, bx, by = True, face, y
-                    break
-        if not overlap:
-            return
-        cx, cy = (paddle.x0 + paddle.x1) / 2, (paddle.y0 + paddle.y1) / 2
-        if paddle.y0 <= by <= paddle.y1 or abs(bx - cx) > paddle.width / 2:
-            normal = (-1, 0) if bx > cx else (1, 0)
+        met = None
+        if last is not None and last[2] is not None:
+            # Where the ball went against the paddle since last frame (both may have moved): the
+            # first face it crossed on the way is where they met, however far it went in one frame.
+            # (Only looking at where it ended up let a quick ball, or any ball after a hitch, pass
+            # right through, or meet the paddle's back.)
+            met = self.meet(r, w, h, (last[0] - last[3], last[1] - last[4]), (bx - paddle.x0, by - paddle.y0))
+        if met is not None:
+            k, normal = met
+            px, py = last[3] + (paddle.x0 - last[3]) * k, last[4] + (paddle.y0 - last[4]) * k
+            bx, by = last[0] + (bx - last[0]) * k, last[1] + (by - last[1]) * k
+            tau = last[2] + (self.tau - last[2]) * k
+        elif ball.x1 > paddle.x0 and ball.x0 < paddle.x1 and ball.y1 > paddle.y0 and ball.y0 < paddle.y1:
+            # touching already (since last frame, or this is the first): judged by where its centre is
+            px, py, tau = paddle.x0, paddle.y0, self.tau
+            cx, cy = px + w / 2, py + h / 2
+            if py <= by <= py + h or abs(bx - cx) > w / 2:
+                normal = (-1, 0) if bx > cx else (1, 0)
+            else:
+                normal = (0, -1) if by > cy else (0, 1)
         else:
-            normal = (0, -1) if by > cy else (0, 1)
+            return
         if (pvx - ball.vx) * normal[0] + (pvy - ball.vy) * normal[1] >= 0:
             return                                  # moving apart already
-        vx, vy, bx, by = self.bounce_off(paddle, side, normal, bx, by, r, ball.vx, ball.vy, pvx, pvy)
+        mine_fx = [k for k, _, _ in view.powerups.effect_list(paddle)]
+        lively = any(key == "gravity" for fx in view.powerups.fx for key, _, _ in fx)
+        at = SimpleNamespace(x0 = px, y0 = py, x1 = px + w, y1 = py + h, width = w, height = h)   # where they met
+        serve = float(info.get("serve", 0.0) or 0.0)
+        if serve:
+            vx, vy, bx, by = self.bounce_off(at, side, normal, bx, by, r, ball.vx, ball.vy, pvx, pvy, serve = serve,
+                                             lively = lively, fire = "fire" in mine_fx,
+                                             frost = view.powerups.frosted(paddle))
+        else:       # a host on an earlier 1.5 doesn't send its serve speed, and expects the simpler bounce
+            vx, vy, bx, by = self.simple_bounce(at, side, normal, bx, by, r, ball.vx, ball.vy, pvx, pvy)
         net.claim_id += 1
-        net.claims.append({"id": net.claim_id, "t": round(self.tau, 4), "bx": round(bx, 1), "by": round(by, 1),
-                           "px": round(paddle.x0, 1), "py": round(paddle.y0, 1), "pvx": round(pvx), "pvy": round(pvy),
-                           "normal": list(normal), "vx": round(vx, 1), "vy": round(vy, 1)})
+        net.claims.append({"id": net.claim_id, "t": round(tau, 4), "bx": round(bx, 1), "by": round(by, 1),
+                           "px": round(px, 1), "py": round(py, 1), "pvx": round(pvx), "pvy": round(pvy),
+                           "normal": list(normal), "vx": round(vx, 1), "vy": round(vy, 1), "rule": 2 if serve else 1})
         net.send_input()                            # straight away, not with the next keys
         net.last_send = time.perf_counter()
         self.claim_rest = 0.25
         sticky = any(k == "sticky" for k, _, _ in view.powerups.effect_list(paddle))
         if not sticky:                              # a Sticky paddle holds it instead: the host shows that
-            self.bounce = {"id": net.claim_id, "t0": self.tau, "x": bx, "y": by, "vx": vx, "vy": vy}
+            self.bounce = {"id": net.claim_id, "t0": tau, "x": bx, "y": by, "vx": vx, "vy": vy}
         self.quiet_hit_until = self.tau + 0.8
         sound = self.app.sound_manager
         if sound.paddle_hit_sound:
@@ -526,11 +546,33 @@ class GuestMatchState(State):
         self.app.fx.spark(bx, by, 22, (255, 122, 44) if side == 1 else (120, 190, 255), speed = 520)
 
     @staticmethod
-    def bounce_off(paddle, side, normal, bx, by, r, bvx, bvy, pvx, pvy):
-        """The ball off your paddle, as the host's game plays a hit (objects/paddle.py): angled by
-        where on the paddle it met, and off the face always leaving faster than the paddle chases
-        it (off an end the paddle is held back instead, so the ball keeps its speed).  Answers
-        (vx, vy, x, y), the ball just clear of the face it met."""
+    def meet(r, w, h, a, b):
+        """A ball (reaching r either side of its centre) going from a to b, measured from the top
+        left of a paddle w by h: where it first touches the paddle, as (share of the way there,
+        normal into the face it crossed), or None if it misses, or was touching it already."""
+        lo, hi = (-r, -r), (w + r, h + r)
+        if lo[0] < a[0] < hi[0] and lo[1] < a[1] < hi[1]:
+            return None
+        enter, leave, axis = 0.0, 1.0, None
+        for i in (0, 1):
+            d = b[i] - a[i]
+            if d == 0:
+                if not lo[i] < a[i] < hi[i]:
+                    return None
+                continue
+            t0, t1 = sorted(((lo[i] - a[i]) / d, (hi[i] - a[i]) / d))
+            if t0 > enter:
+                enter, axis = t0, i
+            leave = min(leave, t1)
+        if axis is None or enter >= leave:
+            return None
+        way = 1 if b[axis] > a[axis] else -1
+        return enter, ((way, 0) if axis == 0 else (0, way))
+
+    @staticmethod
+    def simple_bounce(paddle, side, normal, bx, by, r, bvx, bvy, pvx, pvy):
+        """The bounce as 1.5 first worked it out (the ball keeps its speed), for a host on that build:
+        it keeps a bounce within a third of its own, and this is what it expects."""
         speed = max(1.0, math.hypot(bvx, bvy))
         cy = (paddle.y0 + paddle.y1) / 2
         if normal[0]:
@@ -551,6 +593,78 @@ class GuestMatchState(State):
         need = chasing + 150
         if chasing > 0 and 0 < leaving < need and normal[0]:
             vx, vy = vx * need / leaving, vy * need / leaving
+        return vx, vy, bx, by
+
+    @staticmethod
+    def bounce_off(paddle, side, normal, bx, by, r, bvx, bvy, pvx, pvy, serve = 0.0, lively = False, fire = False,
+                   frost = False):
+        """The ball off your paddle, as the host's game plays a hit (Physics.resolve_collision, then
+        objects/paddle.py on_contact): the knock takes pace off a blocked ball (never below its
+        serve speed), it's angled by where on the paddle it met, eased under the speed ceiling, and
+        off the face always leaves faster than the paddle chases it.  Answers (vx, vy, x, y), the
+        ball just clear of the face it met.  It must match the host exactly: tests/test_online_hits.py
+        checks it does, against the host's own code."""
+        from config import MAX_BALL_SPEEDUP
+        from objects.paddle import SPEED_KNEE
+        nx, ny = normal
+        # the knock, as Physics.resolve_collision plays it: paddle inv_mass 0.05, ball 1,
+        # restitution the average of the paddle's 0.6 and the ball's (1.2 under Gravity, else 0.4)
+        res = (0.6 + (1.2 if lively else 0.4)) / 2
+        rvn = (pvx - bvx) * nx + (pvy - bvy) * ny
+        kvx, kvy, qvx, qvy = bvx, bvy, pvx, pvy
+        if rvn <= 0:
+            imp = -(1 + res) * rvn / 1.05
+            kvx, kvy = bvx - imp * nx, bvy - imp * ny
+            qvx, qvy = pvx + imp * nx * 0.05, pvy + imp * ny * 0.05
+        speed = max(math.hypot(kvx, kvy), serve)
+        if ny:
+            speed = max(math.hypot(bvx, bvy), serve)          # off an end it keeps the speed it came in at
+        cap = MAX_BALL_SPEEDUP * serve * math.sqrt(2)
+        knee = SPEED_KNEE * cap
+        if serve and speed > knee:
+            speed = knee + (cap - knee) * math.tanh((speed - knee) / (cap - knee))
+        cy = (paddle.y0 + paddle.y1) / 2
+        forward = 1 if side == 1 else -1
+        pinched = False
+        if nx:
+            offset = max(-1.0, min(1.0, (by - cy) / (paddle.height / 2)))
+            angle = offset * MAX_BOUNCE_ANGLE
+            if abs(angle) < FLAT_ANGLE:
+                angle = math.copysign(1.5 * FLAT_ANGLE, angle or 1.0)
+            vx, vy = -nx * speed * math.cos(angle), speed * math.sin(angle)
+            bx = paddle.x1 + r if nx < 0 else paddle.x0 - r
+        else:
+            vx = forward * speed * math.cos(MAX_BOUNCE_ANGLE)
+            vy = -ny * speed * math.sin(MAX_BOUNCE_ANGLE)
+            room = paddle.y0 if ny > 0 else BASE_H - paddle.y1
+            if room < 2 * r + 6:                               # no room by the wall: out along it
+                pinched = True
+                vx, vy = forward * speed, 0.0
+            by = paddle.y1 + r if ny < 0 else paddle.y0 - r
+        out_x, out_y = -nx, -ny
+        chasing = qvx * out_x + qvy * out_y
+        leaving = vx * out_x + vy * out_y
+        need = chasing + 150
+        want = max(need, min(chasing * 1.3, cap if serve else math.inf))
+        if chasing > 0 and leaving < want and not pinched and ny == 0:
+            total = math.hypot(vx, vy)
+            share = leaving / total if total and leaving > 0 else 0.0
+            limit = max(cap, need) if serve else math.inf
+            new_speed = min(limit, want / share) if share else need
+            normal_part = max(need, new_speed * share)
+            new_speed = max(new_speed, normal_part)
+            side_x, side_y = vx - out_x * leaving, vy - out_y * leaving
+            side_len = math.hypot(side_x, side_y)
+            keep = math.sqrt(max(0.0, new_speed * new_speed - normal_part * normal_part)) / side_len if side_len else 0.0
+            vx, vy = out_x * normal_part + side_x * keep, out_y * normal_part + side_y * keep
+        total = math.hypot(vx, vy)
+        if total and abs(vx) < total * 0.3:
+            vx = forward * total * 0.3
+            vy = math.copysign(total * math.sqrt(1 - 0.09), vy or -1)
+        if frost:                                              # Frostbite carried on this paddle passes onto the ball
+            vx, vy = vx * 0.7, vy * 0.7
+        if fire:                                               # Spirit Fire: every hit a blazing shot
+            vx, vy = vx * 1.4, vy * 1.4
         return vx, vy, bx, by
 
     # ---------------- Drawing ----------------

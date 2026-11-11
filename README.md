@@ -2,7 +2,7 @@
 
 Pong, the Wangsheng Funeral Parlor way. Version 1.5, 11 November 2026.
 
-Smoother online play.
+Smoother online play, and hits off the joining player's paddle that look the same on both screens.
 
 ## Play it
 

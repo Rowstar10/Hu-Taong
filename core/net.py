@@ -359,6 +359,8 @@ class HostSession:
         self.guest_menu = 0          # what the guest has open: 0 nothing, 1 the pause screen, 2 deeper (settings)
         self.claims = []             # saves the guest saw on its own screen, waiting to be checked
         self.claims_seen = set()
+        self.guest_clear_tau = None  # the furthest the guest's screen has shown the ball with no save to claim
+        self.guest_tells_tau = False # its game says how far on it shows the ball (a 1.5 from after the hit fixes)
         self.acks = {}               # claim id -> the host time it was played at, or -1 if it didn't stand
         self.handled = {}
         self.ping = None
@@ -564,7 +566,18 @@ class HostSession:
         # has nothing to do with this one's: subtracting it read 0, or hours.)
         echo = extra.get("hecho")
         if isinstance(echo, (int, float)) and echo > 0:
-            self.ping = max(0.0, time.perf_counter() - echo)
+            trip = max(0.0, time.perf_counter() - echo)
+            # smoothed: the ball near the friend is drawn this far in the past until their first
+            # save of a match, and a jumpy value made it stutter
+            self.ping = trip if self.ping is None else self.ping + (trip - self.ping) * 0.1
+        # how far on the guest's screen has shown the ball, when it has no save to tell of: a goal
+        # held for word of a save can go as soon as their screen has shown the ball get there
+        tau = extra.get("tau")
+        if isinstance(tau, (int, float)):
+            self.guest_tells_tau = True
+        if isinstance(tau, (int, float)) and not extra.get("claims"):
+            if self.guest_clear_tau is None or tau > self.guest_clear_tau:
+                self.guest_clear_tau = tau
         menu = extra.get("menu")
         if isinstance(menu, int):
             self.guest_menu = menu
@@ -607,7 +620,7 @@ class HostSession:
         info = {"seq": self.applied_seq, "echo": self.guest_clock, "hclock": time.perf_counter(),
                 "paused": paused, "host_menu": host_menu,
                 "events": [[first + i, *e[1:]] for i, e in enumerate(events)],
-                "speed": [game.p1.speed, game.p2.speed],
+                "speed": [game.p1.speed, game.p2.speed], "serve": game.ball.speed,
                 "guest": 1 if getattr(game.p1, "remote", False) else 2,
                 "over": self.over, "rematch": self.rematch_asked,
                 "acks": [[k, v] for k, v in list(self.acks.items())[-8:]],
@@ -704,6 +717,16 @@ class GuestSession:
         self.lateness = deque(maxlen = 180)  # for the last pictures: when each got here, less the host time it shows
         self.gaps = deque(maxlen = 60)       # host time between pictures
         self.tuned = 0
+        self.trips = deque(maxlen = 240)     # (when, round trip) for the last pictures
+        self.ball_clock = None               # the host time the ball is shown at here (see GuestMatchState)
+
+    def quick_trip(self):
+        """The quickest round trip of the last second: what the link takes when nothing holds it up.
+        (The latest one can be stuck high for a while after a stall, and then the ball near your
+        paddle ran ahead of the host's, so your saves were turned down as from the future.)"""
+        now = time.perf_counter()
+        recent = [trip for when, trip in self.trips if now - when <= 1.0]
+        return min(recent) if recent else self.ping
 
     def update(self, dt):
         if self.closed:
@@ -791,6 +814,8 @@ class GuestSession:
             extra["echo"] = self.snaps[-1][2].get("echo")
             if "hclock" in self.snaps[-1][2]:
                 extra["hecho"] = self.snaps[-1][2]["hclock"]      # the host's own time, back to it
+        if self.ball_clock is not None:
+            extra["tau"] = round(self.ball_clock, 4)              # how far on the ball is shown here
         payload = struct.pack("<IBd", self.seq, self.sent_keys(), time.perf_counter()) + pack_json(extra)
         self.link.send(INPUT, payload)
 
@@ -825,6 +850,7 @@ class GuestSession:
         echo = info.get("echo")
         if isinstance(echo, (int, float)) and echo > 0:
             self.ping = max(0.0, time.perf_counter() - echo)
+            self.trips.append((time.perf_counter(), self.ping))
         self.info = info
         for pair in info.get("acks", []):
             if isinstance(pair, list) and len(pair) == 2 and isinstance(pair[0], int):

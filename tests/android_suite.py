@@ -85,7 +85,7 @@ class Screen(unittest.TestCase):
 
     def test_saves_go_to_the_apps_own_storage(self):
         with mock.patch.dict(os.environ, {"ANDROID_PRIVATE": "/data/user/0/hu.taong/files"}):
-            self.assertEqual(str(platform.data_dir()), "/data/user/0/hu.taong/files/HuTaong")
+            self.assertEqual(platform.data_dir().as_posix(), "/data/user/0/hu.taong/files/HuTaong")   # (as on the phone, on any PC)
 
     def test_tooltips_drop_keyboard_hints(self):
         self.assertEqual(touch_tip("Pause\nPause the match.\n~ Esc"), "Pause\nPause the match.")
