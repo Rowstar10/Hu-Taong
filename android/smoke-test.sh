@@ -32,6 +32,8 @@ waitfor() {   # waitfor <pattern> <seconds>
 
 echo "Installing $APK ($PACKAGE) on a ${W}x${H} screen"
 adb install -r -g "$APK"
+# Android explains full-screen mode the first time an app uses it; a player taps it away
+adb shell settings put secure immersive_mode_confirmations confirmed || true
 adb logcat -c
 adb shell am start -n "$PACKAGE/org.kivy.android.PythonActivity"
 

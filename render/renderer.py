@@ -631,7 +631,8 @@ class Renderer:
                 self.app.fx.spark(edge, top + random.uniform(0, h), 2, speed=120, life=.8,
                                   arc=(-2.2, -.9), gravity=-120)
 
-        self.text(screen, "Enter to play   ·   Esc to quit", self.fnt(0.024, bold=False),
+        self.text(screen, "Tap Play Game to begin   ·   Back to quit" if ANDROID else "Enter to play   ·   Esc to quit",
+                  self.fnt(0.024, bold=False),
                   theme.GOLD, center=(cx, 944))
 
     # ── Match setup ────────────────────────────────────────────────────────────
@@ -1481,6 +1482,9 @@ class Renderer:
         font = self.fnt(0.022)
         hint = "Space: next highlight      S: save this one      Esc: stop" if state.mode == "reel" else \
                "Space: skip      S: save this moment      Esc: back to the match"
+        if ANDROID:                     # a phone has the buttons, and Back
+            hint = "Save keeps this one      Skip or Back stops the highlights" if state.mode == "reel" else \
+                   "Save keeps this moment      Skip or Back returns to the match"
         plate = pygame.Rect(0, 0, font.size(hint)[0] + 50, 44)
         plate.midbottom = (BASE_W // 2, BASE_H - 20)
         screen.blit(self.glass(plate.w, plate.h), plate)
@@ -2492,7 +2496,7 @@ class Renderer:
             rect.center = (int(cx), int(BASE_H * 0.74))
             screen.blit(self.art.inset(rect.w, rect.h), rect)
             self.text(screen, text, font, theme.GOLD_BRIGHT, center=rect.center)
-        if game.settings.powerups and game.p1.score + game.p2.score == 0:
+        if game.settings.powerups and game.p1.score + game.p2.score == 0 and not ANDROID:   # (no Tab on a phone)
             font = self.fnt(0.024)
             text = "Hold Tab to see every power-up in play"
             plate = pygame.Rect(0, 0, font.size(text)[0] + 50, 50)

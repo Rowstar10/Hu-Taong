@@ -12,6 +12,7 @@ from game.replay import Recorder
 from objects.wall import Wall
 from objects.ball import Ball
 from objects.paddle import Paddle
+from core.platform import ANDROID
 
 # Things the AI says after a point, when AI Banter is on
 BANTER_SCORED = ["Hehe~ too slow!", "Boo! Gotcha~", "Another one for the parlor!", "Don't blink~",
@@ -74,6 +75,10 @@ class Hu_Taong(GameBase):
                          sound = "Tao.wav")
 
         self.p1.controls_label, self.p2.controls_label = keys.keys_label("p1"), keys.keys_label("p2")
+        if ANDROID:            # a phone is played with fingers: the whole screen, or a half each
+            two = not settings.vs_ai
+            self.p1.controls_label = "Left half" if two else "You"
+            self.p2.controls_label = "Right half" if two else "You"
 
         # vs AI: the AI takes whichever paddle the player didn't pick
         self.p1.ai_enabled = settings.vs_ai and settings.play_as_blue
