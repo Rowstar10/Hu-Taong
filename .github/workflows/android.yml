@@ -4,7 +4,7 @@ name: Android
 # v1.5-android, publishes it as that tag's release (which Toki Hub installs from).
 on:
   push:
-    branches: [main]
+    branches: [main, claude/android]
     tags: ["v*-android"]
   workflow_dispatch:
 
