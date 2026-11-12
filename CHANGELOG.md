@@ -17,6 +17,15 @@ Power-up fixes and changes, from a review of every power-up.
 ### Changed
 - The wait for the next talisman carries on from point to point. It restarted at every point, so quick points, attacking play and games without the Middle Wall hardly saw any.
 - Gravity, Ghost Ball, Wind Gust and Sticky Goo end when the point ends, so the next serve is a plain one. Your own Boons and Curses still carry on until their time runs out.
+- Safety Teleport: an unused save is lost when the point ends. It could be saved up for the rest of the match, which made it the strongest Boon.
+- Swift Step: your paddle still moves half as fast again, but its hits are no harder than usual. A faster paddle hit much harder, and that was most of its edge.
+- Spirit Fire: blazing shots are still 40% faster, but go at most 10% past the usual top speed. They reached about 4,450 px/s, too fast to follow.
+- Frostbite works one way now. Your next hit frosts the ball, and whoever hits it back is frozen at half speed for 5 seconds, whatever they hit. The frost never comes back to you, and a frosted ball no longer slows down.
+- Ghost Ball is always in sight for the last 300 px before the paddle it's heading for.
+- Blink Ball doesn't hop within 350 px of the paddle it's heading for.
+- Twin Balls never split slower than half a serve. They could crawl at a quarter.
+- Wind Gust blows harder: 500 px/s² at the height of a gust, up from 360.
+- Firecracker: the bang always shoots the ball away from whoever lit it. It could shoot straight back at them from point-blank.
 - Online play needs both players on 1.6: it won't connect to 1.5 or earlier, and their rooms show "Other version".
 
 ### Added

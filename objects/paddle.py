@@ -138,6 +138,17 @@ class Paddle(GameObject):
             touch.felt_hit(self)                    # a phone buzzes as your paddle hits the ball
 
         nx, ny = data["normal"]
+        # Swift Step makes the paddle quicker, not its hits harder: off its face, a knock from a
+        # paddle going faster than its normal top speed is played as if at that speed (the extra
+        # power was most of Swift Step's edge: its taker won 74% of points against the Hard AI)
+        top = self.top_speed()
+        before = data.get("before", {})
+        if nx != 0 and top < math.inf and self in before and other in before:
+            pvx, pvy = before[self]
+            drive = -(pvx * nx + pvy * ny)                 # towards the ball's way out
+            if drive > top:
+                other.vx, other.vy = self.knock(other, data, pvx + nx * (drive - top), pvy + ny * (drive - top))
+
         # A blocked ball loses pace, but never drops below its serve speed, so a rally can't stall
         serve = getattr(other, "speed", 0)
         speed = max(math.hypot(other.vx, other.vy), serve)
@@ -203,7 +214,7 @@ class Paddle(GameObject):
         chasing = self.vx * out_x + self.vy * out_y
         leaving = other.vx * out_x + other.vy * out_y
         need = chasing + 150                                       # the least it must leave at
-        want = max(need, min(chasing * 1.3, cap if serve else math.inf))
+        want = max(need, min(min(chasing, top) * 1.3, cap if serve else math.inf))
         if chasing > 0 and leaving < want and not pinched and ny == 0:
             # Speed the whole return up, keeping its angle; at the ceiling the angle flattens
             # only as far as it must for the ball to get clear
@@ -225,6 +236,24 @@ class Paddle(GameObject):
             forward = 1 if self.is_left else -1
             other.vx = forward * speed * 0.3
             other.vy = math.copysign(speed * math.sqrt(1 - 0.09), other.vy or -1)
+
+    def top_speed(self):
+        """This paddle's normal top speed, when Swift Step has it going faster (else infinity)."""
+        powerups = getattr(self.game, "powerups", None)
+        factor = powerups.speed_factor(self) if powerups else 1.0
+        return self.speed / factor if factor > 1 else math.inf
+
+    def knock(self, ball, data, pvx, pvy):
+        """The ball's velocity after a knock from this paddle moving at (pvx, pvy), as
+        Physics.resolve_collision plays it (the paddle is its first body)."""
+        bvx, bvy = data["before"][ball]
+        nx, ny = data["normal"]
+        rvn = (pvx - bvx) * nx + (pvy - bvy) * ny
+        if rvn > 0:
+            return bvx, bvy
+        res = (self.restitution + ball.restitution) / 2
+        imp = -(1 + res) * rvn / (self.inv_mass + ball.inv_mass) * ball.inv_mass
+        return bvx - imp * nx, bvy - imp * ny
 
     # ------------------------ AI Logic ------------------------
     def ai_input(self, dt):

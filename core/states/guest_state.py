@@ -19,6 +19,7 @@ from core import net as netcode
 from core.states.base_state import State
 from core.states.jukebox import JukeboxControls
 from core.states.replay_state import play_event
+from game.powerups import PowerUps
 from game.replay import Clip, Moment, ReplayView
 from objects.paddle import FLAT_ANGLE
 from render import theme
@@ -518,14 +519,19 @@ class GuestMatchState(State):
             return
         if (pvx - ball.vx) * normal[0] + (pvy - ball.vy) * normal[1] >= 0:
             return                                  # moving apart already
-        mine_fx = [k for k, _, _ in view.powerups.effect_list(paddle)]
+        effects = view.powerups.effect_list(paddle)
+        mine_fx = [k for k, _, _ in effects]
         lively = any(key == "gravity" for fx in view.powerups.fx for key, _, _ in fx)
         at = SimpleNamespace(x0 = px, y0 = py, x1 = px + w, y1 = py + h, width = w, height = h)   # where they met
         serve = float(info.get("serve", 0.0) or 0.0)
+        # Swift Step: the host plays a hit as if the paddle went at its normal top speed
+        frozen = any(k == "frost" and left is not None for k, left, _ in effects)
+        factor = (PowerUps.SWIFT if "swift" in mine_fx else 1.0) * (PowerUps.FROZEN if frozen else 1.0)
+        speed = getattr(self, "own_speed", 0)
+        top = speed / factor if factor > 1 and speed else math.inf
         if serve:
             vx, vy, bx, by = self.bounce_off(at, side, normal, bx, by, r, ball.vx, ball.vy, pvx, pvy, serve = serve,
-                                             lively = lively, fire = "fire" in mine_fx,
-                                             frost = view.powerups.frosted(paddle))
+                                             lively = lively, fire = "fire" in mine_fx, top = top)
         else:       # a host on an earlier 1.5 doesn't send its serve speed, and expects the simpler bounce
             vx, vy, bx, by = self.simple_bounce(at, side, normal, bx, by, r, ball.vx, ball.vy, pvx, pvy)
         net.claim_id += 1
@@ -597,13 +603,14 @@ class GuestMatchState(State):
 
     @staticmethod
     def bounce_off(paddle, side, normal, bx, by, r, bvx, bvy, pvx, pvy, serve = 0.0, lively = False, fire = False,
-                   frost = False):
+                   top = math.inf):
         """The ball off your paddle, as the host's game plays a hit (Physics.resolve_collision, then
         objects/paddle.py on_contact): the knock takes pace off a blocked ball (never below its
         serve speed), it's angled by where on the paddle it met, eased under the speed ceiling, and
-        off the face always leaves faster than the paddle chases it.  Answers (vx, vy, x, y), the
-        ball just clear of the face it met.  It must match the host exactly: tests/test_online_hits.py
-        checks it does, against the host's own code."""
+        off the face always leaves faster than the paddle chases it.  `top` is the paddle's normal
+        top speed when Swift Step has it going faster: its hits are played as if at that speed.
+        Answers (vx, vy, x, y), the ball just clear of the face it met.  It must match the host
+        exactly: tests/test_online_hits.py checks it does, against the host's own code."""
         from config import MAX_BALL_SPEEDUP
         from objects.paddle import SPEED_KNEE
         nx, ny = normal
@@ -616,6 +623,14 @@ class GuestMatchState(State):
             imp = -(1 + res) * rvn / 1.05
             kvx, kvy = bvx - imp * nx, bvy - imp * ny
             qvx, qvy = pvx + imp * nx * 0.05, pvy + imp * ny * 0.05
+        drive = -(pvx * nx + pvy * ny)
+        if nx and drive > top:                                 # Swift Step: knocked as if at its normal speed
+            cvx, cvy = pvx + nx * (drive - top), pvy + ny * (drive - top)
+            crvn = (cvx - bvx) * nx + (cvy - bvy) * ny
+            kvx, kvy = bvx, bvy
+            if crvn <= 0:
+                cimp = -(1 + res) * crvn / 1.05
+                kvx, kvy = bvx - cimp * nx, bvy - cimp * ny
         speed = max(math.hypot(kvx, kvy), serve)
         if ny:
             speed = max(math.hypot(bvx, bvy), serve)          # off an end it keeps the speed it came in at
@@ -645,7 +660,7 @@ class GuestMatchState(State):
         chasing = qvx * out_x + qvy * out_y
         leaving = vx * out_x + vy * out_y
         need = chasing + 150
-        want = max(need, min(chasing * 1.3, cap if serve else math.inf))
+        want = max(need, min(min(chasing, top) * 1.3, cap if serve else math.inf))
         if chasing > 0 and leaving < want and not pinched and ny == 0:
             total = math.hypot(vx, vy)
             share = leaving / total if total and leaving > 0 else 0.0
@@ -661,10 +676,12 @@ class GuestMatchState(State):
         if total and abs(vx) < total * 0.3:
             vx = forward * total * 0.3
             vy = math.copysign(total * math.sqrt(1 - 0.09), vy or -1)
-        if frost:                                              # Frostbite carried on this paddle passes onto the ball
-            vx, vy = vx * 0.7, vy * 0.7
-        if fire:                                               # Spirit Fire: every hit a blazing shot
-            vx, vy = vx * 1.4, vy * 1.4
+        if fire:                                               # Spirit Fire: every hit a blazing shot...
+            vx, vy = vx * PowerUps.FIRE, vy * PowerUps.FIRE
+            limit = PowerUps.FIRE_TOP * cap                    # ...a little past the top speed at most
+            total = math.hypot(vx, vy)
+            if serve and total > limit:
+                vx, vy = vx * limit / total, vy * limit / total
         return vx, vy, bx, by
 
     # ---------------- Drawing ----------------

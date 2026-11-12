@@ -36,6 +36,7 @@ from core.net import GuestSession, HostSession, pack_json     # noqa: E402
 from core.states.guest_state import GuestMatchState           # noqa: E402
 from game.hu_taong import Hu_Taong                            # noqa: E402
 from game.physics import Physics as netcode_physics           # noqa: E402  (the host's physics)
+from game.powerups import PowerUps                            # noqa: E402
 
 
 class FakeLink:
@@ -214,12 +215,13 @@ class HostChecks(HostedMatch):
         serve, r = ball.speed, ball.width / 2
         rng = random.Random(5)
         checked = pinched = 0
-        for i in range(500):
-            power = ("", "fire", "frost")[i % 3]
+        base = game.settings.paddle_speed
+        for i in range(600):
+            power = ("", "fire", "frost", "swift")[i % 4]
             end = rng.random() < 0.25
             speed = rng.choice([300, 600, 1100, 2000, 3100])
             px, py = 1840.0, rng.uniform(0, BASE_H - g.height)
-            pvx = rng.choice([0.0, 0.0, -1500.0, -700.0])          # negative: into the ball (a smash)
+            pvx = rng.choice([0.0, 0.0, -1500.0, -700.0, -2200.0 if power == "swift" else -1100.0])  # negative: a smash
             pvy = rng.choice([0.0, 1500.0, -1500.0, 700.0])
             if not end:
                 by = py + g.height / 2 + rng.uniform(-1.15, 1.15) * (g.height / 2 + r)
@@ -237,8 +239,10 @@ class HostChecks(HostedMatch):
             if not r <= by <= BASE_H - r or (pvx - bvx) * normal[0] + (pvy - bvy) * normal[1] >= 0:
                 continue                                # off the court, or not a save the friend would claim
             g.x0, g.y0, g.x1, g.y1 = px, py, px + g.width, py + g.height
+            g.speed = base * (PowerUps.SWIFT if power == "swift" else PowerUps.FROZEN if power == "frost" else 1.0)
+            top = g.speed / PowerUps.SWIFT if power == "swift" else math.inf
             gvx, gvy, gbx, gby = GuestMatchState.bounce_off(g, 2, normal, bx, by, r, bvx, bvy, pvx, pvy, serve = serve,
-                                                            fire = power == "fire", frost = power == "frost")
+                                                            fire = power == "fire", top = top)
             t = 10.0 + i
             game.recorder.clock = t
             game.last_guest_hit = game.last_goal_clock = -1.0
@@ -248,8 +252,8 @@ class HostChecks(HostedMatch):
             ball.stuck, ball.last_paddle, ball.rally_value = None, None, 0
             game.p1.effects, g.effects = {}, {}
             game.powerups.frost = None
-            if power == "fire":
-                g.effects["fire"] = 5.0
+            if power in ("fire", "swift"):
+                g.effects[power] = 5.0
             if power == "frost":
                 game.powerups.frost = {"holder": g, "owner": g, "armed": False, "left": 5.0}
             g.vx = g.vy = 0.0
