@@ -90,6 +90,11 @@ class GuestMatchState(State):
         self.clock = None            # where the host's pictures are shown, on the host's clock
         self.pending = []            # [(host clock, kind, values)] waiting to be heard
         self.pred = None             # your paddle as predicted: [x0, y0, vx, vy]
+        self.pred_gravity = False    # ...under Gravity (it falls, and Up jumps)
+        self.jump_held = None        # ...and how long Up has been held into a jump
+        self.teleport_hold = None    # a Safety Teleport made here: until then the host's word can't pull the paddle back
+        self.teleport_claim = False  # ...and the save it made is still to be claimed
+        self.quiet_teleport_until = -1.0   # the host's echo of that teleport, heard here already
         self.history = []            # [(input number, x0, y0)]
         self.last_seq = 0
         self.last_snap = 0
@@ -173,6 +178,7 @@ class GuestMatchState(State):
         self.view.powerups.popups = [p for p in popups if p[3] < 1.4]
         if self.show(dt):
             self.play_due_events(side)
+            self.watch_for_teleport(side)
             self.watch_for_save(side, info)
             # tell the host how far on the ball is shown here, so a goal it holds for word of a
             # save can be let go as soon as this screen has shown the ball reach the goal without one
@@ -193,6 +199,7 @@ class GuestMatchState(State):
         self.clock = None
         self.pending.clear()
         self.pred = None
+        self.teleport_hold, self.teleport_claim = None, False
         self.history.clear()
         self.bounce = None
         self.calm()
@@ -223,6 +230,8 @@ class GuestMatchState(State):
                 continue
             if kind == "hit" and values and values[0] == side and clock <= self.quiet_hit_until:
                 continue                            # heard already, the moment it happened here
+            if kind == "teleport" and values and values[0] == side and self.clock <= self.quiet_teleport_until:
+                continue                            # your own teleport, made (and heard) here already
             play_event(self.app, self.view, kind, values)
         self.pending = keep
 
@@ -239,10 +248,13 @@ class GuestMatchState(State):
         state = int(a[19])
         frozen = a[20] >= 0 or a[22] != 0 or info.get("paused")    # countdown, a goal, or paused
         effects = [k for k, _, _ in self.view.powerups.effect_list(self.view.p1 if side == 1 else self.view.p2)]
+        gravity = "gravity" in effects
         self.own_box = (auth[0], auth[1], w, h)
         self.own_speed = info.get("speed", [1500, 1500])[side - 1]
-        if frozen or "gravity" in effects or self.pred is None:
+        if frozen or self.pred is None or gravity != self.pred_gravity:
+            # (Gravity starting or ending: start again from where the host has it)
             self.pred = [auth[0], auth[1], 0.0, 0.0]
+            self.pred_gravity, self.jump_held = gravity, None
             self.history.clear()
             return
         # Where the paddle was when the last input went out: those are the keys that input
@@ -253,8 +265,13 @@ class GuestMatchState(State):
             self.last_seq = net.seq
             self.history.append((net.seq, self.pred[0], self.pred[1]))
             del self.history[:-120]
-        # A newer word from the host: compare it with where we thought we'd be by then
-        if net.last_snap != self.last_snap:
+        # A newer word from the host: compare it with where we thought we'd be by then (not while
+        # a Safety Teleport made here is on its way to the host: its word would pull the paddle back)
+        if self.teleport_hold is not None:
+            if math.hypot(auth[0] - self.pred[0], auth[1] - self.pred[1]) < 160 or self.clock > self.teleport_hold:
+                self.teleport_hold = None              # the host has it there too (or it never came)
+                self.history.clear()
+        if net.last_snap != self.last_snap and self.teleport_hold is None:
             self.last_snap = net.last_snap
             ack = info.get("seq", 0)
             for i, (seq, x, y) in enumerate(self.history):
@@ -277,20 +294,50 @@ class GuestMatchState(State):
             dx, dy = net.axis                                # a finger: what the host's paddle averages to
         step = min(dt, 1 / 30) * pace
         p = self.pred
-        drag = math.exp(-step)
-        p[2] *= drag
-        p[3] *= drag
-        k = 1 - math.exp(-8 * step)
-        p[2] += (speed * dx - p[2]) * k
-        p[3] += (speed * dy - p[3]) * k
-        p[0] = max(0.0, min(BASE_W - w, p[0] + p[2] * step))
-        p[1] = max(0.0, min(BASE_H - h, p[1] + p[3] * step))
+        self.jump_held = self.step_paddle(p, dx, dy, speed, w, h, step, gravity, self.jump_held)
         self.own_box = (p[0], p[1], w, h)
         if state & 1:                                        # the Middle Wall keeps it in its half
             if side == 1:
                 p[0] = min(p[0], BASE_W / 2 - w)
             else:
                 p[0] = max(p[0], BASE_W / 2)
+
+    @staticmethod
+    def step_paddle(p, dx, dy, speed, w, h, step, gravity = False, jump = None):
+        """One frame of your paddle on your keys, as the host's game moves it: Physics.step's drag,
+        then Paddle.apply_inputs, and under Gravity Paddle.gravity_jump (it falls, and Up jumps:
+        a tap hops, holding climbs on).  `p` is [x, y, vx, vy], moved in place; `jump` is how long
+        Up has been held into a jump (None on the floor or falling), and the new one is answered.
+        tests/test_powerup_online.py checks it against the host's own paddle."""
+        drag = math.exp(-step)
+        p[2] *= drag
+        p[3] *= drag
+        k = 1 - math.exp(-8 * step)
+        p[2] += (speed * dx - p[2]) * k
+        if gravity:
+            vy = p[3] / drag                                  # a clean fall: no drag
+            g = PowerUps.PADDLE_GRAVITY
+            up = dy < -0.3
+            if p[1] + h >= BASE_H - 0.5 and up and vy >= -1 and jump is None:
+                vy, jump = -PowerUps.JUMP, 0.0                # off the floor
+            elif jump is not None:
+                if up and vy < 0 and jump < PowerUps.JUMP_HOLD:
+                    jump += step                              # still holding: climbs on
+                    g *= PowerUps.HOLD_GRAVITY
+                else:
+                    if not up and vy < -PowerUps.JUMP_CUT:
+                        vy = -PowerUps.JUMP_CUT               # let go early: the climb is cut short
+                    jump = None
+            p[3] = vy + g * step
+        else:
+            jump = None
+            p[3] += (speed * dy - p[3]) * k
+        p[0] = max(0.0, min(BASE_W - w, p[0] + p[2] * step))
+        y = p[1] + p[3] * step
+        if gravity and not 0.0 <= y <= BASE_H - h:
+            p[3] = 0.0                                        # the floor (or the top) stops it dead
+        p[1] = max(0.0, min(BASE_H - h, y))
+        return jump
 
     # ---------------- Drawing ----------------
 
@@ -480,6 +527,45 @@ class GuestMatchState(State):
 
     # ---------------- Your saves ----------------
 
+    def watch_for_teleport(self, side):
+        """Safety Teleport, judged on this screen as your saves are: the ball about to slip past your
+        paddle here (not on the host's late copy of it, which fired it on saves you were making)
+        blinks your paddle in front of it.  The save it then makes tells the host it teleported."""
+        view = self.view
+        ball = view.ball
+        paddle = view.p1 if side == 1 else view.p2
+        if self.pred is None or self.tau is None or self.bounce or ball.stuck:
+            return
+        if view.countdown is not None or view.message_text or self.teleport_hold is not None:
+            return
+        if not any(key == "teleport" and charges for key, _, charges in view.powerups.effect_list(paddle)):
+            return
+        if getattr(ball, "side", None) == ("red" if paddle.is_left else "blue"):
+            return                                  # Twin Balls: your own colour can't score on you
+        toward = -1 if paddle.is_left else 1
+        if ball.vx * toward <= 0:
+            return
+        to_goal = ball.x0 if paddle.is_left else BASE_W - ball.x1
+        if to_goal > abs(ball.vx) * PowerUps.TELEPORT_WARNING + 40 or PowerUps.covered(paddle, ball):
+            return
+        old = ((paddle.x0 + paddle.x1) / 2, (paddle.y0 + paddle.y1) / 2)
+        w, h = paddle.width, paddle.height
+        x0 = ball.x0 - 6 - w if paddle.is_left else ball.x1 + 6
+        y0 = (ball.y0 + ball.y1) / 2 - h / 2
+        x0, y0 = max(0.0, min(BASE_W - w, x0)), max(0.0, min(BASE_H - h, y0))
+        self.pred[:] = [x0, y0, 0.0, 0.0]
+        paddle.place(x0, y0, w, h)
+        paddle.vx = paddle.vy = 0.0
+        self.history.clear()
+        self.last_ball = None                       # no sweep across the jump for a save
+        self.teleport_hold = self.clock + 1.0
+        self.teleport_claim = True
+        self.quiet_teleport_until = self.clock + 1.5
+        tint = "red" if paddle.is_left else "blue"
+        for x, y in (old, (x0 + w / 2, y0 + h / 2)):
+            self.app.fx.burst(x, y, 10, 48, tint, life = (.5, .9))
+        self.app.sound_manager.play("hmyoop!.wav")
+
     def watch_for_save(self, side, info):
         """Did the ball meet your paddle on this screen?  If so, tell the host at once (it decides
         hits on your paddle by what you saw), and fly the ball on from your paddle here."""
@@ -535,9 +621,13 @@ class GuestMatchState(State):
         else:       # a host on an earlier 1.5 doesn't send its serve speed, and expects the simpler bounce
             vx, vy, bx, by = self.simple_bounce(at, side, normal, bx, by, r, ball.vx, ball.vy, pvx, pvy)
         net.claim_id += 1
-        net.claims.append({"id": net.claim_id, "t": round(tau, 4), "bx": round(bx, 1), "by": round(by, 1),
-                           "px": round(px, 1), "py": round(py, 1), "pvx": round(pvx), "pvy": round(pvy),
-                           "normal": list(normal), "vx": round(vx, 1), "vy": round(vy, 1), "rule": 2 if serve else 1})
+        claim = {"id": net.claim_id, "t": round(tau, 4), "bx": round(bx, 1), "by": round(by, 1),
+                 "px": round(px, 1), "py": round(py, 1), "pvx": round(pvx), "pvy": round(pvy),
+                 "normal": list(normal), "vx": round(vx, 1), "vy": round(vy, 1), "rule": 2 if serve else 1}
+        if getattr(self, "teleport_claim", False) and getattr(self, "teleport_hold", None) is not None:
+            claim["teleport"] = 1                   # the save your Safety Teleport made here
+            self.teleport_claim = False
+        net.claims.append(claim)
         net.send_input()                            # straight away, not with the next keys
         net.last_send = time.perf_counter()
         self.claim_rest = 0.25

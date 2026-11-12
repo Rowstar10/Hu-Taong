@@ -13,6 +13,9 @@ Power-up fixes and changes, from a review of every power-up.
 - Safety Teleport under Twin Balls: the save now guards against the ball that can score on you. Red's save watched the red ball, which can't score on Red.
 - Sticky Goo with the Middle Wall down: a paddle can only hold the ball in its own half. Carried over the halfway line, or caught in the other half, the ball is slung there and then. Before, it could be carried right up to the other goal.
 - Double or Nothing now says "This point is worth 2". It said "the next point", but it has always doubled the point being played.
+- Online, the joining player's own paddle answers their keys at once under Gravity. Their game now runs the same fall-and-jump rules as the host's, where it used to wait a full round trip for the host's word.
+- Online, the joining player's Safety Teleport is judged on their own screen, as their saves are. The host judged it from its slightly late copy of their paddle, so it fired on saves they were already making.
+- Online and in replays, the scored message says "x2" when Double or Nothing made the point worth 2. The joining player saw their score jump by 2 without being told why.
 
 ### Changed
 - The wait for the next talisman carries on from point to point. It restarted at every point, so quick points, attacking play and games without the Middle Wall hardly saw any.

@@ -319,10 +319,18 @@ class Hu_Taong(GameBase):
         if math.hypot(bx - hx, by - hy) > max(80, speed * 0.1):
             self.claim_note = ("ball", round(bx - hx), round(by - hy), round(speed))
             return -1                                    # the ball wasn't there
-        reach = g.speed * 0.45 + 90
-        if abs(px - gx) > reach or abs(py - gy) > reach:
-            self.claim_note = ("paddle", round(px - gx), round(py - gy))
-            return -1                                    # nor could the paddle have been
+        # A save their Safety Teleport made on their screen: the paddle blinked there, so it needn't
+        # have been able to reach it, only to be in front of its own goal (and have a save to spend)
+        teleported = bool(claim.get("teleport")) and bool(getattr(g, "charges", {}).get("teleport"))
+        if teleported:
+            if (px > 520) if g.is_left else (px + g.width < BASE_W - 520):
+                self.claim_note = ("teleport", round(px))
+                return -1
+        else:
+            reach = g.speed * 0.45 + 90
+            if abs(px - gx) > reach or abs(py - gy) > reach:
+                self.claim_note = ("paddle", round(px - gx), round(py - gy))
+                return -1                                # nor could the paddle have been
         keep = (g.x0, g.y0, g.vx, g.vy)
         # the ball as it is now, to put back if the save doesn't stand
         ball_was = (ball.x0, ball.y0, ball.x1, ball.y1, ball.vx, ball.vy, ball.last_paddle, ball.rally_value)
@@ -374,6 +382,12 @@ class Hu_Taong(GameBase):
             # put the ball back as it was (the check moved it to the claimed moment and knocked it)
             (ball.x0, ball.y0, ball.x1, ball.y1, ball.vx, ball.vy, ball.last_paddle, ball.rally_value) = ball_was
             return -1
+        if teleported:
+            # their paddle is where it blinked to on their screen; the save is spent
+            old = (keep[0] + g.width / 2, keep[1] + g.height / 2)
+            g.x0, g.y0, g.x1, g.y1 = px, py, px + g.width, py + g.height
+            g.vx, g.vy = (push if push is not None else 0.0), 0.0
+            self.powerups.teleported(g, old)
         self.pending_goal = None                         # it was saved after all
         if self.paused and self.countdown is None and not self.message_text:
             self.resume()

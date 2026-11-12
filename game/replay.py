@@ -202,6 +202,8 @@ class Recorder:
         state |= (128 if pu.frozen(g.p1) else 0) | (256 if pu.frozen(g.p2) else 0)
         cd = g.countdown
         message = 0 if not g.message_text else (1 if g.message_text.startswith(g.p1.color1) else 2)
+        if message and g.message_text.endswith("x2"):
+            message += 2                     # Double or Nothing: 3 Red or 4 Blue scored 2 (older replays: 1 or 2)
         banter = g.banter
         stuck = getattr(ball, "stuck", None)
         if stuck:
@@ -617,8 +619,9 @@ class ReplayView:
         self.p1.ai_enabled, self.p2.ai_enabled = bool(state & 2), bool(state & 4)
         self.countdown = _Countdown(a[20], int(a[21])) if a[20] >= 0 else None
         message = int(a[22])
-        self.message_text = "" if not message else ("Red scored!" if message == 1 else "Blue scored!")
-        self.message_color = (255, 80, 80) if message == 1 else (60, 140, 255)
+        red = message in (1, 3)
+        self.message_text = "" if not message else ("Red scored!" if red else "Blue scored!") + (" x2" if message > 2 else "")
+        self.message_color = (255, 80, 80) if red else (60, 140, 255)
         self.switch_warning = a[23] if a[23] >= 0 else None
         self.switch_flash = a[24]
         self.switch_banner = "换 Swap!" if a[25] else "换 Switch!"

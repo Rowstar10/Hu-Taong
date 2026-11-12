@@ -1245,6 +1245,8 @@ class PowerUps:
         for paddle in (game.p1, game.p2):
             if not paddle.charges.get("teleport"):
                 continue
+            if getattr(paddle, "remote", False) and getattr(game, "net", None):
+                continue                    # online, the friend's own screen judges their teleport (see apply_claim)
             toward = -1 if paddle.is_left else 1
             goal = 1 if paddle.is_left else -1                  # as Ball.scores_in numbers the goals
             for ball in self.balls():
@@ -1256,8 +1258,10 @@ class PowerUps:
                 self.teleport(paddle, ball)
                 break
 
-    def covered(self, paddle, ball):
-        """Would the paddle stop the ball from where it is now?"""
+    @staticmethod
+    def covered(paddle, ball):
+        """Would the paddle stop the ball from where it is now?  (Online, the friend's screen asks
+        it too, of its own paddle and ball.)"""
         r = ball.diameter / 2
         bx, by = (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2
         front = paddle.x1 if paddle.is_left else paddle.x0
@@ -1269,7 +1273,6 @@ class PowerUps:
         return abs(y - (paddle.y0 + paddle.y1) / 2) < paddle.height / 2 + r * 0.6
 
     def teleport(self, paddle, ball):
-        app = self.game.app
         old = ((paddle.x0 + paddle.x1) / 2, (paddle.y0 + paddle.y1) / 2)
         if paddle.is_left:
             paddle.x1 = ball.x0 - 6
@@ -1281,7 +1284,13 @@ class PowerUps:
         paddle.y0, paddle.y1 = cy - paddle.height / 2, cy + paddle.height / 2
         paddle.vx = paddle.vy = 0.0
         Physics.clamp_to_world(paddle)
+        self.teleported(paddle, old)
 
+    def teleported(self, paddle, old):
+        """The paddle has blinked from `old` (its centre) to where it is: the charge is spent, with
+        a flash at both ends, the sound and the popup."""
+        app = self.game.app
+        cy = (paddle.y0 + paddle.y1) / 2
         paddle.charges["teleport"] -= 1
         if not paddle.charges["teleport"]:
             del paddle.charges["teleport"]
