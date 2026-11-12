@@ -34,6 +34,10 @@ class Ball(GameObject):
         self.side = None         # Twin Balls: "red" or "blue", whose ball this is (it keeps that colour)
         self.curve = 0.0         # Curveball: px/s^2 it bends up (negative) or down as it flies
         self.portal_cool = 0.0   # Portal Pair: a moment after coming out of a portal
+        self.press = None        # (what last knocked it sideways, which side of that it was on, when)
+        self.press_clock = 0.0   # seconds the ball has moved, to time those knocks
+
+    PRESS_WINDOW = 0.02          # knocked from both sides within this: it's caught in a squeeze
 
     def scores_in(self, nx):
         """Can this ball score in the goal it just reached (nx 1: Red's goal on the left, -1: Blue's)?
@@ -45,6 +49,7 @@ class Ball(GameObject):
         return True
 
     def commit_position(self, dt):
+        self.press_clock += dt
         stuck = self.stuck
         if not stuck:
             super().commit_position(dt)
@@ -100,6 +105,12 @@ class Ball(GameObject):
             if hook:
                 hook(self, paddle, data)
 
+            if nx != 0 and not self.stuck:
+                squeezer = self.pressed_by(paddle)
+                if squeezer is not None:
+                    self.squeeze_free(paddle, squeezer)
+                    return
+
         if other.is_wall and other.is_goal:
             if not self.scores_in(nx):
                 # Twin Balls: its own colour's goal just turns it back, at no less than serve speed
@@ -121,6 +132,40 @@ class Ball(GameObject):
             hook = getattr(self.game, "on_bounce", None)
             if hook:
                 hook(self, other)
+            if nx != 0:
+                squeezer = self.pressed_by(other)
+                if squeezer is not None and squeezer.is_paddle:
+                    self.squeeze_free(other, squeezer)
+
+    def pressed_by(self, other):
+        """Note that `other` (a paddle or a stone) just knocked the ball sideways, and answer what
+        knocked it from its other side a moment ago, if anything.  Two paddles face to face with
+        the Middle Wall down, or a paddle driving it into a stone, would bounce it between them on
+        the spot hundreds of times a second, and the point could never end."""
+        side = 1 if self.x0 + self.x1 > other.x0 + other.x1 else -1    # which side of `other` it's on
+        last, self.press = self.press, (other, side, self.press_clock)
+        if last is None or last[0] is other or last[1] != -side:
+            return None
+        if self.press_clock - last[2] > self.PRESS_WINDOW or last[0] not in self.game.objects:
+            return None
+        return last[0]
+
+    def squeeze_free(self, a, b):
+        """Caught between `a` and `b` (see pressed_by): it squirts out past their nearer ends, up or
+        down, at no less than serve speed, instead of rattling between them."""
+        r = self.height / 2
+        top, bottom = min(a.y0, b.y0), max(a.y1, b.y1)
+        cy = (self.y0 + self.y1) / 2
+        room_up, room_down = top >= self.height + 4, BASE_H - bottom >= self.height + 4
+        go_up = room_up and (not room_down or cy - top <= bottom - cy)
+        if not room_up and not room_down:
+            go_up = cy < BASE_H / 2
+        y = clamp(top - r - 3 if go_up else bottom + r + 3, r, BASE_H - r)
+        self.y0, self.y1 = y - r, y + r
+        speed = max(math.hypot(self.vx, self.vy), self.speed)
+        self.vy = -speed * 0.9 if go_up else speed * 0.9
+        self.vx = math.copysign(speed * 0.44, self.vx or 1.0)
+        self.press = None
 
     def squeeze_out(self, nx):
         """Twin Balls: a ball pressed against its own goal by a paddle would bounce between the two
@@ -154,3 +199,4 @@ class Ball(GameObject):
         self.side = None
         self.curve = 0.0
         self.portal_cool = 0.0
+        self.press = None

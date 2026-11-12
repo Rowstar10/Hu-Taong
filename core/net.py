@@ -26,7 +26,7 @@ from xml.etree import ElementTree
 from core import rooms
 
 PORT = 47620
-PROTOCOL = 8                  # raised whenever the messages change, so old and new builds turn each other away clearly
+PROTOCOL = 9                  # raised whenever the messages or the shared rules change, so old and new builds turn each other away clearly
 MAGIC = b"HT"
 TIMEOUT = 6.0                 # seconds of silence before the other side is taken as gone
 SEND_RATE = 60                # packets a second each way

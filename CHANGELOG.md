@@ -2,6 +2,26 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 1.6 — 2026-11-12
+
+Power-up fixes and changes, from a review of every power-up.
+
+### Fixed
+- With the Middle Wall down, a ball caught between the two paddles, or between a paddle and a stone, no longer rattles on the spot hundreds of times a second. It squirts out past the paddles' ends.
+- Snowball: holding the key towards your own goal no longer stops a shove from counting. While a paddle reels from the hit, a shove that carries it into its own goal gives away the point whatever key is held. Steering into your own goal yourself, unshoved, still gives nothing away.
+- Portal Pair: a ball can no longer loop between the portals for ever. After three trips through them with no paddle touching a ball, the portals close.
+- Safety Teleport under Twin Balls: the save now guards against the ball that can score on you. Red's save watched the red ball, which can't score on Red.
+- Sticky Goo with the Middle Wall down: a paddle can only hold the ball in its own half. Carried over the halfway line, or caught in the other half, the ball is slung there and then. Before, it could be carried right up to the other goal.
+- Double or Nothing now says "This point is worth 2". It said "the next point", but it has always doubled the point being played.
+
+### Changed
+- The wait for the next talisman carries on from point to point. It restarted at every point, so quick points, attacking play and games without the Middle Wall hardly saw any.
+- Gravity, Ghost Ball, Wind Gust and Sticky Goo end when the point ends, so the next serve is a plain one. Your own Boons and Curses still carry on until their time runs out.
+- Online play needs both players on 1.6: it won't connect to 1.5 or earlier, and their rooms show "Other version".
+
+### Added
+- Tests for these fixes, in the tests folder.
+
 ## 1.5 — 2026-11-11
 
 Smoother online play, and hits off the joining player's paddle that look the same on both screens.

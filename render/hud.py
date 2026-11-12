@@ -15,7 +15,7 @@ SHORT = {"teleport": "Saves one goal", "giant": "Taller paddle", "swift": "Faste
          "tomb": "A tombstone stands on the court", "snowball": "Heavy snowball: shoves paddles back",
          "twin": "Two balls: each scores only in the other side's goal",
          "chaos": "Sizes and speeds drifting", "curve": "Hits bend the way the paddle moved",
-         "double": "The next point is worth 2", "wind": "Wind bending the ball",
+         "double": "This point is worth 2", "wind": "Wind bending the ball",
          "cracker": "Bangs after its last hit", "lantern": "Night: lanterns only",
          "portal": "Two linked portals"}
 

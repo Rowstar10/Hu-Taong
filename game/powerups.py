@@ -131,8 +131,8 @@ KINDS = (
          "• The spin fades as it goes, and flips when it bounces off the top or bottom\n"
          "• Doesn't turn up if Curveball is on for the whole match (in Settings)"),
     Kind("double", "Double or Nothing", "倍", "Wild", 0,
-         "The next point is worth 2, whoever wins it.",
-         "The next point is worth 2.\n"
+         "This point is worth 2, whoever wins it.",
+         "This point is worth 2.\n"
          "• Whoever wins it, Red or Blue\n"
          "• It can win the match outright"),
     Kind("wind", "Wind Gust", "风", "Wild", 10,
@@ -205,6 +205,7 @@ class PowerUps:
     CRACKER_TOP = 2600                      # ...and the ball shoots off at double speed, up to this (3600 was unreturnable)
     PORTAL_R = 80                           # Portal Pair: a portal's radius
     PORTAL_COOL = 0.35                      # seconds before a ball can go through a portal again
+    PORTAL_TRIPS = 3                        # trips with no paddle touch before they close (a loop)
     LANTERN_FADE = (0.6, 0.9)               # Lantern Night: seconds for night to fall, and to lift
     BLAST_R = 280                           # Firecracker: how far its blast flattens stones
     BLAST_TIME = 0.7                        # seconds its shockwave takes to spread and fade
@@ -233,12 +234,13 @@ class PowerUps:
         self.switch_plus = False # Soul Swap: Chaos Switch + is on until the point ends
         self.chaos_plus = False  # Chaos Mode + until the point ends
         self.curve_on = False    # Curveball until the point ends
-        self.double = False      # Double or Nothing: the next point is worth 2
+        self.double = False      # Double or Nothing: the point being played is worth 2
         self.wind = None         # Wind Gust: {"left", "dir" (1 down, -1 up), "t"}
         self.cracker = None      # Firecracker: {"hits": hits left, "fuse": seconds to the bang or None}
         self.lantern = None      # Lantern Night: {"age": seconds, "lifting": seconds left of the dawn, or None}
         self.blasts = []         # Firecracker explosions for the renderer: [x, y, age]
         self.portals = []        # Portal Pair: [{"x", "y", "angle"}, {"x", "y", "angle"}]
+        self.portal_trips = 0    # trips through them since a paddle last touched a ball
         self.ball_v = (game.ball.vx, game.ball.vy)   # the ball's velocity last frame, before any hit
         self.wait = self.next_wait()
         self.ball_restitution = game.ball.restitution
@@ -504,7 +506,7 @@ class PowerUps:
         if self.curve_on:
             items.append(("curve", UNTIL_POINT, "Curveball: hits bend the way the paddle moved"))
         if self.double:
-            items.append(("double", UNTIL_POINT, "The next point is worth 2"))
+            items.append(("double", UNTIL_POINT, "This point is worth 2"))
         if self.wind:
             items.append(("wind", self.wind["left"], "Wind blowing " + ("down" if self.wind["dir"] > 0 else "up")))
         if self.cracker:
@@ -712,6 +714,7 @@ class PowerUps:
         # Frostbite changes hands on every hit: a paddle carrying it passes it onto the ball (which
         # slows), and a paddle that hits the frosted ball catches it (and slows) until its next hit
         main = ball is self.game.ball          # Twin Balls' blue ball carries no frost, goo or snow
+        self.portal_trips = 0                  # a ball looping through the portals has been played
         frost = self.frost
         if frost and main:
             if frost["holder"] is paddle:
@@ -846,6 +849,7 @@ class PowerUps:
                 break
         if len(placed) == 2:
             self.portals = placed
+            self.portal_trips = 0
             for p in placed:
                 game.app.fx.spark(p["x"], p["y"], 24, (170, 120, 255), speed = 300, life = .6)
 
@@ -878,13 +882,25 @@ class PowerUps:
                 hook = getattr(self.game, "on_portal", None)
                 if hook:
                     hook(door, out)
+                self.portal_trips += 1
+                if self.portal_trips >= self.PORTAL_TRIPS:
+                    self.close_portals()        # round and round with nobody touching it: a loop
+                    return
                 break
+
+    def close_portals(self):
+        """The portals snap shut (a ball was looping through them with no paddle near)."""
+        for p in self.portals:
+            self.game.app.fx.spark(p["x"], p["y"], 24, (170, 120, 255), speed = 300, life = .6)
+        self.portals = []
+        self.portal_trips = 0
 
     # ---------------- Snowball ----------------
 
     def shove(self, paddle):
         """The heavy snowball knocks the paddle that hit it back towards its own goal: the bigger
-        and faster the ball, the harder, and driving into it takes some of the shove off."""
+        and faster the ball, the harder.  (SNOW_HOLD would let driving into it take some of the
+        shove off; it's 0, as the tooltip says: even a paddle driving into it is shoved.)"""
         back = -1 if paddle.is_left else 1                  # towards this paddle's goal
         incoming = self.ball_v[0] * back                     # how fast it came at the goal
         if incoming <= 0:
@@ -916,11 +932,15 @@ class PowerUps:
             gap = paddle.x0 - game.left_wall.x1 if paddle.is_left else game.right_wall.x0 - paddle.x1
             back = -1 if paddle.is_left else 1
             # It only counts if the shove carried it in: still going back fast as it got there (the
-            # goal's wall stops it dead, so last frame's speed counts too), and not steered there by
-            # its player (touching your own goal yourself is no point)
+            # goal's wall stops it dead, so last frame's speed counts too).  While it reels from the
+            # hit its player barely steers it, so what key they hold doesn't matter (holding towards
+            # their own goal made them impossible to shove in); after that, a paddle its player
+            # steered into the goal themself gives nothing away
             going = max(paddle.vx * back, getattr(paddle, "back_speed", 0.0))
             paddle.back_speed = paddle.vx * back
-            carried = going > self.SHOVE_CARRY and getattr(paddle, "want_vx", 0.0) * back <= 0
+            reeling = paddle.shoved > self.SHOVE_TIME - self.SNOW_REELING
+            steered = getattr(paddle, "want_vx", 0.0) * back > 0
+            carried = going > self.SHOVE_CARRY and (reeling or not steered)
             if gap <= 2 and not carried:
                 paddle.shoved = 0.0
                 continue
@@ -950,12 +970,19 @@ class PowerUps:
 
     def on_point(self):
         """A point ends whatever was riding on the ball, and clears the court: Open Court's wall
-        goes back up, Tombstones sink away and the Snowball melts back into a ball."""
+        goes back up, Tombstones sink away and the Snowball melts back into a ball.  What acts on
+        both players (Gravity, Sticky Goo, a Ghost Ball, the wind) ends too, so the next serve is a
+        plain one; each player's own Boons and Curses carry on.  The wait for the next talisman
+        carries on where it was (restarted at every point, quick points never got one)."""
         from objects.obstacle import Obstacle
         self.pickups.clear()
-        self.wait = self.next_wait()
         if self.ball_frosted():
             self.frost = None
+        self.ghost = None
+        self.wind = None
+        for paddle in (self.game.p1, self.game.p2):
+            for key in ("gravity", "sticky"):
+                paddle.effects.pop(key, None)
         ball = self.game.ball
         ball.blazing = False
         ball.stuck = None
@@ -979,6 +1006,7 @@ class PowerUps:
                     (stone.broken or stone.hp < stone.max_hp):
                 stone.restore()
         self.portals = []
+        self.portal_trips = 0
         for b in self.balls():
             b.curve = 0.0
         if walled:
@@ -1055,6 +1083,12 @@ class PowerUps:
         # carried into a stone, it's knocked loose there and then
         for stone in self.game.objects:
             if getattr(stone, "is_obstacle", False) and stone.solid and                     min(ball.x1, stone.x1) > max(ball.x0, stone.x0) and min(ball.y1, stone.y1) > max(ball.y0, stone.y0):
+                stuck["left"] = 0
+        # with the Middle Wall down, a paddle can only hold the ball in its own half: carried over
+        # the halfway line, or caught in the other half, it's slung there and then (it could be
+        # carried right up to the other goal and slung in point-blank)
+        if not self.game.wall_up:
+            if ((ball.x0 + ball.x1) / 2 > BASE_W / 2) == stuck["paddle"].is_left:
                 stuck["left"] = 0
         if stuck["left"] > 0:
             return
@@ -1173,19 +1207,22 @@ class PowerUps:
     # ---------------- Safety Teleport ----------------
 
     def check_teleports(self):
-        game, ball = self.game, self.game.ball
-        if ball.stuck:
-            return
+        """A held Safety Teleport saves its player from any ball that could score in their goal
+        (under Twin Balls, the other colour's ball: their own can't score on them)."""
+        game = self.game
         for paddle in (game.p1, game.p2):
             if not paddle.charges.get("teleport"):
                 continue
             toward = -1 if paddle.is_left else 1
-            if ball.vx * toward <= 0:
-                continue
-            to_goal = ball.x0 if paddle.is_left else BASE_W - ball.x1
-            if to_goal > abs(ball.vx) * self.TELEPORT_WARNING + 40 or self.covered(paddle, ball):
-                continue
-            self.teleport(paddle, ball)
+            goal = 1 if paddle.is_left else -1                  # as Ball.scores_in numbers the goals
+            for ball in self.balls():
+                if ball.stuck or ball.vx * toward <= 0 or not ball.scores_in(goal):
+                    continue
+                to_goal = ball.x0 if paddle.is_left else BASE_W - ball.x1
+                if to_goal > abs(ball.vx) * self.TELEPORT_WARNING + 40 or self.covered(paddle, ball):
+                    continue
+                self.teleport(paddle, ball)
+                break
 
     def covered(self, paddle, ball):
         """Would the paddle stop the ball from where it is now?"""
