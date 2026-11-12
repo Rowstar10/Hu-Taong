@@ -145,7 +145,21 @@ class PaddleAI:
                 k["misread"] *= 1.5
                 k["wobble"] += 30
                 k["reaction"] += 0.04
+            night = powerups.lantern_level()
+            if night > 0.5 and self.towards_goal(game.ball.vx) and self.in_the_dark(game.ball, powerups):
+                # Lantern Night: out in the dark, a ball coming its way is as hard to judge as a
+                # Ghost Ball (it used to see perfectly, so only a person was handicapped)
+                k["misread"] *= 1 + 0.5 * night
+                k["wobble"] += 30 * night
+                k["reaction"] += 0.04 * night
         return k
+
+    def in_the_dark(self, ball, powerups):
+        """Lantern Night: is the ball outside both paddles' lantern light?"""
+        bx, by = (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2
+        game = self.paddle.game
+        return all(math.hypot(bx - (p.x0 + p.x1) / 2, by - (p.y0 + p.y1) / 2) > powerups.LANTERN_LIGHT
+                   for p in (game.p1, game.p2))
 
     def opponent(self):
         game = self.paddle.game
@@ -160,8 +174,13 @@ class PaddleAI:
         powerups = getattr(self.paddle.game, "powerups", None)
         if not (powerups and powerups.hidden_from(self.paddle) and self.seen):
             # a Ghost Ball out of sight leaves the AI working from where it last saw it; a ball
-            # stuck to a paddle is read as leaving the way it will once it peels off
-            vx, vy = (ball.stuck["vx"], ball.stuck["vy"]) if getattr(ball, "stuck", None) else (ball.vx, ball.vy)
+            # stuck to a paddle is read as leaving the way it will once it peels off: as the
+            # holding paddle's movement aims it (Sticky Goo's arrow), not on its old return
+            stuck = getattr(ball, "stuck", None)
+            if stuck and powerups and "vx" in stuck:
+                vx, vy = powerups.sling(stuck, stuck["paddle"], getattr(ball, "speed", 0))
+            else:
+                vx, vy = (stuck["vx"], stuck["vy"]) if stuck else (ball.vx, ball.vy)
             self.seen.append((self.clock, (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2, vx, vy))
         while len(self.seen) > 1 and self.seen[0][0] < self.clock - self.MEMORY:
             self.seen.popleft()

@@ -212,6 +212,7 @@ class PowerUps:
     PORTAL_COOL = 0.35                      # seconds before a ball can go through a portal again
     PORTAL_TRIPS = 3                        # trips with no paddle touch before they close (a loop)
     LANTERN_FADE = (0.6, 0.9)               # Lantern Night: seconds for night to fall, and to lift
+    LANTERN_LIGHT = 300                     # px of lantern light round each paddle
     BLAST_R = 280                           # Firecracker: how far its blast flattens stones
     BLAST_TIME = 0.7                        # seconds its shockwave takes to spread and fade
     SNOW_GROW = 1 / 9000                    # Snowball: size gained per px it rolls...

@@ -37,6 +37,8 @@ Power-up fixes and changes, from a review of every power-up.
 - Wind Gust: bolder, busier leaves, and an arrow by its icon showing which way it blows.
 - Portal Pair: bigger, brighter exit arrows, and the portals glow at night.
 - Clearer descriptions for Soul Swap and Chaos Mode +.
+- The computer player reads where a Sticky Goo ball will be slung, as the aim arrow shows. It expected the ball to leave on its old return, so any flick of the paddle fooled it.
+- Lantern Night: the computer player misjudges a ball out in the dark, as it does a Ghost Ball. It used to see perfectly, so only you were handicapped. This applies with Lantern Night on for the whole match, in Settings, too.
 - Online play needs both players on 1.6: it won't connect to 1.5 or earlier, and their rooms show "Other version".
 
 ### Added

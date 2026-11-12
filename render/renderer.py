@@ -2158,7 +2158,7 @@ class Renderer:
             self._night = pygame.Surface((BASE_W, BASE_H), pygame.SRCALPHA)
         dark = self._night
         dark.fill((6, 4, 16, int(236 * level)))
-        lights = [((o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2, 300) for o in (game.p1, game.p2)]
+        lights = [((o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2, PowerUps.LANTERN_LIGHT) for o in (game.p1, game.p2)]
         lights += [((o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2, 150) for o in game.objects if o.is_ball]
         for x, y, radius in lights:
             hole = self.art.get(("night_hole", radius), self._night_hole, radius)
