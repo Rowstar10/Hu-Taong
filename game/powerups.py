@@ -84,12 +84,13 @@ KINDS = (
          "• Lasts until the point ends\n"
          "• Only turns up while the wall is up"),
     Kind("swap", "Soul Swap", "换", "Wild", 0,
-         "Chaos Switch + until the point ends: the wall comes down and the paddles keep swapping places.",
-         "Chaos Switch + is on until the point ends.\n"
-         "• The Middle Wall comes down\n"
-         "• Every so often, after a warning, the paddles swap places and every ball slows to half speed\n"
-         "• Keys, scores and goals stay put\n"
-         "• Doesn't turn up if Chaos Switch + is already on"),
+         "Until the point ends the wall comes down and the paddles keep swapping places.",
+         "Until the point ends, the Middle Wall comes down, and every few seconds, after a warning, "
+         "the paddles swap places.\n"
+         "• Your goal stays put: run back and defend it!\n"
+         "• Every ball slows to half speed at each swap\n"
+         "• Your keys and score stay put too\n"
+         "• Doesn't turn up if Chaos Switch + is on in Settings"),
     Kind("blink", "Blink Ball", "闪", "Wild", 10,
          "For 10 seconds the ball blinks to a nearby spot every so often, swerving a little each time.",
          "The ball blinks to a random spot close by, every 0.1 to 0.5 seconds.\n"
@@ -119,11 +120,11 @@ KINDS = (
          "• Red scores only by getting the red ball into Blue's goal, and Blue the blue ball into Red's\n"
          "• A ball that reaches its own colour's goal just bounces off it"),
     Kind("chaos", "Chaos Mode +", "狂", "Wild", 0,
-         "Chaos Mode + until the point ends: both paddles and the ball drift through sizes and speeds.",
-         "Chaos Mode + is on until the point ends.\n"
-         "• Both paddles and the ball keep drifting bigger and smaller, faster and slower, each on its own\n"
+         "Until the point ends, both paddles and the ball drift through sizes and speeds.",
+         "For the rest of the point, both paddles and the ball keep drifting bigger and smaller, "
+         "faster and slower, each on its own (like the Chaos Mode + setting).\n"
          "• Everything goes back to normal for the next serve\n"
-         "• Doesn't turn up if Chaos Mode + is already on"),
+         "• Doesn't turn up if Chaos Mode + is on in Settings"),
     Kind("curve", "Curveball", "旋", "Wild", 0,
          "Until the point ends, every hit curves the way the paddle was moving as it hit.",
          "Curveball is on until the point ends.\n"

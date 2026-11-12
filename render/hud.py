@@ -35,6 +35,7 @@ class Hud:
         # Each score plate swells briefly when its score changes
         self._scores = {}
         self._pops = {}
+        self._wind_way = 0                      # Wind Gust: 1 blowing down, -1 up (for the arrow by its icon)
 
     # ------------------------------------------------------------------
     # Public draw entry point
@@ -60,6 +61,12 @@ class Hud:
 
         powerups = getattr(game, "powerups", None)
         if powerups:
+            court_keys = {item[0] for item in powerups.court_list()}
+            if live and "double" in court_keys:        # Double or Nothing: a big x2 by both scores
+                self.draw_double(screen, left - 130)
+                self.draw_double(screen, right + 130)
+            force = powerups.wind_force() if hasattr(powerups, "wind_force") else 0.0
+            self._wind_way = (1 if force > 0 else -1) if force else 0
             top = 196 if game.settings.switch_each_point else 150
             self.draw_effects(screen, powerups.effect_list(p1), left, top)
             self.draw_effects(screen, powerups.effect_list(p2), right, top)
@@ -201,7 +208,20 @@ class Hud:
                 arc.center = (x, top + 22)
                 pygame.draw.arc(screen, FAMILY_COLOURS[kind.family], arc, math.pi / 2, math.pi / 2 + k * math.tau, 3)
             renderer.text(screen, self.label(key, left, charges), font, theme.PARCHMENT, center=(x, top + 56))
+            if key == "wind" and self._wind_way:
+                # which way it's blowing: an arrow beside the icon
+                way, ax, ay = self._wind_way, x + 32, top + 22
+                tip = (ax, ay + way * 16)
+                pygame.draw.line(screen, theme.PARCHMENT, (ax, ay - way * 14), (ax, ay + way * 6), 4)
+                pygame.draw.polygon(screen, theme.PARCHMENT, [tip, (ax - 8, ay + way * 4), (ax + 8, ay + way * 4)])
             x += step
+
+    def draw_double(self, screen, cx):
+        """Double or Nothing: a big gold "x2" beside a score, gently pulsing, while the point is worth 2."""
+        k = 1 + 0.08 * math.sin(self.app.fx.time * 6)
+        text = self.art.gilded("x2", self.art.ui(64), thickness=3, glow=None)
+        text = pygame.transform.smoothscale(text, (int(text.get_width() * k), int(text.get_height() * k)))
+        screen.blit(text, text.get_rect(center=(cx, 18 + 54)))
 
     def draw_owner(self, screen, paddle, cx):
         renderer = self.app.renderer

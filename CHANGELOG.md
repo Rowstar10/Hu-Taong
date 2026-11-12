@@ -26,6 +26,17 @@ Power-up fixes and changes, from a review of every power-up.
 - Twin Balls never split slower than half a serve. They could crawl at a quarter.
 - Wind Gust blows harder: 500 px/s² at the height of a gust, up from 360.
 - Firecracker: the bang always shoots the ball away from whoever lit it. It could shoot straight back at them from point-blank.
+- Safety Teleport: a waiting save shows on your paddle, with a soft gold glow and its 遁 glyph, so both players can see it.
+- Swift Step: a Swift paddle leaves gold after-images as it moves.
+- Frostbite: a frozen paddle is crusted in ice, and the ice cracks off as it thaws. While the frost waits on its taker's paddle, that paddle only glows cold.
+- Sticky Goo: the goo sits round the paddle's edges, so your paddle still shows red or blue.
+- Gravity: "Up = jump!" shows over each player's paddle as it starts.
+- Snowball: the goal line lights up while a paddle is being shoved back at it.
+- Twin Balls: the red ball is properly red, and each goal line flashes the colour of the ball that can score there.
+- Double or Nothing: a big x2 beside both scores while the point is worth 2.
+- Wind Gust: bolder, busier leaves, and an arrow by its icon showing which way it blows.
+- Portal Pair: bigger, brighter exit arrows, and the portals glow at night.
+- Clearer descriptions for Soul Swap and Chaos Mode +.
 - Online play needs both players on 1.6: it won't connect to 1.5 or earlier, and their rooms show "Other version".
 
 ### Added
