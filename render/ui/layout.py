@@ -324,14 +324,15 @@ class Cycle(Node):
 
 
 class Slider(Node):
-    """[Reset]  ----o----  label"""
+    """[Reset]  ----o----  label  [Mute]"""
 
     def __init__(self, key, value, color, font, label, label_sample,
-                 reset_key=None, reset_font=None, track_w=None, tip=None):
+                 reset_key=None, reset_font=None, track_w=None, tip=None, mute_key=None, muted=None):
         super().__init__()
         self.key, self.value, self.color, self.tip = key, value, color, tip
         self.font, self.label, self.label_sample = font, label, label_sample
         self.reset_key, self.reset_font = reset_key, reset_font
+        self.mute_key, self.muted = mute_key, muted    # muted: the knob keeps its place, the bar empties
         self.track_w = track_w or int(BASE_W * 0.18)
 
     def measure(self):
@@ -342,11 +343,19 @@ class Slider(Node):
         if self.reset_key:
             self.reset_w = self.reset_font.size("Reset")[0] + int(BASE_W * 0.018)
             self.reset_h = self.reset_font.size("Ag")[1] + int(BASE_H * 0.014)
-        self.label_w = self.font.size(self.label_sample)[0] + 28
+        self.mute_w = self.mute_h = 0
+        if self.mute_key:
+            bf = self.reset_font or self.font
+            self.mute_w = bf.size("Unmute")[0] + int(BASE_W * 0.018)
+            self.mute_h = bf.size("Ag")[1] + int(BASE_H * 0.014)
+        samples = [self.label_sample] + (["Muted"] if self.mute_key else [])
+        self.label_w = max(self.font.size(t)[0] for t in samples) + 28
         self.label_h = self.font.size("Ag")[1] + 6
         self.pad = self.knob_r + self.gap // 2      # the knob overhangs both ends of the track
         self.w = self.reset_w + self.pad + self.track_w + self.pad + self.label_w
-        self.h = max(2 * self.knob_r + 2, self.reset_h, self.label_h)
+        if self.mute_key:
+            self.w += self.gap + self.mute_w
+        self.h = max(2 * self.knob_r + 2, self.reset_h, self.label_h, self.mute_h)
         return self.w, self.h
 
     def place(self, x, y, w, h):
@@ -357,16 +366,19 @@ class Slider(Node):
         self.track = pygame.Rect(x0, r.centery - self.track_h // 2, self.track_w, self.track_h)
         self.plate = pygame.Rect(self.track.right + self.pad, r.centery - self.label_h // 2,
                                  self.label_w, self.label_h)
+        self.mute_rect = pygame.Rect(self.plate.right + self.gap, r.centery - self.mute_h // 2,
+                                     self.mute_w, self.mute_h)
         # grab area is as tall as the knob, not just the thin track
         self.grab = self.track.inflate(0, 2 * self.knob_r - self.track_h)
 
     def draw(self, ui):
         screen, t, art = ui.screen, self.track, ui.art
         value = max(0.0, min(1.0, _val(self.value)))
+        muted = bool(self.mute_key and _val(self.muted))
 
         screen.blit(art.inset(t.w, t.h), t)
         fill_w = int((t.w - 6) * value)
-        if fill_w > 0:
+        if fill_w > 0 and not muted:
             bar = art.slider_fill(t.w - 6, t.h - 6, self.color)
             screen.blit(bar, (t.x + 3, t.y + 3), (0, 0, fill_w, t.h - 6))
 
@@ -380,15 +392,23 @@ class Slider(Node):
         screen.blit(knob, knob.get_rect(center=(kx, ky)))
 
         screen.blit(art.inset(self.plate.w, self.plate.h), self.plate)
-        ui.renderer.text(screen, _val(self.label), self.font, theme.PARCHMENT, center=self.plate.center)
+        ui.renderer.text(screen, "Muted" if muted else _val(self.label), self.font, theme.PARCHMENT,
+                         center=self.plate.center)
 
         if self.reset_key:
             ui.renderer.draw_lacquer(screen, ui.mouse, self.reset_rect, "Reset", self.reset_font, "ink")
             ui.state.ui_hitboxes[self.reset_key] = self.reset_rect
+        if self.mute_key:
+            ui.renderer.draw_lacquer(screen, ui.mouse, self.mute_rect, "Unmute" if muted else "Mute",
+                                     self.reset_font or self.font, "ink")
+            ui.state.ui_hitboxes[self.mute_key] = self.mute_rect
 
         ui.state.ui_hitboxes[self.key] = self.grab
         if self.reset_key and self.reset_rect.collidepoint(ui.mouse):
             ui.offer_tip(self.reset_rect, "Reset\nBack to the default value.")
+        elif self.mute_key and self.mute_rect.collidepoint(ui.mouse):
+            ui.offer_tip(self.mute_rect, "Unmute\nBack to where the slider is." if muted else
+                         "Mute\nSilence it. The slider keeps its place for when you unmute.")
         else:
             ui.offer_tip(self.rect, self.tip)
 

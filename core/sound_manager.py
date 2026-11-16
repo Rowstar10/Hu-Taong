@@ -65,6 +65,8 @@ class SoundManager:
         self.master_volume = DEFAULT_VOLUME
         self.sfx_volume = DEFAULT_VOLUME
         self.music_volume = DEFAULT_VOLUME
+        # Mute buttons: silence a slider while it keeps its place, for unmuting back to it
+        self.master_muted = self.sfx_muted = self.music_muted = False
 
         self.paddle_hit_sound = True
         self.score_sound = True
@@ -75,9 +77,13 @@ class SoundManager:
 
     # ---------------- Volume ----------------
 
+    def level(self, name):
+        """A volume slider ("master", "music" or "sfx") as heard: nothing while it's muted."""
+        return 0.0 if getattr(self, name + "_muted") else getattr(self, name + "_volume")
+
     def gain(self, slider, multiplier = 1):
         """A slider (0-1) times the master volume: what the listener should hear."""
-        return max(0.0, min(1.0, slider * self.master_volume * multiplier))
+        return max(0.0, min(1.0, slider * self.level("master") * multiplier))
 
     # ---------------- Sound effects ----------------
 
@@ -100,7 +106,7 @@ class SoundManager:
             return None
         if name in MENU_SOUNDS and not self.app.settings.audio.menu_sounds:
             return None
-        gain = self.gain(self.sfx_volume if slider is None else slider, multiplier)
+        gain = self.gain(self.level("sfx") if slider is None else slider, multiplier)
         if gain <= 0:
             return None
         snd = self.sound(name, folder)
@@ -124,9 +130,9 @@ class SoundManager:
         if music:
             gain = self.track_gain if self.app.settings.audio.even_volume else 1.0
             set_channel_volume(music["sound"], music["channel"],
-                               self.gain(self.music_volume, self.multiplier * gain))
+                               self.gain(self.level("music"), self.multiplier * gain))
         for channel, sound, level in self.ambience:
-            set_channel_volume(sound, channel, self.gain(self.sfx_volume, 0.5 * level * self.multiplier))
+            set_channel_volume(sound, channel, self.gain(self.level("sfx"), 0.5 * level * self.multiplier))
 
     @staticmethod
     def load_loudness():

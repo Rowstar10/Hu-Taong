@@ -46,6 +46,14 @@ class AudioSettingsState(JukeboxControls, State):
             mx, my = mouse_pos
             key = self.hit_test(mouse_pos)
             
+            # Moving or resetting a muted slider unmutes it: the player wants to hear it at that level
+            for name in ("master", "music", "sfx"):
+                if key in (f"{name}_volume_slider", f"reset_{name}_volume"):
+                    setattr(sound, f"{name}_muted", False)
+                if key == f"mute_{name}_volume":
+                    setattr(sound, f"{name}_muted", not getattr(sound, f"{name}_muted"))
+                    sound.update_music_volume()
+
             if key == "master_volume_slider":
                 self.dragging_master_volume = True
                 sound.master_volume = self.update_slider_from_mouse("master_volume_slider", event)
@@ -57,7 +65,8 @@ class AudioSettingsState(JukeboxControls, State):
             if key == "sfx_volume_slider":
                 self.dragging_sfx_volume = True
                 sound.sfx_volume = self.update_slider_from_mouse("sfx_volume_slider", event)
-                
+                sound.update_music_volume()
+
             if key == "reset_master_volume":
                 sound.master_volume = DEFAULT_VOLUME
                 sound.update_music_volume()
@@ -66,6 +75,7 @@ class AudioSettingsState(JukeboxControls, State):
                 sound.update_music_volume()
             if key == "reset_sfx_volume":
                 sound.sfx_volume = DEFAULT_VOLUME
+                sound.update_music_volume()
             if key == "reset_defaults":
                 self.confirm_reset("Reset audio settings?", self.app.reset_audio_settings)
 

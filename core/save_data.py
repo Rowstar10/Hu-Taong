@@ -23,7 +23,8 @@ INDEX_FIELDS = {"winning_score_index", "ai_difficulty", "max_fps", "background",
                 "rotate_every", "parallax", "powerup_rate", "play_mode", "court", "court_dim",
                 "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right",
                 "touch_steer", "touch_sensitivity"}  # whole numbers only
-SOUND = ["master_volume", "sfx_volume", "music_volume", "paddle_hit_sound", "score_sound"]
+SOUND = ["master_volume", "sfx_volume", "music_volume", "paddle_hit_sound", "score_sound",
+         "master_muted", "sfx_muted", "music_muted"]
 ONLINE = ["own_server", "server_address", "server_user", "server_password"]
 
 

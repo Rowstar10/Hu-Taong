@@ -1275,9 +1275,11 @@ class Renderer:
             track_w = int(BASE_W * 0.16 * s)
 
             def volume(header, key, value):
+                name = key.split("_")[0]          # master, music or sfx
                 return self.section(ui, s, header, Slider(
                     key + "_slider", value, theme.EMBER, sm, lambda: f"{int(round(100 * value()))}%", "100%",
-                    reset_key="reset_" + key, reset_font=ty, track_w=track_w, tip=TIPS[key + "_slider"]))
+                    reset_key="reset_" + key, reset_font=ty, track_w=track_w, tip=TIPS[key + "_slider"],
+                    mute_key="mute_" + key, muted=lambda: getattr(sound, name + "_muted")))
 
             mood_notes = {"menu":    "Relaxed music for the menus",
                           "game":    "Upbeat music for matches",
