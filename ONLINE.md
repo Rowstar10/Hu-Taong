@@ -45,7 +45,11 @@ server's address stays filled in for when it's back. The login is kept in your s
 ## During the match
 
 - Either of you can pause (Esc); it pauses for both, and the match waits while either of you is
-  in a menu. Clicking away from the game (to type to your friend, say) doesn't pause it.
+  in a menu. Clicking away from the game (to type to your friend, say) pauses it for both of
+  you too, and it carries on by itself once you're both back. Turn **Auto-Pause** off (Interface
+  settings) if you'd rather your clicking away didn't pause it.
+- The match only carries on while both of you are in the game, and always after a 3-2-1 on both
+  screens.
 - **Pause screen:** the host has Resume, Reset (serve again), Reset Scores, Replay (the match so
   far), Settings, **Lobby** and Leave Match. The guest has Resume, Restart? (asks the host to start
   again from 0-0), Replay, Settings and Leave Match.

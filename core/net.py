@@ -26,7 +26,7 @@ from xml.etree import ElementTree
 from core import rooms
 
 PORT = 47620
-PROTOCOL = 9                  # raised whenever the messages or the shared rules change, so old and new builds turn each other away clearly
+PROTOCOL = 10                 # raised whenever the messages or the shared rules change, so old and new builds turn each other away clearly
 MAGIC = b"HT"
 TIMEOUT = 6.0                 # seconds of silence before the other side is taken as gone
 SEND_RATE = 60                # packets a second each way
@@ -357,6 +357,7 @@ class HostSession:
         self.applied_seq = 0         # the last input whose keys the match has moved the friend's paddle with
         self.guest_requests = {}     # request counters seen from the guest: pause, resume, rematch
         self.guest_menu = 0          # what the guest has open: 0 nothing, 1 the pause screen, 2 deeper (settings)
+        self.guest_focus = True      # is the guest's window in front (or Auto-Pause off there)?
         self.claims = []             # saves the guest saw on its own screen, waiting to be checked
         self.claims_seen = set()
         self.guest_clear_tau = None  # the furthest the guest's screen has shown the ball with no save to claim
@@ -581,6 +582,9 @@ class HostSession:
         menu = extra.get("menu")
         if isinstance(menu, int):
             self.guest_menu = menu
+        focus = extra.get("focus")
+        if isinstance(focus, int):
+            self.guest_focus = bool(focus)
         for claim in extra.get("claims", []) if isinstance(extra.get("claims"), list) else []:
             if isinstance(claim, dict) and isinstance(claim.get("id"), int) and claim["id"] not in self.acks \
                     and claim["id"] not in self.claims_seen:
@@ -618,7 +622,7 @@ class HostSession:
         # "seq": the input the paddle in this picture has been moved with (one read this frame
         # hasn't moved it yet), so the guest compares like with like
         info = {"seq": self.applied_seq, "echo": self.guest_clock, "hclock": time.perf_counter(),
-                "paused": paused, "host_menu": host_menu,
+                "paused": paused, "host_menu": host_menu, "focus": 1 if self.app.focused() else 0,
                 "events": [[first + i, *e[1:]] for i, e in enumerate(events)],
                 "speed": [game.p1.speed, game.p2.speed], "serve": game.ball.speed,
                 "guest": 1 if getattr(game.p1, "remote", False) else 2,
@@ -638,6 +642,7 @@ class HostSession:
         self.guest = None
         self.link.peer = None
         self.guest_menu = 0
+        self.guest_focus = True
         self.guest_keys = 0
         self.notice = notice
         if self.game is not None:
@@ -808,6 +813,7 @@ class GuestSession:
         self.seq += 1
         extra = dict(self.requests)
         extra["menu"] = self.menu
+        extra["focus"] = 1 if self.app.focused() else 0     # clicked away: the match pauses for both
         if self.claims:
             extra["claims"] = self.claims[-4:]
         if self.snaps:

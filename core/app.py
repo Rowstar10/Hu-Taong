@@ -298,12 +298,15 @@ class App:
             return
         top = self.state_manager.current()
         name = getattr(top, "NAME", "")
-        if net.request("pause") and name == "game":
-            self.state_manager.push_state("pause", mute = True, by_friend = True)
+        asked = net.request("pause")
+        deep = net.guest_menu == 2 and net.connected()
+        away = net.connected() and not (self.focused() and net.guest_focus)     # either of you clicked away
+        if name == "game" and (asked or deep or away):
+            # paused for both; one opened by clicking away ends by itself once you're both back
+            self.state_manager.push_state("pause", mute = True, by_friend = asked or deep or self.focused(),
+                                          auto = away and not (asked or deep))
         if net.request("resume") and name == "pause":
-            self.state_manager.pop_state(mute = True)
-        if net.guest_menu == 2 and name == "game" and net.connected():
-            self.state_manager.push_state("pause", mute = True, by_friend = True)
+            top.resume()                  # 3-2-1 for both, and not while either of you is away
         if net.request("restart"):
             self.renderer.show_toast("Your friend asks to restart the match from 0-0: Reset Scores, on the pause screen, does it",
                                      important = True)
@@ -321,6 +324,11 @@ class App:
             court = display.court_dim_levels[display.court_dim] / 255
             dim = 1 - (1 - dim) * (1 - court)
         return round(dim, 3)
+
+    def focused(self):
+        """Is the player here?  The window is in front, or Auto-Pause is off (then clicking away
+        doesn't count).  Online, the match only plays while both players are."""
+        return self.has_focus or not self.settings.interface.auto_pause
 
     def in_match(self):
         """True while a match is on screen with nothing laid over it."""

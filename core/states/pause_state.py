@@ -44,8 +44,14 @@ class PauseState(JukeboxControls, State):
 
     def update(self, dt):
         # Paused by clicking away, and back with nothing touched here: carry on (after a 3-2-1)
-        if self.auto and self.app.has_focus:
+        if self.auto and self.everyone_back():
             self.resume()
+
+    def everyone_back(self):
+        """Is everyone at the game?  Online, both players' windows must be in front."""
+        game = self.game_state.game if self.game_state else None
+        net = game.net if game else None
+        return self.app.focused() and (not net or not net.connected() or net.guest_focus)
 
     def draw(self, screen):
         super().draw(screen)
@@ -75,6 +81,7 @@ class PauseState(JukeboxControls, State):
                        ("main_menu", "Leave Match", theme.RED, theme.RED_HOVER)]
             net = self.game_state.game.net
             header = lambda: ("Your friend is in the settings..." if net.guest_menu == 2 and net.connected() else
+                              "Waiting for your friend to come back to the game" if net.connected() and not net.guest_focus else
                               "Your friend paused the match" if self.by_friend else "Paused for both of you")
 
         tips = dict(self.TIPS, main_menu = self.TIPS["leave"]) if online else self.TIPS
@@ -88,6 +95,10 @@ class PauseState(JukeboxControls, State):
         game = self.game_state.game if self.game_state else None
         if game and game.net and game.net.guest_menu == 2 and game.net.connected():
             self.app.renderer.show_toast("Your friend is still in the settings", important = True)
+            return
+        if not self.everyone_back():
+            if self.app.focused():
+                self.app.renderer.show_toast("Waiting for your friend to come back to the game", important = True)
             return
         self.auto = False
         if game:

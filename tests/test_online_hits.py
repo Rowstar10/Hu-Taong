@@ -45,6 +45,7 @@ class FakeLink:
     friend_left = notice = None
     guest_menu = 0
     guest_keys = 0
+    guest_focus = True
 
     def __init__(self):
         self.ping, self.claims, self.acks, self.game, self.over = None, [], {}, None, None

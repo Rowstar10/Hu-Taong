@@ -840,6 +840,18 @@ class GuestPauseState(JukeboxControls, State):
         if not net.snaps[-1][2].get("paused"):
             self.pop_state(mute = True)
 
+    def host_away(self):
+        """Has the host clicked away from their game?  Then the match waits for them."""
+        net = self.app.net
+        return bool(net and net.snaps and net.snaps[-1][2].get("focus") == 0)
+
+    def ask_resume(self):
+        """Ask the host's game to carry on (it counts 3-2-1 for both); not while they're away."""
+        if self.host_away():
+            self.app.renderer.show_toast("Waiting for your friend to come back to the game", important = True)
+            return
+        self.app.net.request("resume")
+
     def draw(self, screen):
         super().draw(screen)
         buttons = [("resume", "Resume", theme.GREEN, theme.GREEN_HOVER),
@@ -849,7 +861,9 @@ class GuestPauseState(JukeboxControls, State):
                    ("leave", "Leave Match", theme.RED, theme.RED_HOVER)]
         net = self.app.net
         header = lambda: ("Your friend is in the settings..." if net and net.snaps and
-                          net.snaps[-1][2].get("host_menu") == 2 else "The match is paused for both of you")
+                          net.snaps[-1][2].get("host_menu") == 2 else
+                          "Waiting for your friend to come back to the game" if self.host_away() else
+                          "The match is paused for both of you")
         self.app.renderer.draw_overlay(self, screen, title = "Paused", header = header,
                                        buttons = buttons, mark = "停", jukebox = True,
                                        tips = {"resume": "Resume\nCarry on the match, for both of you.\n~ Esc",
@@ -870,10 +884,10 @@ class GuestPauseState(JukeboxControls, State):
             return
         net = self.app.net
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and net:
-            net.request("resume")
+            self.ask_resume()
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if key == "resume" and net:
-                net.request("resume")
+                self.ask_resume()
             if key == "restart" and net:
                 net.request("restart")
                 self.app.renderer.show_toast("Asked your friend to restart the match")
