@@ -1999,9 +1999,9 @@ class Renderer:
             d = max(8, round(rect.w / 4) * 4)
             ring = self.art.get(("twin_ring", d, side), self._twin_ring, d, side)
             screen.blit(ring, ring.get_rect(center=rect.center))
-        hits = powerups.cracker_hits(ball) if powerups and hasattr(powerups, "cracker_hits") else 0
-        if hits or (powerups and getattr(powerups, "cracker", None) and ball is getattr(ball.game, "ball", None)):
-            self.draw_cracker(screen, rect, hits)
+        fuse = powerups.cracker_fuse(ball) if powerups and hasattr(powerups, "cracker_fuse") else 0
+        if fuse > 0:
+            self.draw_cracker(screen, rect, fuse)
         if snow and ball is getattr(ball.game, "ball", ball):
             d = max(8, round(rect.w / 4) * 4)
             coat = self.art.get(("snow_ball", d), self._snow_ball, d)
@@ -2011,9 +2011,11 @@ class Renderer:
             veil = self.art.get(("ghost_veil", d), self._ghost_veil, d)
             screen.blit(veil, veil.get_rect(center=rect.center))
 
-    def draw_cracker(self, screen, rect, hits):
-        """Firecracker: a red cracker strapped to the ball, its fuse fizzing; the number of hits
-        left before it bangs beside it (none: the fuse is burning down)."""
+    FUSE_LENGTH = 46        # px of Firecracker fuse when it's lit
+
+    def draw_cracker(self, screen, rect, fuse):
+        """Firecracker: a red cracker strapped to the ball, and its fuse burning down: the fuse
+        shortens over its 5 seconds, a spark fizzing at the burning end (harder in the last one)."""
         t = self.app.fx.time
         x, y = rect.right - 4, rect.top + 2
         body = pygame.Rect(0, 0, 14, 32)
@@ -2022,15 +2024,20 @@ class Renderer:
         pygame.draw.rect(screen, (250, 200, 80), (body.x, body.y + 6, body.w, 4))
         pygame.draw.rect(screen, (250, 200, 80), (body.x, body.bottom - 10, body.w, 4))
         pygame.draw.rect(screen, (90, 10, 14), body, 2, border_radius=4)
-        tip = (body.centerx + 8, body.top - 10)
-        pygame.draw.line(screen, (60, 50, 40), (body.centerx, body.top), tip, 3)
-        flicker = 0.5 + 0.5 * math.sin(t * (40 if not hits else 18))
-        glow = self.art.glow(28 if hits else 40, scaled((255, 200, 80), 0.6 + 0.4 * flicker))
+        # the fuse: a gentle S up and away from the cracker, as much of it as is left unburnt
+        left = max(0.0, min(1.0, fuse / POWERUPS["cracker"].seconds))
+        length = max(3.0, self.FUSE_LENGTH * left)
+        points = [(body.centerx + 0.45 * s + 3 * math.sin(s / 9), body.top - 0.9 * s)
+                  for s in [i * length / 8 for i in range(9)]]
+        pygame.draw.lines(screen, (52, 34, 24), False, points, 6)         # a dark edge...
+        pygame.draw.lines(screen, (226, 196, 132), False, points, 3)      # ...round a pale cord
+        tip = points[-1]
+        last = fuse < 1.0                                     # the last second: it fizzes harder
+        flicker = 0.5 + 0.5 * math.sin(t * (40 if last else 22))
+        glow = self.art.glow(40 if last else 30, scaled((255, 200, 80), 0.6 + 0.4 * flicker))
         screen.blit(glow, glow.get_rect(center=tip), special_flags=ADD)
-        if random.random() < (0.9 if not hits else 0.35):
-            self.app.fx.spark(tip[0], tip[1], 1, (255, 210, 120), speed = 160, life = .25)
-        if hits:
-            self.text(screen, str(hits), self.fnt(0.026), (255, 236, 200), midleft=(body.right + 6, body.centery))
+        if random.random() < (0.9 if last else 0.45):
+            self.app.fx.spark(tip[0], tip[1], 2 if last else 1, (255, 210, 120), speed = 160, life = .25)
 
     def draw_portals(self, screen, powerups, ox, oy):
         """Portal Pair: two swirling rings, linked, each with arrows showing the way a ball leaves it."""

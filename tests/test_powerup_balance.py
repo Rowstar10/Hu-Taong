@@ -8,7 +8,8 @@
 - Blink Ball: no hops within 350 px of the paddle it's heading for.
 - Twin Balls: never split slower than half a serve.
 - Wind Gust: gusts up to 500 px/s^2 (360 was too gentle to notice).
-- Firecracker: the bang shoots away from whoever lit it, never back at them.
+- Firecracker: the bang shoots away from whoever lit it (since the playtest's 5-second fuse,
+  whoever hit the ball last), never back at them.
 """
 import math
 import unittest
@@ -138,17 +139,21 @@ class Wind(Match):
 
 
 class Firecracker(Match):
-    def bang_ways(self, lighter):
+    def bang_ways(self, hitter):
+        """(Since the playtest's 5-second fuse, "whoever lit it" is whoever hit the ball last.)"""
         pu, ball = self.pu, self.ball
         ways = set()
         for _ in range(40):
             place(ball, 960, 540)
-            pu.cracker = {"hits": 1, "fuse": None}
-            pu.on_hit(ball, lighter, (1, 0) if lighter.is_left else (-1, 0))
-            ball.vx, ball.vy = (-900.0 if lighter.is_left else 900.0), 0.0    # coming back at the lighter
+            pu.cracker = {"fuse": 0.01, "taker": self.opponent(hitter)}
+            ball.last_paddle = hitter
+            ball.vx, ball.vy = (-900.0 if hitter.is_left else 900.0), 0.0    # coming back at them
             pu.update_cracker(1.0)
             ways.add(1 if ball.vx > 0 else -1)
         return ways
+
+    def opponent(self, paddle):
+        return self.p2 if paddle is self.p1 else self.p1
 
     def test_bangs_away_from_whoever_lit_it(self):
         self.assertEqual(self.bang_ways(self.p1), {1})

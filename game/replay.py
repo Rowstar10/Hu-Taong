@@ -243,7 +243,7 @@ class Recorder:
         portals = getattr(pu, "portals", [])
         values += [getattr(ball, "curve", 0.0), pu.wind_force() if hasattr(pu, "wind_force") else 0.0,
                    pu.lantern_level() if hasattr(pu, "lantern_level") else 0.0,
-                   pu.cracker_hits(ball) if hasattr(pu, "cracker_hits") else 0, len(portals)]
+                   pu.cracker_fuse(ball) if hasattr(pu, "cracker_fuse") else 0, len(portals)]
         for door in portals:
             values += [door["x"], door["y"], door["angle"]]
         # then the Firecracker's shockwaves, and how chipped each stone is
@@ -498,7 +498,7 @@ class ViewPowerUps:
         self.court = []
         self.flags = 0
         self.alpha = 1.0
-        self.wind, self.night, self.cracker, self.portals = 0.0, 0.0, 0, []
+        self.wind, self.night, self.cracker, self.portals = 0.0, 0.0, 0.0, []
         self.blasts = []
 
     def effect_list(self, paddle):
@@ -529,8 +529,8 @@ class ViewPowerUps:
     def lantern_level(self):
         return self.night
 
-    def cracker_hits(self, ball):
-        return self.cracker if ball is self.game.ball else 0
+    def cracker_fuse(self, ball):
+        return self.cracker if ball is self.game.ball else 0.0
 
 
 class _Countdown:
@@ -673,10 +673,11 @@ class ReplayView:
             extra.side = "blue" if int(a[pos + 5]) == 2 else "red"
             extra.blazing = bool(a[pos + 6])
             pos += 7
-        # the ball's spin, the wind, the night, the firecracker and the portals (newer frames only)
-        ball.curve, pu.wind, pu.night, pu.cracker, pu.portals = 0.0, 0.0, 0.0, 0, []
+        # the ball's spin, the wind, the night, the firecracker's fuse in seconds (before 1.6's
+        # playtest, its hits left) and the portals (newer frames only)
+        ball.curve, pu.wind, pu.night, pu.cracker, pu.portals = 0.0, 0.0, 0.0, 0.0, []
         if pos + 5 <= len(a):
-            ball.curve, pu.wind, pu.night, pu.cracker = a[pos], a[pos + 1], a[pos + 2], int(a[pos + 3])
+            ball.curve, pu.wind, pu.night, pu.cracker = a[pos], a[pos + 1], a[pos + 2], max(0.0, a[pos + 3])
             n_portals = int(a[pos + 4])
             pos += 5
             for _ in range(n_portals):

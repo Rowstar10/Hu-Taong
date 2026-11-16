@@ -16,7 +16,7 @@ SHORT = {"teleport": "Saves one goal", "giant": "Taller paddle", "swift": "Faste
          "twin": "Two balls: each scores only in the other side's goal",
          "chaos": "Sizes and speeds drifting", "curve": "Hits bend the way the paddle moved",
          "double": "This point is worth 2", "wind": "Wind bending the ball",
-         "cracker": "Bangs after its last hit", "lantern": "Night: lanterns only",
+         "cracker": "Bangs when its fuse burns down", "lantern": "Night: lanterns only",
          "portal": "Two linked portals"}
 
 
@@ -117,7 +117,7 @@ class Hud:
 
         columns = [(who(game.p1), (255, 112, 92), rows_for(game.p1)),
                    ("Ball & Court", theme.GOLD_BRIGHT,
-                    [(key, Hud.label(key, left, 0) if key in ("cracker", "double") else seconds_text(left), note)
+                    [(key, Hud.label(key, left, 0) if key == "double" else seconds_text(left), note)
                      for key, left, note in powerups.court_list()]),
                    (who(game.p2), (112, 162, 255), rows_for(game.p2))]
 
@@ -174,9 +174,6 @@ class Hud:
 
     @staticmethod
     def label(key, left, charges):
-        if key == "cracker" and left is not None and not math.isinf(left):
-            hits = int(left)
-            return "bang!" if hits <= 0 else f"{hits} hit" + ("s" if hits != 1 else "")
         if key == "double":
             return "x2"
         if left is not None:

@@ -132,13 +132,13 @@ KINDS = (
          "• It bends the ball's path up or down, in gusts\n"
          "• Leaves blowing across the court show which way\n"
          "• It doesn't push the paddles"),
-    Kind("cracker", "Firecracker", "爆", "Wild", 0,
-         "A firecracker is strapped to the ball: after 3 hits it bangs and the ball shoots off.",
-         "A firecracker is strapped to the ball.\n"
-         "• After 3 more hits its fuse runs out and it bangs\n"
-         "• The ball shoots off at double speed at a new angle, away from whoever lit it\n"
+    Kind("cracker", "Firecracker", "爆", "Wild", 5,
+         "A lit firecracker is strapped to the ball: 5 seconds later it bangs and the ball shoots off.",
+         "A firecracker is strapped to the ball, its fuse lit.\n"
+         "• The fuse burns down for 5 s, then it bangs\n"
+         "• The ball shoots off at double speed at a new angle, away from whoever hit it last\n"
          "• The blast flattens any stone close by\n"
-         "• Lasts until it bangs, or the point ends"),
+         "• If the point ends first, it goes out without a bang"),
     Kind("lantern", "Lantern Night", "灯", "Wild", 0,
          "Until the point ends the court goes dark, lit only by lanterns round the paddles and the ball's glow.",
          "Night falls on the court until the point ends.\n"
@@ -187,9 +187,7 @@ class PowerUps:
     CURVE = 2000                            # Curveball: px/s^2 the ball bends at, from a full-speed sweep...
     CURVE_FADE = 1.3                        # ...fading away at this rate as it flies (per second)
     WIND = 500                              # Wind Gust: px/s^2 at the height of a gust (360 was too gentle to notice)
-    CRACKER_HITS = 3                        # Firecracker: hits before it bangs...
-    CRACKER_FUSE = 0.25                     # ...a moment after the last one...
-    CRACKER_TOP = 2600                      # ...and the ball shoots off at double speed, up to this (3600 was unreturnable)
+    CRACKER_TOP = 2600                      # Firecracker: its bang shoots the ball off at double speed, up to this (3600 was unreturnable)
     PORTAL_R = 80                           # Portal Pair: a portal's radius
     PORTAL_COOL = 0.35                      # seconds before a ball can go through a portal again
     PORTAL_TRIPS = 3                        # trips with no paddle touch before they close (a loop)
@@ -222,7 +220,7 @@ class PowerUps:
         self.curve_on = False    # Curveball until the point ends
         self.double = False      # Double or Nothing: the point being played is worth 2
         self.wind = None         # Wind Gust: {"left", "dir" (1 down, -1 up), "t"}
-        self.cracker = None      # Firecracker: {"hits": hits left, "fuse": seconds to the bang or None}
+        self.cracker = None      # Firecracker: {"fuse": seconds to the bang, "taker": who took it}
         self.lantern = None      # Lantern Night: {"age": seconds, "lifting": seconds left of the dawn, or None}
         self.blasts = []         # Firecracker explosions for the renderer: [x, y, age]
         self.portals = []        # Portal Pair: [{"x", "y", "angle"}, {"x", "y", "angle"}]
@@ -322,9 +320,9 @@ class PowerUps:
             level = min(level, max(0.0, self.lantern["lifting"] / lift))
         return level
 
-    def cracker_hits(self, ball):
-        """Firecracker: hits left before it bangs, if it's strapped to this ball (else 0)."""
-        return self.cracker["hits"] if self.cracker and ball is self.game.ball else 0
+    def cracker_fuse(self, ball):
+        """Firecracker: seconds left on its fuse, if it's strapped to this ball (else 0)."""
+        return self.cracker["fuse"] if self.cracker and ball is self.game.ball else 0.0
 
     def point_value(self):
         return 2 if self.double else 1
@@ -472,7 +470,7 @@ class PowerUps:
         if self.wind:
             items.append(("wind", self.wind["left"], "Wind blowing " + ("down" if self.wind["dir"] > 0 else "up")))
         if self.cracker:
-            items.append(("cracker", float(self.cracker["hits"]), "Firecracker: bangs after its last hit"))
+            items.append(("cracker", self.cracker["fuse"], "Firecracker: bangs when its fuse burns down"))
         if self.lantern:
             items.append(("lantern", UNTIL_POINT, "Night: lanterns only, until the point ends"))
         if self.portals:
@@ -651,7 +649,7 @@ class PowerUps:
         elif key == "wind":
             self.wind = {"left": kind.seconds, "dir": random.choice((-1, 1)), "t": 0.0}
         elif key == "cracker":
-            self.cracker = {"hits": self.CRACKER_HITS, "fuse": None}
+            self.cracker = {"fuse": kind.seconds, "taker": owner}      # lit as it's taken
         elif key == "lantern":
             self.lantern = {"age": 0.0, "lifting": None}
         elif key == "portal":
@@ -696,13 +694,6 @@ class PowerUps:
             sweep = clamp(paddle.vy / max(1.0, paddle.speed), -1.0, 1.0)
             ball.curve = sweep * self.CURVE if abs(sweep) > 0.08 else 0.0
 
-        # Firecracker: each hit burns the fuse down; the last lights it
-        if main and self.cracker and self.cracker["fuse"] is None:
-            self.cracker["hits"] -= 1
-            if self.cracker["hits"] <= 0:
-                self.cracker["fuse"] = self.CRACKER_FUSE
-                self.cracker["lit_by"] = paddle
-
         if main and self.has(paddle, "sticky") and normal[0] != 0 and not ball.stuck and ball.unstick <= 0:
             self.stick(ball, paddle)
 
@@ -736,11 +727,13 @@ class PowerUps:
     # ---------------- Firecracker ----------------
 
     def update_cracker(self, dt):
-        """The firecracker's fuse burns after its last hit, then it bangs: the ball shoots off at
-        double speed at a new angle, away from whoever lit it (either way, it could shoot straight
-        back at them from point-blank, and nearly half its points ended on the bang)."""
+        """The firecracker's fuse burns for 5 s of play from when it was taken, then it bangs: the
+        ball shoots off at double speed at a new angle, away from whoever hit it last (or, if no
+        one has since, whoever took it).  Either way it could shoot straight back at them from
+        point-blank, and nearly half its points ended on the bang.  (It burned down over 3 hits
+        before 1.6's playtest; a fuse you can watch is easier to play round.)"""
         cracker = self.cracker
-        if not cracker or cracker["fuse"] is None:
+        if not cracker:
             return
         cracker["fuse"] -= dt
         if cracker["fuse"] > 0:
@@ -751,8 +744,8 @@ class PowerUps:
             self.unstick_now(ball)
         speed = min(self.CRACKER_TOP, max(math.hypot(ball.vx, ball.vy), ball.speed) * 2)
         angle = math.radians(random.uniform(-55, 55))
-        lit_by = cracker.get("lit_by")
-        way = (1 if lit_by.is_left else -1) if lit_by is not None else random.choice((-1, 1))
+        last = getattr(ball, "last_paddle", None) or cracker.get("taker")
+        way = (1 if last.is_left else -1) if last is not None else random.choice((-1, 1))
         ball.vx, ball.vy = way * speed * math.cos(angle), speed * math.sin(angle)
         ball.blazing = True
         cx, cy = (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2
