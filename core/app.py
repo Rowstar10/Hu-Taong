@@ -321,7 +321,7 @@ class App:
         dim = display.dim
         stack = self.state_manager.stack
         if stack and getattr(stack[self.state_manager.screen_index()], "dims_court", False):
-            court = display.court_dim_levels[display.court_dim] / 255
+            court = display.court_dim_level
             dim = 1 - (1 - dim) * (1 - court)
         return round(dim, 3)
 

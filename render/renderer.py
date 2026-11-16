@@ -64,6 +64,8 @@ TIPS = {
     "cycle_rotate_every": "Change Every\nHow long each background stays before Rotate fades to the next.",
     "cycle_parallax": "Parallax\nThe menu background drifts against the mouse, for depth.",
     "dim_slider": "Dim\nDarkens the background so the ball stands out.",
+    "court_dim_slider": "Court Dim\nDarkens the picture behind a match, so the ball and paddles stand out.\n"
+                        "• On top of the Dim Overlay",
 
     # Audio
     "master_volume_slider": "Master Volume\nEverything: music and effects.",
@@ -1218,17 +1220,19 @@ class Renderer:
                 Cycle("cycle_rotate_every", lambda: rotate_texts[d.rotate_every], sm, rotate_texts,
                       tip=TIPS["cycle_rotate_every"]))
 
-            court_texts = [f"Court Dim: {o}" for o in d.court_dim_options]
-            dim = self.section(
-                ui, s, "Dim Overlay",
-                Slider("dim_slider", lambda: d.dim, theme.EMBER, sm, lambda: f"{int(100 * d.dim)}%", "100%",
-                       track_w=int(BASE_W * 0.17 * s), tip=TIPS["dim_slider"]),
-                Cycle("cycle_court_dim", lambda: court_texts[d.court_dim], sm, court_texts,
-                      tip=lambda: options_tip("Court Dim", "Darkens the picture behind a match, so the ball and paddles stand out.",
-                                              [("Off", ""), ("Light", ""), ("Medium", ""), ("Strong", "")], d.court_dim,
-                                              "Menus keep their own Dim Overlay")),
-                Cycle("cycle_parallax", lambda: parallax_texts[d.parallax], sm, parallax_texts,
-                      tip=TIPS["cycle_parallax"]))
+            dim = Stack([
+                self.section(
+                    ui, s, "Dim Overlay",
+                    Slider("dim_slider", lambda: d.dim, theme.EMBER, sm, lambda: f"{int(100 * d.dim)}%", "100%",
+                           track_w=int(BASE_W * 0.17 * s), tip=TIPS["dim_slider"]),
+                    Cycle("cycle_parallax", lambda: parallax_texts[d.parallax], sm, parallax_texts,
+                          tip=TIPS["cycle_parallax"])),
+                self.section(
+                    ui, s, "Court Dim",
+                    Slider("court_dim_slider", lambda: d.court_dim_level, theme.EMBER, sm,
+                           lambda: f"{int(100 * d.court_dim_level)}%", "100%",
+                           track_w=int(BASE_W * 0.17 * s), tip=TIPS["court_dim_slider"]))],
+                gap=self.vgap(ui, s, 1.4))
 
             if ANDROID:                        # a phone's screen has one size, and is always full
                 return Grid([[background, dim], [max_fps]],

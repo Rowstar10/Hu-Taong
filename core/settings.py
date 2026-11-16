@@ -188,10 +188,6 @@ class DisplaySettings:
         self.parallax_options = ["Off", "Gentle", "Full"]
         self.parallax_strength = [0.0, 0.5, 1.0]
 
-        # How much the background is darkened during a match, so the ball and paddles stand out
-        self.court_dim_options = ["Off", "Light", "Medium", "Strong"]
-        self.court_dim_levels = [0, 60, 100, 150]
-
         # How often Rotate fades to a new background: (shortest, longest) wait in seconds
         self.rotate_options = ["30-60 s", "2 min", "5 min"]
         self.rotate_waits = [(30, 60), (100, 140), (270, 330)]
@@ -210,7 +206,9 @@ class DisplaySettings:
         self.rotate_backgrounds = True
         self.rotate_every = 0
         self.parallax = 2
-        self.court_dim = 2
+        # How much the background is darkened during a match (0-1), on top of the Dim Overlay,
+        # so the ball and paddles stand out.  The default is the old Court Dim: Medium.
+        self.court_dim_level = 100 / 255
 
 class AudioSettings:
     def __init__(self, app):

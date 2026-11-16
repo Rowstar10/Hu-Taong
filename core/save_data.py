@@ -10,7 +10,8 @@ GAMEPLAY = ["paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "b
             "winning_score_index", "win_by_two", "ai_difficulty", "adaptive_ai", "chaos_mode",
             "vs_ai", "play_as_blue", "middle_wall", "ai_style", "chaos_switch", "pace",
             "powerups", "powerup_rate", "court", "online_host_blue", "curveball", "lantern_night"] + ["pu_" + kind.key for kind in POWERUP_KINDS]
-DISPLAY = ["max_fps", "show_fps", "dim", "rotate_backgrounds", "background", "rotate_every", "parallax", "court_dim"]
+DISPLAY = ["max_fps", "show_fps", "dim", "rotate_backgrounds", "background", "rotate_every", "parallax", "court_dim_level"]
+OLD_COURT_DIM = [0, 60, 100, 150]     # before the Court Dim slider: Off, Light, Medium, Strong (out of 255)
 AUDIO = ["play_mode", "even_volume", "fade", "menu_sounds", "ambience"]
 INTERFACE = ["tooltips", "ai_banter", "screen_shake", "ball_trail", "auto_pause", "hide_cursor",
              "hud", "effects", "countdown", "instant_replay",
@@ -20,7 +21,7 @@ if ANDROID:
 INDEX_FIELDS = {"winning_score_index", "ai_difficulty", "max_fps", "background",
                 "ai_style", "chaos_mode", "chaos_switch", "hud", "effects", "countdown", "fade", "ambience",
                 "instant_replay",
-                "rotate_every", "parallax", "powerup_rate", "play_mode", "court", "court_dim",
+                "rotate_every", "parallax", "powerup_rate", "play_mode", "court",
                 "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right",
                 "touch_steer", "touch_sensitivity"}  # whole numbers only
 SOUND = ["master_volume", "sfx_volume", "music_volume", "paddle_hit_sound", "score_sound",
@@ -54,9 +55,8 @@ def _limits(app):
                   max_fps = (0, len(d.max_fps_options) - 1),
                   rotate_every = (0, len(d.rotate_options) - 1),
                   parallax = (0, len(d.parallax_options) - 1),
-                  court_dim = (0, len(d.court_dim_options) - 1),
                   background = (0, len(d.backgrounds) - 1),
-                  dim = (0, 1),
+                  dim = (0, 1), court_dim_level = (0, 1),
                   master_volume = (0, 1), sfx_volume = (0, 1), music_volume = (0, 1))
     return limits
 
@@ -121,6 +121,11 @@ def load(app):
     if s.gameplay.middle_wall and s.gameplay.switch_mid_rally:
         s.gameplay.chaos_switch -= 2     # Chaos Switch + only works with the Middle Wall off
     _restore(s.display, data.get("display"), limits)
+    shown = data.get("display") or {}
+    if isinstance(shown, dict) and "court_dim_level" not in shown:
+        old = shown.get("court_dim")     # a save from before the slider: Off / Light / Medium / Strong
+        if isinstance(old, int) and not isinstance(old, bool) and 0 <= old < len(OLD_COURT_DIM):
+            s.display.court_dim_level = OLD_COURT_DIM[old] / 255
     _restore(s.audio, data.get("audio"), limits)
     old = data.get("audio") or {}
     if isinstance(old, dict) and "play_mode" not in old and old.get("loop_music") is True:

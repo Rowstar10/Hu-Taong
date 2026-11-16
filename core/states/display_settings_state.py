@@ -13,6 +13,7 @@ class DisplaySettingsState(State):
         super().__init__(app)
         settings = self.app.settings.display
         self.dragging_dim = False
+        self.dragging_court_dim = False
 
         self.res_index = self.app.res_index
         self.display_mode_index = self.app.display_mode_index
@@ -86,8 +87,7 @@ class DisplaySettingsState(State):
             if key == "toggle_rotate_bg":
                 settings.rotate_backgrounds = not settings.rotate_backgrounds
 
-            for name, options in (("rotate_every", settings.rotate_options), ("parallax", settings.parallax_options),
-                                  ("court_dim", settings.court_dim_options)):
+            for name, options in (("rotate_every", settings.rotate_options), ("parallax", settings.parallax_options)):
                 for suffix, step in (("_left", -1), ("_right", 1)):
                     if key == f"cycle_{name}{suffix}":
                         setattr(settings, name, (getattr(settings, name) + step) % len(options))
@@ -104,6 +104,9 @@ class DisplaySettingsState(State):
             if key == "dim_slider":
                 self.dragging_dim = True
                 settings.dim = self.update_slider_from_mouse("dim_slider", event)
+            if key == "court_dim_slider":
+                self.dragging_court_dim = True
+                settings.court_dim_level = self.update_slider_from_mouse("court_dim_slider", event)
 
             if key == "reset_defaults":
                 self.confirm_reset("Reset display settings?", self.reset_defaults)
@@ -111,11 +114,13 @@ class DisplaySettingsState(State):
             if key == "back":
                 self.pop_state()
 
-        if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.dragging_dim:
-            self.dragging_dim = False
-            
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            self.dragging_dim = self.dragging_court_dim = False
+
         if event.type == pygame.MOUSEMOTION and self.dragging_dim:
             settings.dim = self.update_slider_from_mouse("dim_slider", event)
+        if event.type == pygame.MOUSEMOTION and self.dragging_court_dim:
+            settings.court_dim_level = self.update_slider_from_mouse("court_dim_slider", event)
 
     def reset_defaults(self):
         self.app.reset_display_settings()
