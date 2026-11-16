@@ -22,9 +22,10 @@ class PauseState(JukeboxControls, State):
             "p1_ai": "Red AI\nLet the AI play the red paddle, or take it back.",
             "p2_ai": "Blue AI\nLet the AI play the blue paddle, or take it back."}
 
-    def __init__(self, app, by_friend = False):
+    def __init__(self, app, by_friend = False, auto = False):
         super().__init__(app)
         self.by_friend = by_friend
+        self.auto = auto              # opened by the window losing focus: ends by itself when it's back
         self.game_state = self.app.state_manager.get_state(GameState)
         self.ui_cols = 2
         self.init_jukebox()
@@ -42,7 +43,9 @@ class PauseState(JukeboxControls, State):
         sound_manager.update_music_volume()
 
     def update(self, dt):
-        pass
+        # Paused by clicking away, and back with nothing touched here: carry on (after a 3-2-1)
+        if self.auto and self.app.has_focus:
+            self.resume()
 
     def draw(self, screen):
         super().draw(screen)
@@ -86,6 +89,9 @@ class PauseState(JukeboxControls, State):
         if game and game.net and game.net.guest_menu == 2 and game.net.connected():
             self.app.renderer.show_toast("Your friend is still in the settings", important = True)
             return
+        self.auto = False
+        if game:
+            game.resume_countdown()
         self.pop_state(mute = True)
         self.app.sound_manager.play("shutdown.wav")
 
@@ -95,6 +101,8 @@ class PauseState(JukeboxControls, State):
             return
         super().handle_event(event)
         key = self.hit_test(self.app.window_to_base(event.pos)) if hasattr(event, "pos") else None
+        if event.type == pygame.KEYDOWN or (event.type == pygame.MOUSEBUTTONDOWN and key):
+            self.auto = False         # the player has taken this pause in hand: it stays until they resume
         if self.handle_jukebox(event, key if event.type == pygame.MOUSEBUTTONDOWN else None):
             return
 

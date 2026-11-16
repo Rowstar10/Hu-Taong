@@ -105,6 +105,7 @@ class App:
         
         # ---------- Events ----------
         self.keys_down = set()
+        self.has_focus = True             # is this window the one being typed into?
         self.BG_FADE = pygame.USEREVENT
         self.restart_bg_timer()
         
@@ -457,12 +458,15 @@ class App:
             if self.touch and event.type == pygame.APP_WILLENTERBACKGROUND:
                 save_data.save(self)          # a phone may close a game in the background unasked
             if event.type == pygame.WINDOWFOCUSLOST:
+                self.has_focus = False
                 if self.touch:
                     self.touch.reset()
                 self.keys_down.clear()
                 # online, clicking away (to chat, say) mustn't stop the match for both players
                 if self.settings.interface.auto_pause and self.in_match() and not self.net:
-                    self.state_manager.push_state("pause", mute = True)
+                    self.state_manager.push_state("pause", mute = True, auto = True)
+            if event.type == pygame.WINDOWFOCUSGAINED:
+                self.has_focus = True     # an auto-pause sees it and resumes (PauseState.update)
 
             # ---------- Background Rotation ----------
             if event.type == self.BG_FADE:
