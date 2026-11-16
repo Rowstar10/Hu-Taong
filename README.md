@@ -1,8 +1,8 @@
-# Hu Taong 1.5
+# Hu Taong 1.6
 
-Pong, the Wangsheng Funeral Parlor way. Version 1.5, 11 November 2026.
+Pong, the Wangsheng Funeral Parlor way. Version 1.6, 12 November 2026.
 
-Smoother online play, and hits off the joining player's paddle that look the same on both screens.
+Power-up fixes and changes, from a review of every power-up, then a round of changes from playtesting it.
 
 ## Play it
 
@@ -28,7 +28,8 @@ The .exe appears in `dist`.
 
 Hu Taong also plays on Android phones and tablets, with touch controls: Toki Hub for Android
 installs it, or get the APK from a `v1.5-android` style release. It plays online with the PC
-version of the same number.
+version of the same number. The phone version is 1.5 for now: 1.6 has no APK yet, so a phone
+can't play a PC on 1.6 online.
 
 The APK is built by GitHub (`.github/workflows/android.yml`), with `android/build.sh`
 (python-for-android). The phone's controls live in `core/touch.py`.

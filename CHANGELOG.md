@@ -4,7 +4,7 @@ Every version of Hu Taong, newest first. Toki Hub shows each version's section o
 
 ## 1.6 — 2026-11-12
 
-Power-up fixes and changes, from a review of every power-up.
+Power-up fixes and changes, from a review of every power-up, then a round of changes from playtesting it.
 
 ### Fixed
 - With the Middle Wall down, a ball caught between the two paddles, or between a paddle and a stone, no longer rattles on the spot hundreds of times a second. It squirts out past the paddles' ends.
@@ -13,27 +13,24 @@ Power-up fixes and changes, from a review of every power-up.
 - Safety Teleport under Twin Balls: the save now guards against the ball that can score on you. Red's save watched the red ball, which can't score on Red.
 - Sticky Goo with the Middle Wall down: a paddle can only hold the ball in its own half. Carried over the halfway line, or caught in the other half, the ball is slung there and then. Before, it could be carried right up to the other goal.
 - Double or Nothing now says "This point is worth 2". It said "the next point", but it has always doubled the point being played.
-- Online, the joining player's own paddle answers their keys at once under Gravity. Their game now runs the same fall-and-jump rules as the host's, where it used to wait a full round trip for the host's word.
 - Online, the joining player's Safety Teleport is judged on their own screen, as their saves are. The host judged it from its slightly late copy of their paddle, so it fired on saves they were already making.
 - Online and in replays, the scored message says "x2" when Double or Nothing made the point worth 2. The joining player saw their score jump by 2 without being told why.
 
 ### Changed
 - The wait for the next talisman carries on from point to point. It restarted at every point, so quick points, attacking play and games without the Middle Wall hardly saw any.
-- Gravity, Ghost Ball, Wind Gust and Sticky Goo end when the point ends, so the next serve is a plain one. Your own Boons and Curses still carry on until their time runs out.
+- Ghost Ball, Wind Gust and Sticky Goo end when the point ends, so the next serve is a plain one. Your own Boons and Curses still carry on until their time runs out.
 - Safety Teleport: an unused save is lost when the point ends. It could be saved up for the rest of the match, which made it the strongest Boon.
 - Swift Step: your paddle still moves half as fast again, but its hits are no harder than usual. A faster paddle hit much harder, and that was most of its edge.
 - Spirit Fire: blazing shots are still 40% faster, but go at most 10% past the usual top speed. They reached about 4,450 px/s, too fast to follow.
-- Frostbite works one way now. Your next hit frosts the ball, and whoever hits it back is frozen at half speed for 5 seconds, whatever they hit. The frost never comes back to you, and a frosted ball no longer slows down.
 - Ghost Ball is always in sight for the last 300 px before the paddle it's heading for.
 - Blink Ball doesn't hop within 350 px of the paddle it's heading for.
 - Twin Balls never split slower than half a serve. They could crawl at a quarter.
 - Wind Gust blows harder: 500 px/s² at the height of a gust, up from 360.
-- Firecracker: the bang always shoots the ball away from whoever lit it. It could shoot straight back at them from point-blank.
+- Firecracker: its fuse is lit as it's taken and burns for 5 seconds, burning down on the ball where everyone can see it, then it bangs. It banged after 3 hits. It still goes out without a bang if the point ends first.
+- Firecracker: the bang always shoots the ball away from whoever hit it last. It could shoot straight back at them from point-blank.
 - Safety Teleport: a waiting save shows on your paddle, with a soft gold glow and its 遁 glyph, so both players can see it.
 - Swift Step: a Swift paddle leaves gold after-images as it moves.
-- Frostbite: a frozen paddle is crusted in ice, and the ice cracks off as it thaws. While the frost waits on its taker's paddle, that paddle only glows cold.
 - Sticky Goo: the goo sits round the paddle's edges, so your paddle still shows red or blue.
-- Gravity: "Up = jump!" shows over each player's paddle as it starts.
 - Snowball: the goal line lights up while a paddle is being shoved back at it.
 - Twin Balls: the red ball is properly red, and each goal line flashes the colour of the ball that can score there.
 - Double or Nothing: a big x2 beside both scores while the point is worth 2.
@@ -42,10 +39,20 @@ Power-up fixes and changes, from a review of every power-up.
 - Clearer descriptions for Soul Swap and Chaos Mode +.
 - The computer player reads where a Sticky Goo ball will be slung, as the aim arrow shows. It expected the ball to leave on its old return, so any flick of the paddle fooled it.
 - Lantern Night: the computer player misjudges a ball out in the dark, as it does a Ghost Ball. It used to see perfectly, so only you were handicapped. This applies with Lantern Night on for the whole match, in Settings, too.
+- Resuming a match from a pause counts 3-2-1 first, so nobody is caught out: a quick one on your own, at the usual pace online, on both screens.
+- Online, clicking away from the game pauses it for both players, and it only carries on while both of you are in the game. Turn Auto-Pause off if you'd rather your clicking away didn't pause it.
+- Court Dim is a slider, like the Dim Overlay's, instead of four steps. Your old setting keeps its darkness.
 - Online play needs both players on 1.6: it won't connect to 1.5 or earlier, and their rooms show "Other version".
+- 1.6 was updated after its first playtest. To get the update, uninstall 1.6 and install it again, both of you: a 1.6 installed before the update won't play online with one installed after.
 
 ### Added
+- Clicking back into the game after Auto-Pause has paused it carries on by itself, after the 3-2-1. A pause you made yourself, or used (opened Settings from, say), stays until you resume.
+- A Mute button by each volume slider. The slider keeps its place, so unmuting brings back the same level, and the mute is saved.
+- A "Reset Ball & Paddles" button under "Randomise Ball & Paddles", putting the ball's and paddles' sizes and speeds back to their defaults.
 - Tests for these fixes, in the tests folder.
+
+### Removed
+- The Gravity and Frostbite power-ups. Saves and replays from before still load; in an old replay they simply don't show.
 
 ## 1.5 — 2026-11-11
 
