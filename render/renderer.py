@@ -45,6 +45,7 @@ TIPS = {
     "ball_diameter_slider": "Ball Size\nHow big the ball is.",
     "paddle_size_slider": "Paddle Size\nHow tall and wide the paddles are.",
     "randomise_all": "Randomise All\nRandom ball and paddle speeds and sizes.",
+    "reset_ball_and_paddles": "Reset Ball & Paddles\nThe ball and paddle speeds and sizes back to their defaults.",
     "open_powerups": "Power-Ups\nSee what each power-up does, and choose which can appear.",
     "toggle_powerups": "Power-Ups\nTalismans appear on the court during a match.\n• Touch one with your paddle, or a ball you hit last\n~ Hold Tab in a match to see every power-up in play",
     "toggle_lantern_night": "Lantern Night\nThe court is always dark, lit only by lanterns round the paddles and the ball's glow.\n~ Off by default",
@@ -1104,6 +1105,8 @@ class Renderer:
                 lambda: f"{g.pace:.2f}x"))
 
             rand = Button("randomise_all", "Randomise Ball & Paddles", sm, (G, theme.GREEN_HOVER), tip=TIPS["randomise_all"])
+            unrand = Button("reset_ball_and_paddles", "Reset Ball & Paddles", sm, (theme.BLUE, theme.BLUE_HOVER),
+                            tip=TIPS["reset_ball_and_paddles"])
             chaos_tip = lambda: options_tip(
                 "Chaos Mode", "Shakes up the ball's and paddles' sizes and speeds.",
                 [("Off", ""), ("Chaos Mode", "new random sizes and speeds every point"),
@@ -1130,7 +1133,7 @@ class Renderer:
             return Grid([[ai, win],
                          [ball_speed, paddle_speed],
                          [ball_size, paddle_size],
-                         [pace, Stack([rand], gap=0)],
+                         [pace, Stack([rand, unrand], gap=self.vgap(ui, s, 0.5))],
                          [extras]],
                         gap_x=int(BASE_W * 0.06 * s), gap_y=self.vgap(ui, s, 1.6))
 

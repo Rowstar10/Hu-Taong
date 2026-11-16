@@ -108,6 +108,9 @@ class GameplaySettingsState(State):
                 audio.paddle_height = audio.paddle_height_min + random.random() * audio.paddle_height_range
                 audio.paddle_width = audio.paddle_width_min + random.random() * audio.paddle_width_range
 
+            if key == "reset_ball_and_paddles":
+                audio.reset_ball_and_paddles()
+
             if key == "reset_defaults":
                 self.confirm_reset("Reset gameplay settings?", self.app.reset_gameplay_settings)
 

@@ -88,11 +88,7 @@ class GameplaySettings:
         self.reset()
 
     def reset(self):
-        self.paddle_width = (self.paddle_width_min + self.paddle_width_max) // 2
-        self.paddle_height = (self.paddle_height_min + self.paddle_height_max) // 2
-        self.paddle_speed = (self.paddle_speed_min + self.paddle_speed_max) // 2
-        self.ball_diameter = (self.ball_diameter_min + self.ball_diameter_max) // 2
-        self.ball_speed = (self.ball_speed_min + self.ball_speed_max) // 2
+        self.reset_ball_and_paddles()
         self.pace = 1.0
 
         # Match setup (chosen on the Match Setup screen)
@@ -133,6 +129,14 @@ class GameplaySettings:
     def switch_mid_rally(self):
         """Chaos Switch +: the paddles swap places mid-rally."""
         return self.chaos_switch in (2, 3)
+
+    def reset_ball_and_paddles(self):
+        """The ball's and paddles' sizes and speeds back to their defaults (what Randomise changes)."""
+        self.paddle_width = (self.paddle_width_min + self.paddle_width_max) // 2
+        self.paddle_height = (self.paddle_height_min + self.paddle_height_max) // 2
+        self.paddle_speed = (self.paddle_speed_min + self.paddle_speed_max) // 2
+        self.ball_diameter = (self.ball_diameter_min + self.ball_diameter_max) // 2
+        self.ball_speed = (self.ball_speed_min + self.ball_speed_max) // 2
 
     def reset_powerups(self):
         """Power-ups on, at the normal rate, every one of them allowed."""
