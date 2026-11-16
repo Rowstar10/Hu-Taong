@@ -2,8 +2,8 @@
 
 - Double or Nothing: the friend (and anyone watching a replay) saw the score jump by 2 with no
   "x2" in the scored message.
-- Gravity: the friend's own paddle wasn't predicted under Gravity, so every key answered a full
-  round trip late.  Their game now runs the same fall-and-jump rules as the host's.
+- The friend's own paddle, predicted on their screen, moves as the host's game moves it.  (It
+  also covered Gravity, until Gravity was removed later in 1.6.)
 - Safety Teleport: the host judged the friend's save from its late copy of their paddle, so it
   fired on saves they were already making.  Their own screen judges it now, and the save it makes
   tells the host it teleported.
@@ -41,26 +41,26 @@ class DoubleOnline(Match):
         self.assertEqual(self.message_shown(f"{self.p2.color1} scored!"), "Blue scored!")
 
 
-class GravityPrediction(Match):
-    def test_friends_paddle_falls_and_jumps_as_the_hosts_does(self):
+class Prediction(Match):
+    def test_friends_paddle_moves_as_the_hosts_does(self):
         game, p1, ball = self.game, self.p1, self.ball
-        p1.effects["gravity"] = 10.0
         place(ball, 1500, 300)
         ball.vx = ball.vy = 0.0
         place(p1, 400, 300)
         p1.vx = p1.vy = 0.0
         game.apply_gameplay_settings()
         dt = 1 / 120
-        p, jump = [p1.x0, p1.y0, 0.0, 0.0], None
-        # fall to the floor, hold Up into a high jump, run right, tap Up for a hop, run left, jump again
-        script = [(0, 0)] * 60 + [(0, -1)] * 30 + [(1, 0)] * 40 + [(0, -1)] * 4 + [(-1, 0)] * 60 + [(0, -1)] * 50
+        p = [p1.x0, p1.y0, 0.0, 0.0]
+        # still, up, right, a tap down, left, down (all clear of the walls, where the host's physics
+        # stops the paddle dead and the prediction catches up a moment later, as in 1.5)
+        script = [(0, 0)] * 30 + [(0, -1)] * 12 + [(1, 0)] * 40 + [(0, 1)] * 4 + [(-1, 0)] * 60 + [(0, 1)] * 50
         worst = 0.0
         for dx, dy in script:
             app.keys_down.clear()
-            app.keys_down.update(k for k, on in ((p1.right, dx > 0), (p1.left, dx < 0), (p1.up, dy < 0)) if on)
+            app.keys_down.update(k for k, on in ((p1.right, dx > 0), (p1.left, dx < 0), (p1.up, dy < 0),
+                                                 (p1.down, dy > 0)) if on)
             game.update(dt)
-            jump = GuestMatchState.step_paddle(p, dx, dy, p1.speed, p1.width, p1.height, dt * game.settings.pace,
-                                               True, jump)
+            GuestMatchState.step_paddle(p, dx, dy, p1.speed, p1.width, p1.height, dt * game.settings.pace)
             worst = max(worst, abs(p[0] - p1.x0), abs(p[1] - p1.y0))
         self.assertLess(worst, 3.0)
 

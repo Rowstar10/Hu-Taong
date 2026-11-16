@@ -876,7 +876,7 @@ class Art:
         return self.get(("paddle_glow", w, h, finish), self._paddle_glow, w, h, finish)
 
     PADDLE_GLOWS = {"red": (140, 42, 22), "blue": (30, 74, 170), "gold": (150, 108, 26),
-                    "violet": (104, 40, 170), "jade": (28, 134, 84), "ice": (96, 160, 214)}
+                    "violet": (104, 40, 170)}
 
     def _paddle_glow(self, w, h, finish):
         pad = 44
@@ -1054,19 +1054,6 @@ class Art:
                 bezier(P(-.3, .62), P(-.5, .25), P(-.1, .1), P(0, -.35))
         pygame.draw.polygon(surf, (255, 222, 110), inner)
 
-    def _icon_frost(self, surf, P, u, pale, line):
-        ice = (190, 236, 255)
-        for a in range(0, 180, 60):
-            dx, dy = math.cos(math.radians(a + 90)), math.sin(math.radians(a + 90))
-            pygame.draw.line(surf, ice, P(-dx, -dy), P(dx, dy), line)
-            for sign in (-1, 1):
-                bx, by = sign * dx * .6, sign * dy * .6
-                for turn in (-1, 1):
-                    ang = math.atan2(sign * dy, sign * dx) + turn * 2.4
-                    pygame.draw.line(surf, ice, P(bx, by), P(bx + math.cos(ang) * .35, by + math.sin(ang) * .35),
-                                     max(1, line * 3 // 4))
-        pygame.draw.circle(surf, (255, 255, 255), P(0, 0), u * .14)
-
     def _icon_shrink(self, surf, P, u, pale, line):
         pygame.draw.rect(surf, (150, 120, 220), (*P(-.24, -.26), .48 * u, .52 * u), border_radius=int(.12 * u))
         for sign in (-1, 1):
@@ -1100,11 +1087,6 @@ class Art:
         for x, y in ((.475, .72), (-.1, .97), (-.635, .45)):
             pygame.draw.circle(surf, goo, P(x, y), u * .1)
         pygame.draw.circle(surf, (240, 255, 200), P(-.35, -.5), u * .12)
-
-    def _icon_gravity(self, surf, P, u, pale, line):
-        pygame.draw.line(surf, pale, P(-.95, .92), P(.95, .92), line)
-        pygame.draw.circle(surf, (120, 236, 170), P(0, .55), u * .3)
-        self._arrow(surf, pale, P, (0, .1), (0, -1.0), line + 1)
 
     def _icon_wall(self, surf, P, u, pale, line):
         stone = (196, 176, 150)

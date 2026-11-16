@@ -32,7 +32,7 @@ class PowerUpsSettingsState(State):
                 for name in [attr for attr in vars(settings) if attr.startswith("pu_")]:
                     setattr(settings, name, key == "all_pu_on")
 
-            # each power-up's own switch, e.g. "toggle_pu_frost"
+            # each power-up's own switch, e.g. "toggle_pu_fire"
             if key and key.startswith("toggle_pu_"):
                 name = key[len("toggle_"):]
                 setattr(settings, name, not getattr(settings, name))

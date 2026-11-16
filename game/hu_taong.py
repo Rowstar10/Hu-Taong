@@ -757,7 +757,7 @@ class Hu_Taong(GameBase):
                 else:
                     width, height, obj.speed = s.paddle_width, s.paddle_height, s.paddle_speed
 
-                # Giant Paddle, Shrink Curse, Swift Step and frost act on top of the settings
+                # Giant Paddle, Shrink Curse and Swift Step act on top of the settings
                 powerups = getattr(self, "powerups", None)
                 if powerups:
                     height = min(BASE_H * 0.62, height * powerups.size_factor(obj))

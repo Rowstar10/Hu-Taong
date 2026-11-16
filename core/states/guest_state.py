@@ -90,8 +90,6 @@ class GuestMatchState(State):
         self.clock = None            # where the host's pictures are shown, on the host's clock
         self.pending = []            # [(host clock, kind, values)] waiting to be heard
         self.pred = None             # your paddle as predicted: [x0, y0, vx, vy]
-        self.pred_gravity = False    # ...under Gravity (it falls, and Up jumps)
-        self.jump_held = None        # ...and how long Up has been held into a jump
         self.teleport_hold = None    # a Safety Teleport made here: until then the host's word can't pull the paddle back
         self.teleport_claim = False  # ...and the save it made is still to be claimed
         self.quiet_teleport_until = -1.0   # the host's echo of that teleport, heard here already
@@ -247,14 +245,10 @@ class GuestMatchState(State):
         w, h = a[base + 2], a[base + 3]
         state = int(a[19])
         frozen = a[20] >= 0 or a[22] != 0 or info.get("paused")    # countdown, a goal, or paused
-        effects = [k for k, _, _ in self.view.powerups.effect_list(self.view.p1 if side == 1 else self.view.p2)]
-        gravity = "gravity" in effects
         self.own_box = (auth[0], auth[1], w, h)
         self.own_speed = info.get("speed", [1500, 1500])[side - 1]
-        if frozen or self.pred is None or gravity != self.pred_gravity:
-            # (Gravity starting or ending: start again from where the host has it)
+        if frozen or self.pred is None:
             self.pred = [auth[0], auth[1], 0.0, 0.0]
-            self.pred_gravity, self.jump_held = gravity, None
             self.history.clear()
             return
         # Where the paddle was when the last input went out: those are the keys that input
@@ -294,7 +288,7 @@ class GuestMatchState(State):
             dx, dy = net.axis                                # a finger: what the host's paddle averages to
         step = min(dt, 1 / 30) * pace
         p = self.pred
-        self.jump_held = self.step_paddle(p, dx, dy, speed, w, h, step, gravity, self.jump_held)
+        self.step_paddle(p, dx, dy, speed, w, h, step)
         self.own_box = (p[0], p[1], w, h)
         if state & 1:                                        # the Middle Wall keeps it in its half
             if side == 1:
@@ -303,41 +297,17 @@ class GuestMatchState(State):
                 p[0] = max(p[0], BASE_W / 2)
 
     @staticmethod
-    def step_paddle(p, dx, dy, speed, w, h, step, gravity = False, jump = None):
+    def step_paddle(p, dx, dy, speed, w, h, step):
         """One frame of your paddle on your keys, as the host's game moves it: Physics.step's drag,
-        then Paddle.apply_inputs, and under Gravity Paddle.gravity_jump (it falls, and Up jumps:
-        a tap hops, holding climbs on).  `p` is [x, y, vx, vy], moved in place; `jump` is how long
-        Up has been held into a jump (None on the floor or falling), and the new one is answered.
-        tests/test_powerup_online.py checks it against the host's own paddle."""
+        then Paddle.apply_inputs.  `p` is [x, y, vx, vy], moved in place."""
         drag = math.exp(-step)
         p[2] *= drag
         p[3] *= drag
         k = 1 - math.exp(-8 * step)
         p[2] += (speed * dx - p[2]) * k
-        if gravity:
-            vy = p[3] / drag                                  # a clean fall: no drag
-            g = PowerUps.PADDLE_GRAVITY
-            up = dy < -0.3
-            if p[1] + h >= BASE_H - 0.5 and up and vy >= -1 and jump is None:
-                vy, jump = -PowerUps.JUMP, 0.0                # off the floor
-            elif jump is not None:
-                if up and vy < 0 and jump < PowerUps.JUMP_HOLD:
-                    jump += step                              # still holding: climbs on
-                    g *= PowerUps.HOLD_GRAVITY
-                else:
-                    if not up and vy < -PowerUps.JUMP_CUT:
-                        vy = -PowerUps.JUMP_CUT               # let go early: the climb is cut short
-                    jump = None
-            p[3] = vy + g * step
-        else:
-            jump = None
-            p[3] += (speed * dy - p[3]) * k
+        p[3] += (speed * dy - p[3]) * k
         p[0] = max(0.0, min(BASE_W - w, p[0] + p[2] * step))
-        y = p[1] + p[3] * step
-        if gravity and not 0.0 <= y <= BASE_H - h:
-            p[3] = 0.0                                        # the floor (or the top) stops it dead
-        p[1] = max(0.0, min(BASE_H - h, y))
-        return jump
+        p[1] = max(0.0, min(BASE_H - h, p[1] + p[3] * step))
 
     # ---------------- Drawing ----------------
 
@@ -474,13 +444,12 @@ class GuestMatchState(State):
 
     def fly(self, cx, cy, vx, vy, r, seconds):
         """The ball flown on for `seconds` of the host's clock: straight, off the top and bottom and
-        any stones, falling under Gravity.  It stops at the goal lines."""
+        any stones, bent by Curveball and the wind.  It stops at the goal lines."""
         from game.powerups import PowerUps as PortalSize
         view = self.view
         t = max(0.0, min(0.5, seconds)) * float(view.settings.pace or 1.0)
         if t <= 0:
             return cx, cy, vx, vy
-        gravity = any(key == "gravity" for fx in view.powerups.fx for key, _, _ in fx)
         stones = [(s.x0, s.y0, s.x1, s.y1) for s in view.stones if getattr(s, "k", 1) > 0.5]
         if view.powerups.alpha < 0.99 or view.powerups.ghostly():
             stones = []                                # a Ghost Ball goes through them
@@ -491,8 +460,6 @@ class GuestMatchState(State):
         portals = getattr(view.powerups, "portals", [])
         cool = 0.0
         for _ in range(steps):
-            if gravity:
-                vy = max(-2400.0, min(2400.0, vy + 1500 * h))
             if curve or wind:
                 vy = max(-2600.0, min(2600.0, vy + (curve + wind) * h))
                 curve *= math.exp(-1.3 * h)
@@ -605,19 +572,16 @@ class GuestMatchState(State):
             return
         if (pvx - ball.vx) * normal[0] + (pvy - ball.vy) * normal[1] >= 0:
             return                                  # moving apart already
-        effects = view.powerups.effect_list(paddle)
-        mine_fx = [k for k, _, _ in effects]
-        lively = any(key == "gravity" for fx in view.powerups.fx for key, _, _ in fx)
+        mine_fx = [k for k, _, _ in view.powerups.effect_list(paddle)]
         at = SimpleNamespace(x0 = px, y0 = py, x1 = px + w, y1 = py + h, width = w, height = h)   # where they met
         serve = float(info.get("serve", 0.0) or 0.0)
         # Swift Step: the host plays a hit as if the paddle went at its normal top speed
-        frozen = any(k == "frost" and left is not None for k, left, _ in effects)
-        factor = (PowerUps.SWIFT if "swift" in mine_fx else 1.0) * (PowerUps.FROZEN if frozen else 1.0)
+        factor = PowerUps.SWIFT if "swift" in mine_fx else 1.0
         speed = getattr(self, "own_speed", 0)
         top = speed / factor if factor > 1 and speed else math.inf
         if serve:
             vx, vy, bx, by = self.bounce_off(at, side, normal, bx, by, r, ball.vx, ball.vy, pvx, pvy, serve = serve,
-                                             lively = lively, fire = "fire" in mine_fx, top = top)
+                                             fire = "fire" in mine_fx, top = top)
         else:       # a host on an earlier 1.5 doesn't send its serve speed, and expects the simpler bounce
             vx, vy, bx, by = self.simple_bounce(at, side, normal, bx, by, r, ball.vx, ball.vy, pvx, pvy)
         net.claim_id += 1
@@ -692,7 +656,7 @@ class GuestMatchState(State):
         return vx, vy, bx, by
 
     @staticmethod
-    def bounce_off(paddle, side, normal, bx, by, r, bvx, bvy, pvx, pvy, serve = 0.0, lively = False, fire = False,
+    def bounce_off(paddle, side, normal, bx, by, r, bvx, bvy, pvx, pvy, serve = 0.0, fire = False,
                    top = math.inf):
         """The ball off your paddle, as the host's game plays a hit (Physics.resolve_collision, then
         objects/paddle.py on_contact): the knock takes pace off a blocked ball (never below its
@@ -705,8 +669,8 @@ class GuestMatchState(State):
         from objects.paddle import SPEED_KNEE
         nx, ny = normal
         # the knock, as Physics.resolve_collision plays it: paddle inv_mass 0.05, ball 1,
-        # restitution the average of the paddle's 0.6 and the ball's (1.2 under Gravity, else 0.4)
-        res = (0.6 + (1.2 if lively else 0.4)) / 2
+        # restitution the average of the paddle's 0.6 and the ball's 0.4
+        res = (0.6 + 0.4) / 2
         rvn = (pvx - bvx) * nx + (pvy - bvy) * ny
         kvx, kvy, qvx, qvy = bvx, bvy, pvx, pvy
         if rvn <= 0:

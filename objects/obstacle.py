@@ -35,7 +35,7 @@ class Obstacle(GameObject):
 
     @property
     def restitution(self):
-        """Whatever the ball's own bounciness (Gravity raises it), a bounce off a stone keeps its speed."""
+        """Whatever the ball's own bounciness, a bounce off a stone keeps its speed."""
         return 2.0 - self.game.ball.restitution
 
     @restitution.setter

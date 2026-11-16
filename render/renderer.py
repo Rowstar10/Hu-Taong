@@ -338,7 +338,6 @@ class Renderer:
         self._leaves = []                        # Wind Gust's leaves: [x, y, vx, vy, angle, spin, colour, size, phase]
         self._night = None                       # Lantern Night's darkness, made once
         self._paddle_tracks = {}                 # each side's paddle, its last few frames: deque of (x, y, time)
-        self._was_frozen = {}                    # each side: frozen by Frostbite last frame (to crack the ice off)
 
     # ── Shorthands ─────────────────────────────────────────────────────────────
     # Menus are *described* here (what is on the screen); UILayout decides where
@@ -561,11 +560,10 @@ class Renderer:
         w = max(4, int(g.paddle_width / 2) * 2)
         for k in (1.0, PowerUps.GIANT, PowerUps.SHRINK, PowerUps.GIANT * PowerUps.SHRINK):
             h = max(8, int(min(BASE_H * 0.62, g.paddle_height * k) / 4) * 4)
-            for finish in ("red", "blue", "gold", "violet", "jade", "ice"):
+            for finish in ("red", "blue", "gold", "violet"):
                 jobs.append(lambda w=w, h=h, finish=finish: art.paddle_glow(w, h, finish))
             for finish in ("red", "blue"):
                 jobs.append(lambda w=w, h=h, finish=finish: art.paddle(w, h, finish))
-            jobs.append(lambda w=w, h=h: art.get(("ice_crust", w, h), self._ice_crust, w, h))
 
         jobs.reverse()          # taken from the end, so the goal-burst butterflies come first
         return jobs
@@ -1896,10 +1894,9 @@ class Renderer:
             pygame.draw.line(screen, scaled((255, 214, 120), .35 + .5 * k), (px, py + rect.h * .35), (x, y + rect.h * .35), 2)
         sprite.set_alpha(255, pygame.RLEACCEL)
 
-    # One aura per paddle, the first that applies: boons gold, curses violet, Gravity jade, and
-    # Sticky Goo the paddle's own colour (violet over red read as pink, so you lost track of yours)
-    EFFECT_GLOWS = (("giant", "gold"), ("swift", "gold"), ("shrink", "violet"),
-                    ("sticky", None), ("gravity", "jade"))
+    # One aura per paddle, the first that applies: boons gold, curses violet, and Sticky Goo the
+    # paddle's own colour (violet over red read as pink, so you lost track of yours)
+    EFFECT_GLOWS = (("giant", "gold"), ("swift", "gold"), ("shrink", "violet"), ("sticky", None))
     ICON_SIZES = (80, 64, 44, 34)
 
     def draw_paddle_effects(self, screen, paddle, rect, powerups):
@@ -1912,29 +1909,6 @@ class Renderer:
                 screen.blit(halo, halo.get_rect(center=rect.center), special_flags=ADD)
                 halo.set_alpha(255, pygame.RLEACCEL)
                 break
-        frozen = powerups.frozen(paddle)
-        if frozen:
-            # Frostbite has this paddle: a thick ice crust, glinting, so everyone can see who's slowed
-            halo = art.paddle_glow(rect.w, rect.h, "ice")
-            screen.blit(halo, halo.get_rect(center=rect.center), special_flags=ADD)
-            screen.blit(halo, halo.get_rect(center=rect.center), special_flags=ADD)
-            ice = art.get(("ice_crust", rect.w, rect.h), self._ice_crust, rect.w, rect.h)
-            screen.blit(ice, ice.get_rect(center=rect.center))
-            if random.random() < 6 * self.app.dt:
-                self.app.fx.spark(random.uniform(rect.left, rect.right), random.uniform(rect.top, rect.bottom), 1,
-                                  (220, 244, 255), speed=60, life=.5)
-        elif powerups.frosted(paddle):
-            # the frost waiting on its taker's paddle for their next hit: just a cold glow
-            halo = art.paddle_glow(rect.w, rect.h, "ice")
-            halo.set_alpha(int(255 * pulse))
-            screen.blit(halo, halo.get_rect(center=rect.center), special_flags=ADD)
-            halo.set_alpha(255, pygame.RLEACCEL)
-        if self._was_frozen.get(paddle.is_left) and not frozen:
-            # the ice cracks off as it thaws
-            cx, cy = rect.center
-            self.app.fx.spark(cx, cy, 26, (210, 240, 255), speed=420, life=.6)
-            self.app.fx.spark(cx, cy, 10, (255, 255, 255), speed=260, life=.4)
-        self._was_frozen[paddle.is_left] = frozen
         if powerups.has(paddle, "sticky"):
             goo = art.get(("goo_coat", rect.w, rect.h), self._goo_coat, rect.w, rect.h)
             screen.blit(goo, goo.get_rect(midtop=rect.midtop))
@@ -1965,30 +1939,6 @@ class Renderer:
             pygame.draw.rect(coat, (200, 230, 70, 190), (x, y, 4, length), border_radius=2)
             pygame.draw.circle(coat, (210, 240, 90, 210), (x + 2, y + length), 3)
         pygame.draw.rect(coat, (230, 250, 140, 200), (0, 0, w, h), 2, border_radius=max(3, w // 3))
-        return coat
-
-    @staticmethod
-    def _ice_crust(w, h):
-        """Frostbite: a paddle frozen in a thick crust of ice, with icicles and frost spikes."""
-        pad = 10
-        coat = blank(w + 2 * pad, h + 2 * pad)
-        body = pygame.Rect(pad - 4, pad - 4, w + 8, h + 8)
-        pygame.draw.rect(coat, (196, 230, 255, 165), body, border_radius=8)
-        pygame.draw.rect(coat, (240, 250, 255, 235), body, 3, border_radius=8)
-        rng = random.Random(w * 7 + h)
-        for _ in range(4 + h // 30):                     # frost spikes off both long sides
-            y = rng.uniform(body.top + 6, body.bottom - 6)
-            for side in (-1, 1):
-                x = body.left if side < 0 else body.right
-                tip = (x + side * rng.uniform(5, pad), y + rng.uniform(-4, 4))
-                pygame.draw.polygon(coat, (230, 246, 255, 220), [(x, y - 4), tip, (x, y + 4)])
-        for _ in range(3 + w // 10):                     # icicles hanging off the bottom
-            x = rng.uniform(body.left + 3, body.right - 3)
-            pygame.draw.polygon(coat, (220, 242, 255, 230), [(x - 3, body.bottom - 2), (x + 3, body.bottom - 2),
-                                                             (x, body.bottom + rng.uniform(4, pad))])
-        for _ in range(6 + h // 20):                     # glints in the ice
-            x, y = rng.uniform(body.left + 3, body.right - 3), rng.uniform(body.top + 3, body.bottom - 3)
-            pygame.draw.circle(coat, (255, 255, 255, 220), (int(x), int(y)), 1)
         return coat
 
     def draw_ball(self, screen, ball, rect, ox, oy):
@@ -2028,8 +1978,6 @@ class Renderer:
         ghost = bool(powerups) and powerups.ghostly()
         if getattr(ball, "blazing", False):
             fire = (255, 116, 30)                  # Spirit Fire
-        elif powerups and powerups.ball_frosted():
-            fire = (120, 190, 240)                 # Frostbite
         elif snow:
             fire = (190, 214, 240)                 # Snowball
         elif ghost:
@@ -2054,10 +2002,7 @@ class Renderer:
         hits = powerups.cracker_hits(ball) if powerups and hasattr(powerups, "cracker_hits") else 0
         if hits or (powerups and getattr(powerups, "cracker", None) and ball is getattr(ball.game, "ball", None)):
             self.draw_cracker(screen, rect, hits)
-        if powerups and powerups.ball_frosted() and ball is getattr(ball.game, "ball", ball):
-            ice = self.art.get(("ice_ball", rect.w), self._ice_ball, max(8, round(rect.w / 2) * 2))
-            screen.blit(ice, ice.get_rect(center=rect.center))
-        elif snow and ball is getattr(ball.game, "ball", ball):
+        if snow and ball is getattr(ball.game, "ball", ball):
             d = max(8, round(rect.w / 4) * 4)
             coat = self.art.get(("snow_ball", d), self._snow_ball, d)
             screen.blit(coat, coat.get_rect(center=rect.center))
@@ -2227,13 +2172,6 @@ class Renderer:
         pygame.draw.circle(coat, (200, 220, 245, 255), (c, c), d // 2, max(1, d // 30))
         return coat
 
-    @staticmethod
-    def _ice_ball(d):
-        coat = blank(d + 8, d + 8)
-        pygame.draw.circle(coat, (200, 232, 255, 110), (d // 2 + 4, d // 2 + 4), d // 2 + 2)
-        pygame.draw.circle(coat, (240, 250, 255, 220), (d // 2 + 4, d // 2 + 4), d // 2 + 2, 2)
-        return coat
-
     def draw_pickups(self, screen, powerups, ox, oy):
         """Power-up talismans bobbing on the court; they blink before they fade away."""
         t = self.app.fx.time
@@ -2303,21 +2241,6 @@ class Renderer:
             return shoved > 0 and back > 100 and gap < 500
         return back > 250 and gap < 400
 
-    def draw_jump_hints(self, screen, game, powerups):
-        """Gravity has just started: "Up = jump!" over each player's paddle (not the AI's)."""
-        seconds = POWERUPS["gravity"].seconds
-        font = self.fnt(0.026)
-        for paddle in (game.p1, game.p2):
-            if getattr(paddle, "ai_enabled", False):
-                continue
-            left = next((left for key, left, _ in powerups.effect_list(paddle) if key == "gravity"), None)
-            if left is None or left < seconds - 2.2:
-                continue
-            half = font.size("Up = jump!")[0] / 2 + 12
-            cx = min(max((paddle.x0 + paddle.x1) / 2, half), BASE_W - half)     # all of it on screen
-            y = max(60, paddle.y0 - 34 - 6 * math.sin(self.app.fx.time * 8))
-            self.text(screen, "Up = jump!", font, (150, 240, 190), center=(cx, y))
-
     def draw_popups(self, screen, powerups):
         """The name of a power-up, rising and fading from where it was taken."""
         for text, x, y, age, tint in powerups.popups:
@@ -2363,7 +2286,6 @@ class Renderer:
                 self.draw_portals(screen, powerups, ox, oy)     # portals and talismans glow in the dark
                 self.draw_pickups(screen, powerups, ox, oy)
             self.draw_blasts(screen, powerups, ox, oy)
-            self.draw_jump_hints(screen, game, powerups)
             self.draw_popups(screen, powerups)
 
         if getattr(game, "switch_warning", None) is not None:

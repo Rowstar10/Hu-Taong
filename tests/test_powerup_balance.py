@@ -4,8 +4,6 @@
 - Swift Step: the paddle moves 1.5x as fast, but its drives hit no harder than a normal paddle's
   (a faster paddle hit much harder, which was most of its edge: the taker won 74% at Hard).
 - Spirit Fire: blazing shots go at most 10% past the usual top speed (they reached about 4,450 px/s).
-- Frostbite: one-way.  Your next hit frosts the ball; whoever hits it back is frozen at half speed
-  for 5 s, whatever they hit; it never comes back to you, and the ball keeps its speed.
 - Ghost Ball: always in sight in the last 300 px before the paddle it's heading for.
 - Blink Ball: no hops within 350 px of the paddle it's heading for.
 - Twin Balls: never split slower than half a serve.
@@ -78,43 +76,6 @@ class Hits(Match):
         plain = self.hit(self.p2, 0.0, 900.0)
         fire = self.hit(self.p2, 0.0, 900.0, ("fire",))
         self.assertAlmostEqual(fire / plain, PowerUps.FIRE, delta = 0.01)
-
-
-class Frostbite(Match):
-    def setUp(self):
-        super().setUp()
-        self.pu.collect({"kind": "frost", "x": 900, "y": 500}, self.p1)
-        self.ball.vx, self.ball.vy = 900.0, 300.0
-
-    def test_one_way(self):
-        pu, p1, p2, ball = self.pu, self.p1, self.p2, self.ball
-        pu.on_hit(ball, p1, (1, 0))                      # Red's hit frosts the ball...
-        self.assertTrue(pu.ball_frosted())
-        self.assertEqual((ball.vx, ball.vy), (900.0, 300.0), "the frosted ball slowed")
-        pu.on_hit(ball, p2, (-1, 0))                     # ...Blue hits it back and is frozen
-        self.assertTrue(pu.frozen(p2))
-        self.assertAlmostEqual(pu.frost["left"], PowerUps.FROST_TIME)
-        pu.on_hit(ball, p2, (-1, 0))                     # Blue hitting again doesn't pass it on
-        self.assertTrue(pu.frozen(p2))
-        pu.on_hit(ball, p1, (1, 0))
-        self.assertFalse(pu.frozen(p1), "the frost came back to Red")
-        self.assertTrue(pu.frozen(p2))
-
-    def test_frozen_for_five_seconds(self):
-        pu, p1, p2, ball = self.pu, self.p1, self.p2, self.ball
-        pu.on_hit(ball, p1, (1, 0))
-        pu.on_hit(ball, p2, (-1, 0))
-        for _ in range(int(4.9 * 120)):
-            pu.update(1 / 120)
-        self.assertTrue(pu.frozen(p2))
-        for _ in range(int(0.2 * 120)):
-            pu.update(1 / 120)
-        self.assertFalse(pu.frozen(p2))
-
-    def test_tooltip(self):
-        about = BY_KEY["frost"].about
-        self.assertIn("5 s", about)
-        self.assertIn("never comes back to you", about)
 
 
 class GhostNearPaddle(Match):

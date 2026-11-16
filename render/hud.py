@@ -8,9 +8,9 @@ from render.art import mix
 
 # What each power-up is doing, in a few words, for the Tab overview
 SHORT = {"teleport": "Saves one goal", "giant": "Taller paddle", "swift": "Faster paddle",
-         "fire": "Every hit is a blazing shot", "frost": "Next hit frosts the ball", "shrink": "Shorter paddle",
+         "fire": "Every hit is a blazing shot", "shrink": "Shorter paddle",
          "ghost": "Ball vanishes and reappears at random",
-         "sticky": "Ball sticks to this paddle", "gravity": "Paddle falls; Up jumps",
+         "sticky": "Ball sticks to this paddle",
          "wall": "Middle Wall is down", "swap": "Paddles about to swap", "blink": "Ball blinks about",
          "tomb": "A tombstone stands on the court", "snowball": "Heavy snowball: shoves paddles back",
          "twin": "Two balls: each scores only in the other side's goal",
@@ -107,19 +107,13 @@ class Hud:
 
     def draw_overview(self, screen, game, powerups):
         renderer, art = self.app.renderer, self.art
-        frozen = {p: powerups.frozen(p) for p in (game.p1, game.p2)}
 
         def who(paddle):
             return f"{paddle.color1}  ({'AI' if paddle.ai_enabled else paddle.controls_label})"
 
         def rows_for(paddle):
-            rows = []
-            for key, left, charges in powerups.effect_list(paddle):
-                note = SHORT[key]
-                if key == "frost" and frozen[paddle]:
-                    note = "Frozen: moves at half speed"
-                rows.append((key, self.label(key, left, charges), note))
-            return rows
+            return [(key, self.label(key, left, charges), SHORT[key])
+                    for key, left, charges in powerups.effect_list(paddle)]
 
         columns = [(who(game.p1), (255, 112, 92), rows_for(game.p1)),
                    ("Ball & Court", theme.GOLD_BRIGHT,

@@ -193,13 +193,12 @@ class Recorder:
 
     def row(self):
         g, ball, pu = self.game, self.game.ball, self.game.powerups
-        flags = (1 if getattr(ball, "blazing", False) else 0) | (2 if pu.ball_frosted() else 0)
+        # flags 2 and state 32-256 were Frostbite's (removed in 1.6): left unused, for older replays
+        flags = 1 if getattr(ball, "blazing", False) else 0
         flags |= 32 if getattr(ball, "side", None) == "red" else 0         # Twin Balls: the ball is Red's
         last = ball.last_paddle
         flags |= 8 if last is g.p1 else 16 if last is g.p2 else 0
         state = (1 if g.wall_up else 0) | (2 if g.p1.ai_enabled else 0) | (4 if g.p2.ai_enabled else 0)
-        state |= (32 if pu.frosted(g.p1) else 0) | (64 if pu.frosted(g.p2) else 0)
-        state |= (128 if pu.frozen(g.p1) else 0) | (256 if pu.frozen(g.p2) else 0)
         cd = g.countdown
         message = 0 if not g.message_text else (1 if g.message_text.startswith(g.p1.color1) else 2)
         if message and g.message_text.endswith("x2"):
@@ -499,7 +498,6 @@ class ViewPowerUps:
         self.court = []
         self.flags = 0
         self.alpha = 1.0
-        self.ball_frost = False
         self.wind, self.night, self.cracker, self.portals = 0.0, 0.0, 0, []
         self.blasts = []
 
@@ -513,17 +511,8 @@ class ViewPowerUps:
     def has(self, paddle, key):
         return any(k == key and left is not None for k, left, _ in self.effect_list(paddle))
 
-    def frosted(self, paddle):
-        return bool(self.flags & (32 if paddle.is_left else 64))
-
-    def frozen(self, paddle):
-        return bool(self.flags & (128 if paddle.is_left else 256))
-
     def ball_alpha(self, ball=None):
         return self.alpha if ball is None or ball is self.game.ball else 1.0
-
-    def ball_frosted(self):
-        return self.ball_frost
 
     def wall_open(self):
         return any(key == "wall" for key, _ in self.court)
@@ -610,7 +599,6 @@ class ReplayView:
         flags = int(a[15])
         ball.blazing = bool(flags & 1)
         ball.side = "red" if flags & 32 else None
-        pu.ball_frost = bool(flags & 2)
         ball.last_paddle = self.p1 if flags & 8 else self.p2 if flags & 16 else None
         self.p1.score, self.p2.score, ball.rally_value = int(a[16]), int(a[17]), int(a[18])
         state = int(a[19])

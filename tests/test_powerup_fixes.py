@@ -3,7 +3,7 @@
 - A ball caught between two paddles (Middle Wall down), or between a paddle and a stone, rattled
   on the spot hundreds of times a second and the point could never end.
 - Every point restarted the wait for the next talisman, so quick points never got one.
-- Gravity, Ghost Ball, Wind Gust and Sticky Goo carried on into the next serve.
+- Ghost Ball, Wind Gust and Sticky Goo carried on into the next serve.
 - Under Twin Balls, Red's Safety Teleport watched the red ball, which can't score on Red.
 - Sticky Goo with the wall down: a paddle could carry the ball to the other goal and sling it
   point-blank.
@@ -101,7 +101,7 @@ class BetweenPoints(Match):
 
     def test_court_wide_wilds_end_with_the_point(self):
         pu, p1, p2 = self.pu, self.p1, self.p2
-        for key in ("ghost", "wind", "gravity", "sticky"):
+        for key in ("ghost", "wind", "sticky"):
             pu.collect({"kind": key, "x": 900, "y": 500}, p1)
         pu.collect({"kind": "giant", "x": 900, "y": 500}, p1)
         pu.collect({"kind": "shrink", "x": 900, "y": 500}, p1)
@@ -109,7 +109,6 @@ class BetweenPoints(Match):
         self.assertIsNone(pu.ghost)
         self.assertIsNone(pu.wind)
         for paddle in (p1, p2):
-            self.assertNotIn("gravity", paddle.effects)
             self.assertNotIn("sticky", paddle.effects)
         # your own Boons and Curses carry on
         self.assertIn("giant", p1.effects)

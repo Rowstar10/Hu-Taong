@@ -218,7 +218,7 @@ class HostChecks(HostedMatch):
         checked = pinched = 0
         base = game.settings.paddle_speed
         for i in range(600):
-            power = ("", "fire", "frost", "swift")[i % 4]
+            power = ("", "fire", "swift")[i % 3]
             end = rng.random() < 0.25
             speed = rng.choice([300, 600, 1100, 2000, 3100])
             px, py = 1840.0, rng.uniform(0, BASE_H - g.height)
@@ -240,7 +240,7 @@ class HostChecks(HostedMatch):
             if not r <= by <= BASE_H - r or (pvx - bvx) * normal[0] + (pvy - bvy) * normal[1] >= 0:
                 continue                                # off the court, or not a save the friend would claim
             g.x0, g.y0, g.x1, g.y1 = px, py, px + g.width, py + g.height
-            g.speed = base * (PowerUps.SWIFT if power == "swift" else PowerUps.FROZEN if power == "frost" else 1.0)
+            g.speed = base * (PowerUps.SWIFT if power == "swift" else 1.0)
             top = g.speed / PowerUps.SWIFT if power == "swift" else math.inf
             gvx, gvy, gbx, gby = GuestMatchState.bounce_off(g, 2, normal, bx, by, r, bvx, bvy, pvx, pvy, serve = serve,
                                                             fire = power == "fire", top = top)
@@ -252,11 +252,8 @@ class HostChecks(HostedMatch):
                                   (t, bx, by, bvx, bvy, px, py)], maxlen = 240)
             ball.stuck, ball.last_paddle, ball.rally_value = None, None, 0
             game.p1.effects, g.effects = {}, {}
-            game.powerups.frost = None
             if power in ("fire", "swift"):
                 g.effects[power] = 5.0
-            if power == "frost":
-                game.powerups.frost = {"holder": g, "owner": g, "armed": False, "left": 5.0}
             g.vx = g.vy = 0.0
             claim = {"id": i, "t": t, "bx": round(gbx, 1), "by": round(gby, 1), "px": px, "py": py, "pvx": pvx,
                      "pvy": pvy, "normal": list(normal), "vx": round(gvx, 1), "vy": round(gvy, 1), "rule": 2}
@@ -346,7 +343,7 @@ def straight_shot(side, speed, fps, rng, hitch = 0.0):
     me = SimpleNamespace(
         net = SimpleNamespace(claim_id = 0, claims = claims, send_input = lambda: None, last_send = 0.0),
         view = SimpleNamespace(ball = ball, p1 = paddle, p2 = paddle, countdown = None, message_text = "",
-                               powerups = SimpleNamespace(effect_list = lambda p: [], fx = [], frosted = lambda p: False)),
+                               powerups = SimpleNamespace(effect_list = lambda p: [], fx = [])),
         app = SimpleNamespace(sound_manager = SimpleNamespace(paddle_hit_sound = False),
                               fx = SimpleNamespace(spark = lambda *a, **k: None)),
         last_ball = None, bounce = None, claim_rest = 0.0, pred = [x0, 440.0, 0.0, 0.0], tau = 0.0,
@@ -413,8 +410,7 @@ class EarlierHost(unittest.TestCase):
             me = SimpleNamespace(
                 net = SimpleNamespace(claim_id = 0, claims = claims, send_input = lambda: None, last_send = 0.0),
                 view = SimpleNamespace(ball = ball, p1 = paddle, p2 = paddle, countdown = None, message_text = "",
-                                       powerups = SimpleNamespace(effect_list = lambda p: [], fx = [],
-                                                                  frosted = lambda p: False)),
+                                       powerups = SimpleNamespace(effect_list = lambda p: [], fx = [])),
                 app = SimpleNamespace(sound_manager = SimpleNamespace(paddle_hit_sound = False),
                                       fx = SimpleNamespace(spark = lambda *a, **k: None)),
                 last_ball = (paddle.x0 - 70, 540.0, 0.0, paddle.x0, paddle.y0), bounce = None, claim_rest = 0.0,

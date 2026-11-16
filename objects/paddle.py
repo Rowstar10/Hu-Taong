@@ -43,8 +43,7 @@ class Paddle(GameObject):
         self.held = None                     # (ball, out_y) after hitting a ball with an end: see hold_back
 
     def apply_inputs(self, dt):
-        """Keys or the AI ask for a velocity and the paddle eases towards it.  Under Gravity
-        the paddle falls, and Up jumps off the floor."""
+        """Keys or the AI ask for a velocity and the paddle eases towards it."""
         net = getattr(self.game, "net", None)
         if self.ai_enabled:
             dvx, dvy = self.ai_input(dt)
@@ -73,11 +72,7 @@ class Paddle(GameObject):
             k *= powerups.SNOW_GRIP          # reeling from a Snowball's hit: it carries the paddle back
         a = 1 - math.exp(-k * dt)
         self.vx += (dvx - self.vx) * a
-        if powerups and powerups.gravity(self):
-            self.gravity_jump(dt, dvy < -0.3 * self.speed, powerups)
-        else:
-            self.jump_held = None
-            self.vy += (dvy - self.vy) * a
+        self.vy += (dvy - self.vy) * a
         self.hold_back()
 
     def hold_back(self):
@@ -100,25 +95,6 @@ class Paddle(GameObject):
         limit = max(0.0, ball.vy * out_y - HOLD_GAP)
         if self.vy * out_y > limit:
             self.vy = out_y * limit
-
-    def gravity_jump(self, dt, up, powerups):
-        """Under Gravity the paddle falls, and Up jumps: a tap is a small hop, and the longer Up is
-        held (up to half a second) the higher it goes, right up to the top of the court."""
-        vy = self.vy / math.exp(-self.linear_drag * dt)        # a clean fall: undo the physics' drag
-        g = powerups.PADDLE_GRAVITY
-        held = getattr(self, "jump_held", None)
-        if self.y1 >= BASE_H - 0.5 and up and vy >= -1 and held is None:
-            vy, held = -powerups.JUMP, 0.0                      # off the floor
-        elif held is not None:
-            if up and vy < 0 and held < powerups.JUMP_HOLD:
-                held += dt                                      # still holding: climbs on
-                g *= powerups.HOLD_GRAVITY
-            else:
-                if not up and vy < -powerups.JUMP_CUT:
-                    vy = -powerups.JUMP_CUT                     # let go early: the climb is cut short
-                held = None
-        self.jump_held = held
-        self.vy = vy + g * dt
 
     def can_collide_with(self, other):
         if getattr(other, "is_separator", False):

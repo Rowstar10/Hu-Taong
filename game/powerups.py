@@ -49,11 +49,6 @@ KINDS = (
          "• 40% faster, even a little past the usual top speed\n"
          "• Blazing shots chip stones: tombstones break in 2 hits, ferry gates in 3, walls in 4\n"
          "• Lasts 10 s"),
-    Kind("frost", "Frostbite", "冰", "Curse", 10,
-         "Your next hit frosts the ball; whoever hits it back is frozen at half speed for 5 seconds.",
-         "Your next hit frosts the ball. Whoever hits it back is frozen: half speed for 5 s.\n"
-         "• The frost never comes back to you\n"
-         "• Unused, it wears off 10 s after it was taken"),
     Kind("shrink", "Shrink Curse", "缩", "Curse", 10,
          "Your opponent's paddle shrinks by a third for 10 seconds.",
          "Your opponent's paddle shrinks by a third.\n"
@@ -71,12 +66,6 @@ KINDS = (
          "• The way your paddle is moving as it peels off aims it (up slings it up)\n"
          "• A quick flick of the paddle throws it faster\n"
          "• An arrow on the ball shows where it will go\n"
-         "• Lasts 10 s"),
-    Kind("gravity", "Gravity", "重", "Wild", 10,
-         "Both paddles and the ball fall for 10 s; run along the floor, jump with Up.",
-         "Gravity takes both paddles and the ball.\n"
-         "• The paddles drop to the floor: run with Left and Right, jump with Up\n"
-         "• The ball arcs and bounces\n"
          "• Lasts 10 s"),
     Kind("wall", "Open Court", "破", "Wild", 0,
          "The Middle Wall comes down until the point ends; both paddles can roam.",
@@ -179,16 +168,9 @@ class PowerUps:
     WAITS = ((14, 22), (8, 14), (4, 8), (1.5, 3))   # seconds between talismans: Rare, Normal, Frequent, Chaotic
 
     GIANT, SHRINK = 1.5, 0.65               # paddle height
-    SWIFT, FROZEN = 1.5, 0.5                # paddle speed (Swift Step's hits are no harder: see Paddle.on_contact)
-    FROST_TIME = 5.0                        # seconds whoever hits a frosted ball back stays frozen
+    SWIFT = 1.5                             # paddle speed (Swift Step's hits are no harder: see Paddle.on_contact)
     FIRE = 1.4                              # a Spirit Fire shot's speed...
     FIRE_TOP = 1.1                          # ...up to this much past the usual top speed (it reached 1.4 times)
-    BALL_GRAVITY = 1500                     # px/s^2
-    PADDLE_GRAVITY = 2600
-    JUMP = 1900                             # px/s off the floor; a tap is cut to JUMP_CUT at once (a hop)...
-    JUMP_HOLD = 0.4                         # ...but holding Up for up to this long keeps it rising...
-    HOLD_GRAVITY = 0.15                     # ...under only this share of gravity: right up to the top
-    JUMP_CUT = 500                          # px/s: letting go of Up early cuts the climb to this
     TELEPORT_WARNING = 0.12                 # seconds before the ball would be in
     TELEPORTS_HELD = 1                      # Safety Teleport charges a player can hold
     STICK_TIME = (0.6, 1.0)                 # seconds a gooey paddle holds the ball before slinging it
@@ -228,9 +210,6 @@ class PowerUps:
         self.game = game
         self.pickups = []        # {"kind", "x", "y", "age", "phase"}
         self.popups = []         # floating names: [text, x, y, age, colour]
-        self.frost = None        # {"holder": a paddle or "ball", "owner": who took it, "armed": True while it
-                                 #  waits on the taker's paddle for their next hit (they aren't slowed by
-                                 #  it), "left": seconds}
         self.ghost = None        # {"left": seconds, "hidden": bool, "next": seconds till it turns, "alpha"}
         self.blink = None        # {"left": seconds, "next": seconds to the next hop}
         self.hops = []           # recent Blink Ball hops for the renderer: [x0, y0, x1, y1, age]
@@ -250,7 +229,6 @@ class PowerUps:
         self.portal_trips = 0    # trips through them since a paddle last touched a ball
         self.ball_v = (game.ball.vx, game.ball.vy)   # the ball's velocity last frame, before any hit
         self.wait = self.next_wait()
-        self.ball_restitution = game.ball.restitution
         for paddle in (game.p1, game.p2):
             paddle.effects = {}  # key -> seconds left
             paddle.charges = {}  # key -> uses left
@@ -301,23 +279,7 @@ class PowerUps:
         factor = 1.0
         if self.has(paddle, "swift"):
             factor *= self.SWIFT
-        if self.frozen(paddle):
-            factor *= self.FROZEN
         return factor
-
-    def frosted(self, paddle):
-        return self.frost is not None and self.frost["holder"] is paddle
-
-    def frozen(self, paddle):
-        """Caught the frost by hitting a frosted ball back: slowed until it melts (FROST_TIME).  The
-        one who took the power-up isn't slowed while it waits for their next hit."""
-        return self.frosted(paddle) and not self.frost["armed"]
-
-    def ball_frosted(self):
-        return self.frost is not None and self.frost["holder"] == "ball"
-
-    def gravity(self, paddle):
-        return self.has(paddle, "gravity")
 
     def wall_open(self):
         """Open Court, or Soul Swap's Chaos Switch +, has the Middle Wall down."""
@@ -344,8 +306,8 @@ class PowerUps:
         return w["dir"] * self.WIND * ease * (0.65 + 0.35 * math.sin(w["t"] * 2.3))
 
     def ball_accel(self):
-        """What pulls the ball up or down as it flies: Gravity and the wind (for the AI's reckoning)."""
-        return (self.BALL_GRAVITY if self.ball_gravity() else 0.0) + self.wind_force()
+        """What pulls the ball up or down as it flies: the wind (for the AI's reckoning)."""
+        return self.wind_force()
 
     def lantern_level(self):
         """Lantern Night: 0 (day) to 1 (full night), easing in and out.  Always night if it's on
@@ -459,9 +421,6 @@ class PowerUps:
             ball.stuck = None
             ball.unstick = 0.3
 
-    def ball_gravity(self):
-        return any(self.has(p, "gravity") for p in (self.game.p1, self.game.p2))
-
     def ball_alpha(self, ball=None):
         """How visible the ball is: a Ghost Ball fades out of sight and back at random moments.
         (Twin Balls' blue ball is never a ghost.)"""
@@ -479,18 +438,13 @@ class PowerUps:
     def effect_list(self, paddle):
         """What is on this player right now, for the HUD: [(key, seconds left or None, charges)]."""
         items = [(key, left, 0) for key, left in paddle.effects.items()]
-        if self.frosted(paddle):
-            ready = self.frost["armed"]
-            items.append(("frost", None if ready else self.frost["left"], 1 if ready else 0))
-        items += [(key, None, count) for key, count in paddle.charges.items()]
+        items +=[(key, None, count) for key, count in paddle.charges.items()]
         return items
 
     def court_list(self):
         """What is on the ball and the court: [(key, seconds left or None, note)]."""
         items = []
         ball = self.game.ball
-        if self.ball_frosted():
-            items.append(("frost", self.frost["left"], "Frosted: whoever hits it back is frozen"))
         if getattr(ball, "blazing", False):
             items.append(("fire", None, "Blazing shot"))
         if self.ghost:
@@ -535,10 +489,6 @@ class PowerUps:
                 if paddle.effects[key] <= 0:
                     del paddle.effects[key]
 
-        if self.frost:
-            self.frost["left"] -= dt
-            if self.frost["left"] <= 0:
-                self.frost = None
         if self.ghost:
             self.update_ghost(dt)
         if self.wall_down > 0:
@@ -557,14 +507,6 @@ class PowerUps:
         self.update_portals(dt)
         if self.update_snow(dt):
             return                          # a paddle was shoved into its goal: the point is over
-
-        # Gravity pulls the ball down; its bounces keep their height so it doesn't die on the floor
-        if self.ball_gravity():
-            if not ball.stuck:
-                ball.vy = clamp(ball.vy + self.BALL_GRAVITY * dt, -2400, 2400)
-            ball.restitution = 1.2
-        else:
-            ball.restitution = self.ball_restitution      # (not under Wind Gust: lively bounces sped its rallies up)
 
         kinds = self.kinds()
         keys = {kind.key for kind in kinds}
@@ -679,12 +621,10 @@ class PowerUps:
             owner.charges["teleport"] = min(self.TELEPORTS_HELD, owner.charges.get("teleport", 0) + 1)
         elif key in ("giant", "swift", "fire"):
             owner.effects[key] = kind.seconds
-        elif key in ("gravity", "sticky"):
+        elif key == "sticky":
             owner.effects[key] = rival.effects[key] = kind.seconds      # on both paddles
         elif key == "shrink":
             rival.effects[key] = kind.seconds
-        elif key == "frost":
-            self.frost = {"holder": owner, "owner": owner, "armed": True, "left": kind.seconds}
         elif key == "ghost":
             self.ghost = {"left": kind.seconds, "hidden": False, "alpha": 1.0,
                           "next": random.uniform(0.3, 0.8)}
@@ -728,19 +668,8 @@ class PowerUps:
 
     def on_hit(self, ball, paddle, normal=(1, 0)):
         """A paddle touched the ball (called after the paddle has shaped the return)."""
-        # Frostbite goes one way: the taker's next hit frosts the ball, and whoever hits the frosted
-        # ball back catches it and is frozen for FROST_TIME, whatever they hit.  It never comes back
-        # to the taker, and the ball keeps its speed (slowing it gave the frozen player more time).
-        main = ball is self.game.ball          # Twin Balls' blue ball carries no frost, goo or snow
+        main = ball is self.game.ball          # Twin Balls' blue ball carries no goo, snow or firecracker
         self.portal_trips = 0                  # a ball looping through the portals has been played
-        frost = self.frost
-        if frost and main:
-            if frost["holder"] is paddle and frost["armed"]:
-                frost["holder"] = "ball"
-                frost["armed"] = False
-            elif frost["holder"] == "ball" and paddle is not frost["owner"]:
-                frost["holder"] = paddle
-                frost["left"] = self.FROST_TIME
 
         # Spirit Fire: every hit while it lasts is a blazing shot, 40% faster, but never more than a
         # little past the usual top speed (it reached 1.4 times it, faster than anyone can follow)
@@ -998,18 +927,15 @@ class PowerUps:
     def on_point(self):
         """A point ends whatever was riding on the ball, and clears the court: Open Court's wall
         goes back up, Tombstones sink away and the Snowball melts back into a ball.  What acts on
-        both players (Gravity, Sticky Goo, a Ghost Ball, the wind) ends too, so the next serve is a
-        plain one; each player's own Boons and Curses carry on.  The wait for the next talisman
-        carries on where it was (restarted at every point, quick points never got one)."""
+        both players (Sticky Goo, a Ghost Ball, the wind) ends too, so the next serve is a plain
+        one; each player's own Boons and Curses carry on.  The wait for the next talisman carries
+        on where it was (restarted at every point, quick points never got one)."""
         from objects.obstacle import Obstacle
         self.pickups.clear()
-        if self.ball_frosted():
-            self.frost = None
         self.ghost = None
         self.wind = None
         for paddle in (self.game.p1, self.game.p2):
-            for key in ("gravity", "sticky"):
-                paddle.effects.pop(key, None)
+            paddle.effects.pop("sticky", None)
             paddle.charges.pop("teleport", None)        # an unused Safety Teleport is lost
         ball = self.game.ball
         ball.blazing = False
@@ -1052,11 +978,6 @@ class PowerUps:
         a, b = self.game.p1, self.game.p2
         a.effects, b.effects = b.effects, a.effects
         a.charges, b.charges = b.charges, a.charges
-        swap = {a: b, b: a}
-        if self.frost:
-            self.frost["owner"] = swap[self.frost["owner"]]
-            if self.frost["holder"] != "ball":
-                self.frost["holder"] = swap[self.frost["holder"]]
 
     # ---------------- Sticky Goo ----------------
 

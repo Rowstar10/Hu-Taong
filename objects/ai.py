@@ -75,7 +75,8 @@ CONTACT_OFFSETS = (-0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75)
 
 
 def falling(y, vy, t, g, lo, hi, step=1 / 120):
-    """Where a ball under Gravity will be after `t` seconds, bouncing off the floor and ceiling."""
+    """Where a ball pulled up or down (by the wind) will be after `t` seconds, bouncing off the
+    floor and ceiling."""
     for _ in range(min(int(t / step), 480)):
         vy += g * step
         y += vy * step
@@ -107,7 +108,6 @@ class PaddleAI:
         self.hesitate = 0.0
         self.sway = random.uniform(0, math.tau)
         self.t_hit = math.inf
-        self.jump = False
         self.chase = False
         self.pickup = None          # the power-up it has decided to go for
         self.pickup_cooldown = 0.0
@@ -314,17 +314,10 @@ class PaddleAI:
         powerups = getattr(p.game, "powerups", None)
         field = powerups.ball_accel() if powerups else 0.0
         if field:
-            # Gravity or the wind bends its path: it reads the arc by eye, like a player, and a
-            # sharper AI judges the bend a little better
+            # The wind bends its path: it reads the arc by eye, like a player, and a sharper AI
+            # judges the bend a little better
             judged = field * (0.8 + 0.2 * min(1.0, k["foresight"] / 2)) * (1 + 0.06 * self.noise)
-            if powerups.gravity(p):
-                # On the floor itself: pick where along its half to meet the ball, low in its arc
-                # where it can, and only as high as it can jump there in time
-                line, t_hit, y = self.gravity_contact(bx, by, vx, vy, r, k, judged, line)
-                contact_x = line + forward * (p.width / 2 + r)
-                self.t_hit = t_hit
-            else:
-                y = falling(by, vy, t_hit, judged, r, BASE_H - r)
+            y = falling(by, vy, t_hit, judged, r, BASE_H - r)
         elif bounces > k["foresight"]:
             y = clamp(raw, r, BASE_H - r)             # loses track: assumes it sticks to the wall
         y += self.noise * (k["misread"] * min(t_hit, 1.5) + k["wobble"])
@@ -452,66 +445,6 @@ class PaddleAI:
         if closing <= 50:
             return 0.0
         return clamp(1 - gap / 260, 0, 1) * clamp(closing / 600, 0, 1)
-
-    # ---------------- Gravity ----------------
-
-    def rise_time(self, rise):
-        """Seconds a jump with Up held takes to lift the paddle `rise` px."""
-        pw = self.paddle.game.powerups
-        v, held_g = pw.JUMP, pw.PADDLE_GRAVITY * pw.HOLD_GRAVITY
-        hold_h = v * pw.JUMP_HOLD - 0.5 * held_g * pw.JUMP_HOLD ** 2
-        if rise <= hold_h:
-            return (v - math.sqrt(max(0.0, v * v - 2 * held_g * rise))) / held_g
-        v2, g = v - held_g * pw.JUMP_HOLD, pw.PADDLE_GRAVITY
-        disc = v2 * v2 - 2 * g * (rise - hold_h)
-        return pw.JUMP_HOLD + ((v2 - math.sqrt(disc)) / g if disc > 0 else v2 / g)
-
-    def gravity_contact(self, bx, by, vx, vy, r, k, judged, line):
-        """Under Gravity: where along its half to meet the falling ball.  It weighs each spot by
-        how high it would have to jump there, and keeps to spots it can reach (run and jump) in time.
-        Answers (line x, seconds till contact, the ball's height there)."""
-        p = self.paddle
-        forward = 1 if p.is_left else -1
-        px = (p.x0 + p.x1) / 2
-        floor_y = BASE_H - p.height / 2
-        top = max(1.0, p.speed * k["pace"])
-        far = BASE_W / 2 - forward * (p.width / 2 + 8) if p.game.wall_up else BASE_W / 2 + forward * BASE_W * 0.12
-        best = None
-        x = p.home_x
-        while (far - x) * forward >= 0:
-            contact = x + forward * (p.width / 2 + r)
-            t = (bx - contact) * forward / max(1.0, -forward * vx)
-            if t > 0.05:
-                y = falling(by, vy, t, judged, r, BASE_H - r)
-                need = floor_y - y                          # how high it must jump to meet it there
-                jump = self.rise_time(need) if need > p.height * 0.3 else 0.0
-                run = abs(x - px) / top
-                if max(run, jump) + k["reaction"] + 0.08 < t:
-                    score = max(0.0, need) + 0.25 * abs(x - line)
-                    if best is None or score < best[0]:
-                        best = (score, x, t, y)
-            x += forward * 50
-        if best is None:                                   # nowhere it can get to in time: do its best
-            contact = line + forward * (p.width / 2 + r)
-            t = max(0.0, (bx - contact) * forward / max(1.0, -forward * vx))
-            return line, t, falling(by, vy, t, judged, r, BASE_H - r)
-        return best[1], best[2], best[3]
-
-    def jump_now(self, target_y):
-        """Under Gravity, whether to hold Up this frame: take off just in time to rise to the ball,
-        and keep holding only while it still has to climb (letting go early stops the climb)."""
-        p = self.paddle
-        powerups = p.game.powerups
-        cy = (p.y0 + p.y1) / 2
-        if p.y1 >= BASE_H - 1:
-            if not self.incoming:
-                return False
-            rise = cy - target_y
-            if rise < p.height * 0.3:
-                return False
-            return self.t_hit <= self.rise_time(rise) + 0.04
-        coast = powerups.JUMP_CUT ** 2 / (2 * powerups.PADDLE_GRAVITY)    # it rises this much more after letting go
-        return getattr(p, "jump_held", None) is not None and p.vy < 0 and cy - coast > target_y
 
     def pounce_target(self, ball, bx, by, vx, vy, r):
         """A trickster's pounce: having tapped the ball back softly, it sprints after it and hits it
@@ -676,9 +609,6 @@ class PaddleAI:
             self.hesitate -= dt
             target = self.target
 
-        powerups = getattr(p.game, "powerups", None)
-        self.jump = bool(powerups and powerups.gravity(p) and self.jump_now(target[1]))
-
         self.target = target
         return self.steer(target, k, drive)
 
@@ -700,7 +630,4 @@ class PaddleAI:
             if dvx * forward > 0:
                 dvx = forward * min(abs(dvx), top * drive)
         dvy = clamp(ey / self.EASE, -1, 1) * top if abs(ey) > 3 else 0
-        powerups = getattr(p.game, "powerups", None)
-        if powerups and powerups.gravity(p):
-            dvy = -p.speed if self.jump else 0           # under Gravity, Up is a jump
         return dvx, dvy
