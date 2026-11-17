@@ -433,7 +433,9 @@ class App:
 
             alpha = int(255 * t)
             bg_next = self.backgrounds.get(self.bg_next, dim)
-            bg_next.set_alpha(alpha)
+            # faded right in, it's drawn plain: the same picture, but SDL draws a solid picture at
+            # alpha 255 some twenty times slower (25 ms here, a stutter at the end of every fade)
+            bg_next.set_alpha(alpha if alpha < 255 else None)
             self.virtual.blit(bg_next, pos)
 
             if t >= 1:

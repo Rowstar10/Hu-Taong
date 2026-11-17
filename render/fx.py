@@ -311,5 +311,8 @@ class Ambience:
             fly.draw(screen, self.art)
 
         if self.fade_left > 0:
-            self.fade_surf.set_alpha(int(255 * max(0, self.fade_left) / self.fade_total))
+            alpha = int(255 * max(0, self.fade_left) / self.fade_total)
+            # at full strength it's drawn plain: the same, but SDL draws a solid surface at alpha
+            # 255 some twenty times slower (25 ms, on the first frame of every change of screen)
+            self.fade_surf.set_alpha(alpha if alpha < 255 else None)
             screen.blit(self.fade_surf, (0, 0))

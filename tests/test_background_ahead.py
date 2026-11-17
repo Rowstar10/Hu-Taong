@@ -130,6 +130,44 @@ class WholeFade(unittest.TestCase):
         self.assertEqual(app.bg_current, upcoming)
         self.assertIsNone(app.bg_next)
         self.assertEqual(shaded, [])
+        self.assertIsNone(bg.get(upcoming, app.background_dim()).get_alpha(), "drawn plain once faded in")
+
+
+class NeverSolidAt255(unittest.TestCase):
+    """SDL draws a solid picture at alpha 255 some twenty times slower than a plain one (25 ms for
+    the whole screen): the last frame of every background fade, and the first of every change of
+    screen, stuttered.  At full strength they're drawn plain: the same pixels."""
+
+    def test_the_last_frame_of_a_fade(self):
+        name = next(n for n in display.backgrounds if n != app.bg_current)
+        app.bg_next, app.bg_transition_active = name, True
+        app.bg_transition_time = app.bg_transition_duration - 0.001
+        seen = []
+        real_get = bg.get
+
+        def get(n, dim):
+            surf = real_get(n, dim)
+            if n == name:
+                seen.append(surf)
+            return surf
+        bg.get = get
+        try:
+            app.dt = 0.01
+            app.draw_background()
+        finally:
+            bg.get = real_get
+        self.assertTrue(seen)
+        self.assertIsNone(seen[-1].get_alpha())
+
+    def test_the_first_frame_of_a_change_of_screen(self):
+        fx = app.fx
+        fx.fade()
+        fx.draw_overlays(app.virtual)
+        self.assertIsNone(fx.fade_surf.get_alpha(), "full strength: drawn plain")
+        fx.fade_left = fx.fade_total / 2
+        fx.draw_overlays(app.virtual)
+        self.assertEqual(fx.fade_surf.get_alpha(), 127)
+        fx.fade_left = 0
 
 
 if __name__ == "__main__":
