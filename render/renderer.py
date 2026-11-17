@@ -2535,7 +2535,8 @@ class Renderer:
         r = ball.width / 2
         width = max(2, int(r * (0.9 - 0.7 * k)))
         for dy in (-0.55, 0.0, 0.55):
-            start = (face + ox, cy + dy * r * 1.2)
+            # from the face itself, even when the ball hangs off the paddle's end
+            start = (face + ox, min(max(cy + dy * r * 1.2, paddle.y0 + oy), paddle.y1 + oy))
             end = (cx - stuck["side"] * r * 0.6, cy + dy * r * 0.7)
             pygame.draw.line(screen, (150, 176, 40), start, end, width + 2)
             pygame.draw.line(screen, (204, 230, 80), start, end, width)

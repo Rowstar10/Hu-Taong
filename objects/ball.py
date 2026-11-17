@@ -38,6 +38,7 @@ class Ball(GameObject):
         self.press_clock = 0.0   # seconds the ball has moved, to time those knocks
 
     PRESS_WINDOW = 0.02          # knocked from both sides within this: it's caught in a squeeze
+    HELD_BY = 4                  # Sticky Goo: px of a held ball that stay beside the paddle's face
 
     def scores_in(self, nx):
         """Can this ball score in the goal it just reached (nx 1: Red's goal on the left, -1: Blue's)?
@@ -58,8 +59,11 @@ class Ball(GameObject):
         paddle = stuck["paddle"]
         k = 1 - stuck["left"] / stuck["total"]
         gap = 1 + 14 * k * k
-        half = paddle.height / 2
-        cy = (paddle.y0 + paddle.y1) / 2 + clamp(stuck["dy"], -half, half)
+        # It's held where it touched.  A big ball (a Snowball) caught on the paddle's end has its
+        # middle out past the end; held no further out than the end, it was dragged onto the paddle,
+        # up to 70 px in a frame.  It only has to keep a little of itself beside the face.
+        reach = paddle.height / 2 + max(0.0, self.height / 2 - self.HELD_BY)
+        cy = (paddle.y0 + paddle.y1) / 2 + clamp(stuck["dy"], -reach, reach)
         x0 = paddle.x1 + gap if stuck["side"] > 0 else paddle.x0 - gap - self.width
         x0 = clamp(x0, 1, BASE_W - self.width - 1)
         y0 = clamp(cy - self.height / 2, 0, BASE_H - self.height)
