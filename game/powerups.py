@@ -107,7 +107,8 @@ KINDS = (
          "• They fly apart at half the speed the ball had (never slower than half a serve)\n"
          "• Hits don't change their colours\n"
          "• Red scores only by getting the red ball into Blue's goal, and Blue the blue ball into Red's\n"
-         "• A ball that reaches its own colour's goal just bounces off it"),
+         "• A ball that reaches its own colour's goal just bounces off it\n"
+         "• Doesn't turn up in a Twin Ball match"),
     Kind("shape", "Shape Shift", "变", "Wild", 0,
          "Until the point ends, the paddles grow and shrink together, and the ball on its own.",
          "For the rest of the point, the paddles keep drifting bigger and smaller together, always "
@@ -122,7 +123,7 @@ KINDS = (
          "• Move your paddle up or down as you hit, and the ball bends that way as it flies\n"
          "• The faster you sweep, the harder it bends; a still paddle hits it straight\n"
          "• The spin fades as it goes, and flips when it bounces off the top or bottom\n"
-         "• Doesn't turn up if Curveball is on for the whole match (in Settings)"),
+         "• Doesn't turn up in a Curveball match"),
     Kind("double", "Double or Nothing", "倍", "Wild", 0,
          "This point is worth 2, whoever wins it.",
          "This point is worth 2.\n"
@@ -146,7 +147,7 @@ KINDS = (
          "Night falls on the court until the point ends.\n"
          "• Only lantern light round each paddle and the ball's own glow light it up\n"
          "• Power-up talismans still glow in the dark\n"
-         "• Doesn't turn up if Lantern Night is on for the whole match (in Settings)"),
+         "• Doesn't turn up in a Lantern Night match"),
     Kind("portal", "Portal Pair", "门", "Wild", 0,
          "Two linked portals open on the court until the point ends: in one, out the other.",
          "Two linked portals open somewhere on the court, each facing its own way.\n"
@@ -244,19 +245,21 @@ class PowerUps:
         return self.game.settings
 
     def kinds(self):
-        """The power-ups switched on in Settings."""
+        """The power-ups switched on in Settings (Talisman Rush brings them even with Power-Ups off)."""
         s = self.settings
-        if not s.powerups:
+        if not s.talismans_on:
             return []
         return [kind for kind in KINDS if getattr(s, "pu_" + kind.key)]
 
     def most(self):
-        """Talismans that may wait on the court at once: three on Chaotic, two otherwise."""
-        return 3 if self.settings.powerup_rate >= 3 else self.MOST
+        """Talismans that may wait on the court at once: three on Chaotic or in Talisman Rush, two otherwise."""
+        return 3 if self.settings.powerup_rate >= 3 or self.settings.mode_talisman_rush else self.MOST
 
     def next_wait(self):
+        """Seconds to the next talisman, at the Spawn rate; Talisman Rush cuts it to a third."""
         lo, hi = self.WAITS[self.settings.powerup_rate]
-        return random.uniform(lo, hi)
+        rush = self.settings.RUSH if self.settings.mode_talisman_rush else 1.0
+        return random.uniform(lo, hi) / rush
 
     def opponent(self, paddle):
         game = self.game
@@ -362,7 +365,7 @@ class PowerUps:
         if kind.key == "snowball":
             return self.snow is None
         if kind.key == "twin":
-            return self.twin is None
+            return self.twin is None and not self.settings.mode_twin_ball
         return True
 
     # ---------------- Twin Balls ----------------
@@ -404,6 +407,29 @@ class PowerUps:
         ball.side, blue.side = "red", "blue"
         self.twin = {"left": UNTIL_POINT, "ball": blue}            # until the point ends
         game.app.fx.spark(cx, cy, 30, (255, 236, 200), speed = 420, life = .6)
+
+    def twin_serve(self):
+        """Twin Ball (a game mode): every point is served with both balls, Red's (the ball itself) and
+        Blue's, under the Twin Balls rules.  Each sets off at the usual serve towards the goal it can
+        score in (red only scores in Blue's goal), on mirrored paths."""
+        from objects.ball import Ball
+        game, ball = self.game, self.game.ball
+        self.end_twin()
+        r = ball.diameter / 2
+        cx, cy = (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2
+        blue = Ball(game, diameter = ball.diameter, x = ball.x0, y = ball.y0, speed = ball.speed, color = "white")
+        blue.drift = getattr(ball, "drift", None)
+        down = 1 if getattr(ball, "spawn_vy", 1) >= 0 else -1
+        ball.vx, ball.vy = ball.speed, down * ball.speed            # red: towards Blue's goal
+        blue.vx, blue.vy = -ball.speed, -down * ball.speed          # blue: towards Red's goal
+        apart = r + 4                                               # each a little clear of the other, moving apart
+        ball.y0 = clamp(cy - r + down * apart, 0, BASE_H - 2 * r)
+        ball.y1 = ball.y0 + 2 * r
+        blue.y0 = clamp(cy - r - down * apart, 0, BASE_H - 2 * r)
+        blue.y1 = blue.y0 + 2 * r
+        blue.x0, blue.x1 = cx - r, cx + r
+        ball.side, blue.side = "red", "blue"
+        self.twin = {"left": UNTIL_POINT, "ball": blue}
 
     def end_twin(self):
         """Twin Balls is over (its time, or a point): the blue ball vanishes, the ball plays on."""

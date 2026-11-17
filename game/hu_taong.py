@@ -118,6 +118,8 @@ class Hu_Taong(GameBase):
         # The court's own stones, for the whole match (power-up Tombstones come and go)
         self.court = courts.pick(settings.court)
         self.stones = courts.build(self, self.court)
+        if settings.mode_twin_ball:
+            self.powerups.twin_serve()            # Twin Ball: the first serve is with both balls too
 
         self.recorder = Recorder(self)           # every match is recorded, for replays and highlights
 
@@ -510,6 +512,8 @@ class Hu_Taong(GameBase):
 
         for obj in self.objects:
             obj.reset()
+        if self.settings.mode_twin_ball:
+            self.powerups.twin_serve()          # Twin Ball: both balls, every point
 
         if self.switch_after_point:
             self.switch_after_point = False
