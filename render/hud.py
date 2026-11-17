@@ -14,7 +14,7 @@ SHORT = {"teleport": "Saves one goal", "giant": "Taller paddle", "swift": "Faste
          "wall": "Middle Wall is down", "swap": "Paddles about to swap", "blink": "Ball blinks about",
          "tomb": "A tombstone stands on the court", "snowball": "Heavy snowball: shoves paddles back",
          "twin": "Two balls: each scores only in the other side's goal",
-         "chaos": "Sizes and speeds drifting", "curve": "Hits bend the way the paddle moved",
+         "shape": "Sizes drifting", "curve": "Hits bend the way the paddle moved",
          "double": "This point is worth 2", "wind": "Wind bending the ball",
          "cracker": "Bangs when its fuse burns down", "lantern": "Night: lanterns only",
          "portal": "Two linked portals"}
@@ -71,7 +71,7 @@ class Hud:
             self.draw_effects(screen, powerups.effect_list(p1), left, top)
             self.draw_effects(screen, powerups.effect_list(p2), right, top)
             court = [(key, seconds, 0) for key, seconds, _ in powerups.court_list()
-                     if key in ("wall", "blink", "snowball", "ghost", "twin", "swap", "chaos", "curve",
+                     if key in ("wall", "blink", "snowball", "ghost", "twin", "swap", "shape", "curve",
                                 "double", "wind", "cracker", "lantern", "portal")]
             if court:                            # things that are on everyone sit in the middle
                 self.draw_effects(screen, court, BASE_W // 2, 150)

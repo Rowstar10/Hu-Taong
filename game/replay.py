@@ -27,6 +27,7 @@ RATE = 60                    # frames a second
 MOST_FRAMES = RATE * 60 * 30 # half an hour; a longer match keeps its last half hour
 MAGIC = b"HUTAONG-REPLAY 1\n"
 KIND_KEYS = [kind.key for kind in KINDS]
+RENAMED = {"chaos": "shape"}        # power-ups since renamed: Chaos Mode + is Shape Shift (1.6)
 STYLES = ["tomb", "pillar"]
 GREAT = 14.0                 # a point's best moment worth an instant replay scores at least this
 REEL_REPEAT = 0.6            # each repeat of a kind of moment in the reel counts for this much less
@@ -118,7 +119,8 @@ class Clip:
                 frames.append(payload[pos:pos + 4 * n])
                 pos += 4 * n
             if header.get("kinds") != KIND_KEYS:
-                header["remap"] = [KIND_KEYS.index(k) if k in KIND_KEYS else -1 for k in header.get("kinds", [])]
+                kinds = [RENAMED.get(k, k) for k in header.get("kinds", [])]
+                header["remap"] = [KIND_KEYS.index(k) if k in KIND_KEYS else -1 for k in kinds]
             events = [tuple(e) for e in header.pop("events", [])]
             moments = [Moment.from_dict(m) for m in header.pop("moments", [])]
             return cls(frames, events, header, moments)

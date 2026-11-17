@@ -101,6 +101,7 @@ class Hu_Taong(GameBase):
         self.ball = Ball(self, diameter = settings.ball_diameter, x = (BASE_W - settings.ball_diameter) / 2, y = (BASE_H - settings.ball_diameter) / 2, speed = settings.ball_speed, color = "white")
 
         # Chaos Mode +: each paddle and the ball drift through sizes and speeds on their own
+        # (Shape Shift: through sizes only)
         for obj in (self.p1, self.p2, self.ball):
             obj.drift = {"size": self.drift_track(obj, "size"), "speed": self.drift_track(obj, "speed")}
 
@@ -701,7 +702,7 @@ class Hu_Taong(GameBase):
                 self.next_switch = random.uniform(4, 8)     # Soul Swap's: sooner, as it only lasts the point
             self.swap_positions()
 
-    # ---------------- Chaos Mode + ----------------
+    # ---------------- Chaos Mode + and Shape Shift ----------------
 
     def drift_track(self, obj, key):
         """[value, target, seconds until a new target], as a share of the setting's range."""
@@ -714,13 +715,13 @@ class Hu_Taong(GameBase):
         return [value, value, 0.0]
 
     def reset_drift(self):
-        """Back to the settings' own sizes and speeds (after a Chaos Mode + power-up's point)."""
+        """Back to the settings' own sizes and speeds (after a Shape Shift point)."""
         for obj in (self.p1, self.p2, self.ball):
             obj.drift = {"size": self.drift_track(obj, "size"), "speed": self.drift_track(obj, "speed")}
 
     def update_drift(self, dt):
         powerups = getattr(self, "powerups", None)
-        if not (powerups.drifting() if powerups else self.app.settings.gameplay.chaos_mode == 2):
+        if not (powerups.sizes_drifting() if powerups else self.app.settings.gameplay.chaos_mode == 2):
             return
         ease = 1 - math.exp(-dt / 1.1)
         for obj in (self.p1, self.p2, self.ball):
@@ -744,17 +745,22 @@ class Hu_Taong(GameBase):
         super().apply_gameplay_settings()
         s = self.app.settings.gameplay
         powerups = getattr(self, "powerups", None)
-        drifting = powerups.drifting() if powerups else s.chaos_mode == 2
+        # Chaos Mode + (Settings) drifts sizes and speeds; Shape Shift sizes only
+        sizes = powerups.sizes_drifting() if powerups else s.chaos_mode == 2
+        speeds = powerups.speeds_drifting() if powerups else s.chaos_mode == 2
 
         for obj in self.objects:
             if obj.is_paddle:
-                if drifting:
-                    t, pace = obj.drift["size"][0], obj.drift["speed"][0]
+                if sizes:
+                    t = obj.drift["size"][0]
                     width = s.paddle_width_min + t * s.paddle_width_range
                     height = s.paddle_height_min + t * s.paddle_height_range
-                    obj.speed = s.paddle_speed_min + pace * s.paddle_speed_range
                 else:
-                    width, height, obj.speed = s.paddle_width, s.paddle_height, s.paddle_speed
+                    width, height = s.paddle_width, s.paddle_height
+                if speeds:
+                    obj.speed = s.paddle_speed_min + obj.drift["speed"][0] * s.paddle_speed_range
+                else:
+                    obj.speed = s.paddle_speed
 
                 # Giant Paddle, Shrink Curse and Swift Step act on top of the settings
                 powerups = getattr(self, "powerups", None)
@@ -780,8 +786,11 @@ class Hu_Taong(GameBase):
 
 
             if obj.is_ball:
-                if drifting:
+                if sizes:
                     diameter = s.ball_diameter_min + obj.drift["size"][0] * s.ball_diameter_range
+                else:
+                    diameter = s.ball_diameter
+                if speeds:
                     speed = s.ball_speed_min + obj.drift["speed"][0] * s.ball_speed_range
                     if obj.speed > 0:     # speed the ball up or down as the drift moves, keeping its direction
                         k = speed / obj.speed
@@ -789,7 +798,7 @@ class Hu_Taong(GameBase):
                         obj.vy *= k
                     obj.speed = speed
                 else:
-                    diameter, obj.speed = s.ball_diameter, s.ball_speed
+                    obj.speed = s.ball_speed
 
                 # A Snowball grows as it rolls (to 200 px at most)
                 powerups = getattr(self, "powerups", None)

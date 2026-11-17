@@ -1128,8 +1128,8 @@ class Art:
             pygame.draw.circle(surf, tint, P(x, y), u * .42)
             pygame.draw.circle(surf, (255, 255, 255), P(x - .13, y - .13), u * .12)
 
-    def _icon_chaos(self, surf, P, u, pale, line):
-        # a big and a small paddle, and a ball, with drift arrows between them
+    def _icon_shape(self, surf, P, u, pale, line):
+        # Shape Shift: a big and a small paddle, and a ball, with drift arrows between them
         pygame.draw.rect(surf, (236, 170, 90), (*P(-.85, -.75), .28 * u, 1.5 * u), border_radius=int(.1 * u))
         pygame.draw.rect(surf, (236, 170, 90), (*P(.55, -.3), .28 * u, .6 * u), border_radius=int(.1 * u))
         pygame.draw.circle(surf, (255, 255, 255), P(0, .35), u * .2)

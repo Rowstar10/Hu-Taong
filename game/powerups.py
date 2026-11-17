@@ -108,10 +108,11 @@ KINDS = (
          "• Hits don't change their colours\n"
          "• Red scores only by getting the red ball into Blue's goal, and Blue the blue ball into Red's\n"
          "• A ball that reaches its own colour's goal just bounces off it"),
-    Kind("chaos", "Chaos Mode +", "狂", "Wild", 0,
-         "Until the point ends, both paddles and the ball drift through sizes and speeds.",
+    Kind("shape", "Shape Shift", "变", "Wild", 0,
+         "Until the point ends, both paddles and the ball keep growing and shrinking.",
          "For the rest of the point, both paddles and the ball keep drifting bigger and smaller, "
-         "faster and slower, each on its own (like the Chaos Mode + setting).\n"
+         "each on its own.\n"
+         "• Speeds stay as they are\n"
          "• Everything goes back to normal for the next serve\n"
          "• Doesn't turn up if Chaos Mode + is on in Settings"),
     Kind("curve", "Curveball", "旋", "Wild", 0,
@@ -216,7 +217,7 @@ class PowerUps:
         self.snow = None         # Snowball: {"size": times the ball's own diameter}
         self.twin = None         # Twin Balls: {"left": seconds, "ball": the blue ball}; the main ball is red
         self.switch_plus = False # Soul Swap: Chaos Switch + is on until the point ends
-        self.chaos_plus = False  # Chaos Mode + until the point ends
+        self.shape_shift = False # Shape Shift: sizes drift until the point ends
         self.curve_on = False    # Curveball until the point ends
         self.double = False      # Double or Nothing: the point being played is worth 2
         self.wind = None         # Wind Gust: {"left", "dir" (1 down, -1 up), "t"}
@@ -287,9 +288,14 @@ class PowerUps:
         """Chaos Switch + is on: from Settings, or from Soul Swap until the point ends."""
         return self.settings.switch_mid_rally or self.switch_plus
 
-    def drifting(self):
-        """Chaos Mode + is on: from Settings, or from the power-up until the point ends."""
-        return self.settings.chaos_mode == 2 or self.chaos_plus
+    def sizes_drifting(self):
+        """Paddles and ball drift bigger and smaller: with Chaos Mode + on in Settings, or from
+        Shape Shift until the point ends."""
+        return self.settings.chaos_mode == 2 or self.shape_shift
+
+    def speeds_drifting(self):
+        """Their speeds drift too: only with Chaos Mode + on in Settings (Shape Shift leaves them be)."""
+        return self.settings.chaos_mode == 2
 
     def curving(self):
         """Curveball is on: for the whole match (Settings), or from the power-up until the point ends."""
@@ -340,8 +346,8 @@ class PowerUps:
             return game.wall_up
         if kind.key == "swap":
             return not self.swapping()
-        if kind.key == "chaos":
-            return not self.drifting()
+        if kind.key == "shape":
+            return not self.sizes_drifting()
         if kind.key == "curve":
             return not self.curving()
         if kind.key == "double":
@@ -461,8 +467,8 @@ class PowerUps:
             items.append(("twin", self.twin["left"], "Red and blue balls: each scores only in the other's goal"))
         if self.switch_plus:
             items.append(("swap", UNTIL_POINT, "Chaos Switch +: the paddles keep swapping places"))
-        if self.chaos_plus:
-            items.append(("chaos", UNTIL_POINT, "Chaos Mode +: sizes and speeds drifting"))
+        if self.shape_shift:
+            items.append(("shape", UNTIL_POINT, "Shape Shift: sizes drifting"))
         if self.curve_on:
             items.append(("curve", UNTIL_POINT, "Curveball: hits bend the way the paddle moved"))
         if self.double:
@@ -640,8 +646,8 @@ class PowerUps:
         elif key == "swap":
             self.switch_plus = True
             self.game.start_switch_mode()
-        elif key == "chaos":
-            self.chaos_plus = True
+        elif key == "shape":
+            self.shape_shift = True
         elif key == "curve":
             self.curve_on = True
         elif key == "double":
@@ -939,9 +945,9 @@ class PowerUps:
         self.end_twin()
         walled = self.switch_plus
         self.switch_plus = False
-        if self.chaos_plus:
-            self.chaos_plus = False
-            self.game.reset_drift()                 # sizes and speeds are back to normal for the serve
+        if self.shape_shift:
+            self.shape_shift = False
+            self.game.reset_drift()                 # sizes are back to normal for the serve
         self.curve_on = False
         self.double = False
         self.cracker = None

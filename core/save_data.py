@@ -118,6 +118,9 @@ def load(app):
     limits = _limits(app)
     s = app.settings
     _restore(s.gameplay, data.get("gameplay"), limits)
+    old = data.get("gameplay") or {}
+    if isinstance(old, dict) and "pu_shape" not in old and isinstance(old.get("pu_chaos"), bool):
+        s.gameplay.pu_shape = old["pu_chaos"]       # Shape Shift was the Chaos Mode + talisman
     if s.gameplay.middle_wall and s.gameplay.switch_mid_rally:
         s.gameplay.chaos_switch -= 2     # Chaos Switch + only works with the Middle Wall off
     _restore(s.display, data.get("display"), limits)
