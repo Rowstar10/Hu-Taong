@@ -553,6 +553,9 @@ class Renderer:
                                        bottom=(255, 200, 80), glow=None))
         for n in range(1, 6):                                 # the Firecracker's 5-to-1 over the ball
             jobs.append(lambda n=n: self.cracker_digit(n))
+        for R in range(PowerUps.PORTAL_START, PowerUps.PORTAL_R + 1, PowerUps.PORTAL_GROW):   # every size a portal grows through
+            jobs.append(lambda R=R: (art.get(("portal_ring", R), self._portal_ring, R),
+                                     art.glow(int(R * 2.2) // 4 * 4, scaled((150, 100, 255), .7))))
         for mark in "三二一":
             jobs.append(lambda mark=mark: art.get(("countdown_mark", mark), self._faint_mark, mark))
         for text in ("3", "2", "1", "GO!"):
@@ -2227,8 +2230,8 @@ class Renderer:
         if not portals:
             return
         t = self.app.fx.time
-        R = PowerUps.PORTAL_R
         for i, door in enumerate(portals):
+            R = self.portal_size(door)
             x, y = door["x"] + ox, door["y"] + oy
             glow = self.art.glow(int(R * 2.2) // 4 * 4, scaled((150, 100, 255), .7))
             screen.blit(glow, glow.get_rect(center=(x, y)), special_flags=ADD)
@@ -2251,6 +2254,12 @@ class Renderer:
                 for colour, width in (((20, 60, 90), 9), ((170, 250, 255), 5)):
                     pygame.draw.line(screen, colour, (cx - px * 18, cy - py * 18), tipp, width)
                     pygame.draw.line(screen, colour, (cx + px * 18, cy + py * 18), tipp, width)
+
+    @staticmethod
+    def portal_size(door):
+        """A portal's radius as drawn: in PORTAL_GROW steps, so each size's sprites are built once."""
+        step = PowerUps.PORTAL_GROW
+        return max(step, int(round(door.get("r", PowerUps.PORTAL_R) / step)) * step)
 
     @staticmethod
     def _portal_ring(R):

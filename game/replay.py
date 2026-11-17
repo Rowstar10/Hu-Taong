@@ -21,12 +21,13 @@ from array import array
 from pathlib import Path
 
 from config import BASE_W, BASE_H
-from game.powerups import BY_KEY, KINDS
+from game.powerups import BY_KEY, KINDS, PowerUps
 
 RATE = 60                    # frames a second
 MOST_FRAMES = RATE * 60 * 30 # half an hour; a longer match keeps its last half hour
 MAGIC = b"HUTAONG-REPLAY 1\n"
 KIND_KEYS = [kind.key for kind in KINDS]
+ROWS = 2        # the rows' layout: 2 from 1.7 (each portal's size); none said in a header means 1
 RENAMED = {"chaos": "shape"}        # power-ups since renamed: Chaos Mode + is Shape Shift (1.6)
 STYLES = ["tomb", "pillar"]
 GREAT = 14.0                 # a point's best moment worth an instant replay scores at least this
@@ -154,7 +155,7 @@ class Recorder:
                            "AI" if g.p2.ai_enabled else g.p2.controls_label],
                 "pace": g.settings.pace, "switch_each_point": g.settings.switch_each_point,
                 "switching": g.settings.switching,
-                "court": g.court.name, "strings": self.strings,
+                "court": g.court.name, "strings": self.strings, "rows": ROWS,
                 "title": f"{datetime.datetime.now():%d %b %Y, %H:%M}"}
 
     def new_point(self):
@@ -248,7 +249,7 @@ class Recorder:
                    pu.lantern_level() if hasattr(pu, "lantern_level") else 0.0,
                    pu.cracker_fuse(ball) if hasattr(pu, "cracker_fuse") else 0, len(portals)]
         for door in portals:
-            values += [door["x"], door["y"], door["angle"]]
+            values += [door["x"], door["y"], door["angle"], door.get("r", PowerUps.PORTAL_R)]
         # then the Firecracker's shockwaves, and how chipped each stone is
         blasts = getattr(pu, "blasts", [])
         values.append(len(blasts))
@@ -567,6 +568,7 @@ class ReplayView:
         self.objects = []
         self.remap = info.get("remap")
         self.strings = info.get("strings", [])
+        self.portal_fields = 4 if info.get("rows", 1) >= 2 else 3     # 1.6's rows: no portal size
         self.running = True
         self.paused = False
 
@@ -684,10 +686,13 @@ class ReplayView:
             ball.curve, pu.wind, pu.night, pu.cracker = a[pos], a[pos + 1], a[pos + 2], max(0.0, a[pos + 3])
             n_portals = int(a[pos + 4])
             pos += 5
+            fields = self.portal_fields
             for _ in range(n_portals):
-                if pos + 3 <= len(a):
-                    pu.portals.append({"x": a[pos], "y": a[pos + 1], "angle": a[pos + 2]})
-                pos += 3
+                if pos + fields <= len(a):
+                    door = {"x": a[pos], "y": a[pos + 1], "angle": a[pos + 2]}
+                    door["r"] = a[pos + 3] if fields == 4 else 80.0       # (1.6's portals were always 80)
+                    pu.portals.append(door)
+                pos += fields
         pu.blasts = []
         for stone in self.stones:
             stone.strength = 1.0

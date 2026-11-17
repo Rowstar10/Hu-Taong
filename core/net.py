@@ -611,6 +611,7 @@ class HostSession:
         return False
 
     def send_snapshot(self):
+        from game.replay import ROWS
         game = self.game
         rec = game.recorder
         row = rec.row()
@@ -635,7 +636,7 @@ class HostSession:
                                     for p in (game.p1, game.p2)],
                          "pace": game.settings.pace, "switch_each_point": game.settings.switch_each_point,
                          "switching": game.settings.switching,
-                         "court": game.court.name}}
+                         "court": game.court.name, "rows": ROWS}}
         head = pack_json(info)
         self.snap_seq += 1
         self.link.send(SNAP, struct.pack("<IH", self.snap_seq, len(head)) + head + row)

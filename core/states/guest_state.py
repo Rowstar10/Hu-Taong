@@ -469,11 +469,12 @@ class GuestMatchState(State):
             cool = max(0.0, cool - h)
             if portals and cool <= 0:
                 for i, door in enumerate(portals):
-                    if math.hypot(cx - door["x"], cy - door["y"]) <= PortalSize.PORTAL_R * 0.6:
+                    if math.hypot(cx - door["x"], cy - door["y"]) <= door.get("r", PortalSize.PORTAL_R) * 0.6:
                         out = portals[1 - i] if len(portals) > 1 else door
-                        dx, dy = math.cos(out["angle"]), math.sin(out["angle"])
+                        dx, dy = PortalSize.portal_exit(out["angle"])        # as the host's game does
                         speed = math.hypot(vx, vy)
-                        cx, cy = out["x"] + dx * (PortalSize.PORTAL_R * 0.5 + r), out["y"] + dy * (PortalSize.PORTAL_R * 0.5 + r)
+                        reach = out.get("r", PortalSize.PORTAL_R) * 0.5 + r
+                        cx, cy = out["x"] + dx * reach, out["y"] + dy * reach
                         vx, vy = speed * dx, speed * dy
                         cool = 0.35
                         break

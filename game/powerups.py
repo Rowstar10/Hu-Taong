@@ -148,10 +148,11 @@ KINDS = (
          "• Power-up talismans still glow in the dark\n"
          "• Doesn't turn up in a Lantern Night match"),
     Kind("portal", "Portal Pair", "门", "Wild", 0,
-         "Two linked portals open on the court until the point ends: in one, out the other.",
-         "Two linked portals open somewhere on the court, each facing its own way.\n"
+         "Two linked portals drift about the court until the point ends: in one, out the other.",
+         "Two linked portals open on the court, drifting slowly about, each facing its own way.\n"
          "• A ball that goes into one comes out of the other at the same speed\n"
-         "• It leaves the way that portal is facing (shown by its arrows)\n"
+         "• It leaves the way that portal's arrows point, and they slowly turn\n"
+         "• They open small and grow a little each time a ball goes through\n"
          "• Paddles pass straight through them\n"
          "• Lasts until the point ends"),
 )
@@ -190,7 +191,14 @@ class PowerUps:
     CURVE_FADE = 1.3                        # ...fading away at this rate as it flies (per second)
     WIND = 500                              # Wind Gust: px/s^2 at the height of a gust (360 was too gentle to notice)
     CRACKER_TOP = 2600                      # Firecracker: its bang shoots the ball off at double speed, up to this (3600 was unreturnable)
-    PORTAL_R = 80                           # Portal Pair: a portal's radius
+    PORTAL_R = 96                           # Portal Pair: a portal's radius at its biggest...
+    PORTAL_START = 48                       # ...as it opens; every ball through grows both by...
+    PORTAL_GROW = 8                         # ...this much (six trips to full size; 1.6's were 80 all along)
+    PORTAL_DRIFT = (35.0, 60.0)             # px/s a portal drifts about the court...
+    PORTAL_TURN = (0.25, 0.45)              # ...and radians/s its arrows turn
+    PORTAL_AREA = (0.24, 0.76, 170)         # where they keep to: this share of the court's width, and px from top and bottom
+    PORTAL_APART = 420                      # centres closer than this and the two drift apart
+    PORTAL_STEEPEST = 0.45                  # a ball never leaves steeper than this (the cosine of its angle)
     PORTAL_COOL = 0.35                      # seconds before a ball can go through a portal again
     PORTAL_TRIPS = 3                        # trips with no paddle touch before they close (a loop)
     LANTERN_FADE = (0.6, 0.9)               # Lantern Night: seconds for night to fall, and to lift
@@ -225,7 +233,7 @@ class PowerUps:
         self.cracker = None      # Firecracker: {"fuse": seconds to the bang, "taker": who took it}
         self.lantern = None      # Lantern Night: {"age": seconds, "lifting": seconds left of the dawn, or None}
         self.blasts = []         # Firecracker explosions for the renderer: [x, y, age]
-        self.portals = []        # Portal Pair: [{"x", "y", "angle"}, {"x", "y", "angle"}]
+        self.portals = []        # Portal Pair: two {"x", "y", "angle", "r", "vx", "vy", "spin"}
         self.portal_trips = 0    # trips through them since a paddle last touched a ball
         self.ball_v = (game.ball.vx, game.ball.vy)   # the ball's velocity last frame, before any hit
         self.wait = self.next_wait()
@@ -802,8 +810,8 @@ class PowerUps:
     # ---------------- Portal Pair ----------------
 
     def open_portals(self):
-        """Two linked portals open somewhere mid-court, well apart, each facing its own way (never
-        straight up or down)."""
+        """Two linked portals open somewhere mid-court, well apart and small, each facing its own way
+        (never straight up or down), and set off drifting, their arrows slowly turning."""
         game, ball = self.game, self.game.ball
         bx, by = (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2
         stones = [o for o in game.objects if getattr(o, "is_obstacle", False)]
@@ -821,7 +829,11 @@ class PowerUps:
                 angle = random.uniform(0, math.tau)
                 if abs(math.cos(angle)) >= 0.45:
                     break
-            placed.append({"x": x, "y": y, "angle": angle})
+            heading = random.uniform(0, math.tau)
+            drift = random.uniform(*self.PORTAL_DRIFT)
+            placed.append({"x": x, "y": y, "angle": angle, "r": float(self.PORTAL_START),
+                           "vx": drift * math.cos(heading), "vy": drift * math.sin(heading),
+                           "spin": random.choice((-1, 1)) * random.uniform(*self.PORTAL_TURN)})
             if len(placed) == 2:
                 break
         if len(placed) == 2:
@@ -830,24 +842,75 @@ class PowerUps:
             for p in placed:
                 game.app.fx.spark(p["x"], p["y"], 24, (170, 120, 255), speed = 300, life = .6)
 
+    @classmethod
+    def portal_exit(cls, angle):
+        """The way a ball leaves a portal whose arrows point at `angle`: that way, but never steeper
+        than PORTAL_STEEPEST, as the arrows turn through straight up or down.  (The friend's screen
+        flies the ball through portals by this too.)"""
+        dx, dy = math.cos(angle), math.sin(angle)
+        if abs(dx) < cls.PORTAL_STEEPEST:
+            dx = math.copysign(cls.PORTAL_STEEPEST, dx or 1.0)
+            dy = math.copysign(math.sqrt(1 - dx * dx), dy or 1.0)
+        return dx, dy
+
+    def drift_portals(self, dt):
+        """The portals drift about mid-court: off the edges of their area and any stone (with room
+        to spare), and apart from each other; their arrows slowly turn."""
+        lo, hi, edge = self.PORTAL_AREA
+        lo, hi, top, bottom = BASE_W * lo, BASE_W * hi, edge, BASE_H - edge
+        stones = [o for o in self.game.objects if getattr(o, "is_obstacle", False)]
+        for door in self.portals:
+            door["angle"] = (door["angle"] + door.get("spin", 0.0) * dt) % math.tau
+            vx, vy = door.get("vx", 0.0), door.get("vy", 0.0)
+            x, y = door["x"] + vx * dt, door["y"] + vy * dt
+            if not lo <= x <= hi:
+                vx, x = -vx, clamp(x, lo, hi)
+            if not top <= y <= bottom:
+                vy, y = -vy, clamp(y, top, bottom)
+            room = door.get("r", self.PORTAL_R) + 30
+            for o in stones:
+                if o.x0 - room < x < o.x1 + room and o.y0 - room < y < o.y1 + room:
+                    # bounce off the side it came at, and stay where it was
+                    if door["x"] <= o.x0 - room or door["x"] >= o.x1 + room:
+                        vx = -vx
+                    else:
+                        vy = -vy
+                    x, y = door["x"], door["y"]
+                    break
+            door["x"], door["y"], door["vx"], door["vy"] = x, y, vx, vy
+        if len(self.portals) == 2:
+            a, b = self.portals
+            gap_x, gap_y = b["x"] - a["x"], b["y"] - a["y"]
+            if math.hypot(gap_x, gap_y) < self.PORTAL_APART:
+                # heading towards each other along the line between them: both turn back along it
+                for door, sign in ((a, -1), (b, 1)):
+                    toward = (door.get("vx", 0.0) * gap_x + door.get("vy", 0.0) * gap_y) * sign
+                    if toward < 0:
+                        n = math.hypot(gap_x, gap_y) or 1.0
+                        ux, uy = gap_x / n, gap_y / n
+                        along = door["vx"] * ux + door["vy"] * uy
+                        door["vx"] -= 2 * along * ux
+                        door["vy"] -= 2 * along * uy
+
     def update_portals(self, dt):
-        """A ball whose centre reaches a portal comes out of the other one, at the same speed, the
-        way that portal faces."""
+        """The portals drift and turn; a ball whose centre reaches one comes out of the other, at
+        the same speed, the way that portal's arrows point, and both grow a little."""
         if not self.portals:
             return
+        self.drift_portals(dt)
         for b in self.balls():
             b.portal_cool = max(0.0, getattr(b, "portal_cool", 0.0) - dt)
             if b.stuck or b.portal_cool > 0:
                 continue
             cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
             for i, door in enumerate(self.portals):
-                if math.hypot(cx - door["x"], cy - door["y"]) > self.PORTAL_R * 0.6:
+                if math.hypot(cx - door["x"], cy - door["y"]) > door.get("r", self.PORTAL_R) * 0.6:
                     continue
                 out = self.portals[1 - i]
                 r = b.width / 2
-                dx, dy = math.cos(out["angle"]), math.sin(out["angle"])
-                x = clamp(out["x"] + dx * (self.PORTAL_R * 0.5 + r), r + 2, BASE_W - r - 2)
-                y = clamp(out["y"] + dy * (self.PORTAL_R * 0.5 + r), r + 2, BASE_H - r - 2)
+                dx, dy = self.portal_exit(out["angle"])
+                x = clamp(out["x"] + dx * (out.get("r", self.PORTAL_R) * 0.5 + r), r + 2, BASE_W - r - 2)
+                y = clamp(out["y"] + dy * (out.get("r", self.PORTAL_R) * 0.5 + r), r + 2, BASE_H - r - 2)
                 b.x0, b.y0, b.x1, b.y1 = x - r, y - r, x + r, y + r
                 speed = math.hypot(b.vx, b.vy)
                 b.vx, b.vy = speed * dx, speed * dy
@@ -859,6 +922,8 @@ class PowerUps:
                 hook = getattr(self.game, "on_portal", None)
                 if hook:
                     hook(door, out)
+                for p in self.portals:                     # both grow a little, to their full size
+                    p["r"] = min(float(self.PORTAL_R), p.get("r", self.PORTAL_R) + self.PORTAL_GROW)
                 self.portal_trips += 1
                 if self.portal_trips >= self.PORTAL_TRIPS:
                     self.close_portals()        # round and round with nobody touching it: a loop
