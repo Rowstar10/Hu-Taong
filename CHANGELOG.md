@@ -4,7 +4,7 @@ Every version of Hu Taong, newest first. Toki Hub shows each version's section o
 
 ## 1.6 — 2026-11-12
 
-Power-up fixes and changes, from a review of every power-up, then a round of changes from playtesting it.
+Power-up fixes and changes, from a review of every power-up, then two rounds of changes from playtesting it.
 
 ### Fixed
 - With the Middle Wall down, a ball caught between the two paddles, or between a paddle and a stone, no longer rattles on the spot hundreds of times a second. It squirts out past the paddles' ends.
@@ -15,6 +15,7 @@ Power-up fixes and changes, from a review of every power-up, then a round of cha
 - Double or Nothing now says "This point is worth 2". It said "the next point", but it has always doubled the point being played.
 - Online, the joining player's Safety Teleport is judged on their own screen, as their saves are. The host judged it from its slightly late copy of their paddle, so it fired on saves they were already making.
 - Online and in replays, the scored message says "x2" when Double or Nothing made the point worth 2. The joining player saw their score jump by 2 without being told why.
+- Sticky Goo on a big Snowball: a ball caught on the end of a paddle is held where it touched. It was dragged onto the paddle, jumping as much as 70 px in an instant.
 
 ### Changed
 - The wait for the next talisman carries on from point to point. It restarted at every point, so quick points, attacking play and games without the Middle Wall hardly saw any.
@@ -26,7 +27,7 @@ Power-up fixes and changes, from a review of every power-up, then a round of cha
 - Blink Ball doesn't hop within 350 px of the paddle it's heading for.
 - Twin Balls never split slower than half a serve. They could crawl at a quarter.
 - Wind Gust blows harder: 500 px/s² at the height of a gust, up from 360.
-- Firecracker: its fuse is lit as it's taken and burns for 5 seconds, burning down on the ball where everyone can see it, then it bangs. It banged after 3 hits. It still goes out without a bang if the point ends first.
+- Firecracker: its fuse is lit as it's taken and burns for 5 seconds, burning down on the ball where everyone can see it, then it bangs. A number over the ball counts it down from 5 to 1, turning red for the last two. It banged after 3 hits. It still goes out without a bang if the point ends first.
 - Firecracker: the bang always shoots the ball away from whoever hit it last. It could shoot straight back at them from point-blank.
 - Safety Teleport: a waiting save shows on your paddle, with a soft gold glow and its 遁 glyph, so both players can see it.
 - Swift Step: a Swift paddle leaves gold after-images as it moves.
@@ -36,15 +37,17 @@ Power-up fixes and changes, from a review of every power-up, then a round of cha
 - Double or Nothing: a big x2 beside both scores while the point is worth 2.
 - Wind Gust: bolder, busier leaves, and an arrow by its icon showing which way it blows.
 - Portal Pair: bigger, brighter exit arrows, and the portals glow at night.
-- Clearer descriptions for Soul Swap and Chaos Mode +.
+- Clearer descriptions for Soul Swap.
+- The Chaos Mode + talisman is now Shape Shift: for the rest of the point the paddles and the ball keep growing and shrinking, but their speeds no longer change. If you'd switched it off, it stays off. The Chaos Mode + setting is unchanged.
 - The computer player reads where a Sticky Goo ball will be slung, as the aim arrow shows. It expected the ball to leave on its old return, so any flick of the paddle fooled it.
 - Lantern Night: the computer player misjudges a ball out in the dark, as it does a Ghost Ball. It used to see perfectly, so only you were handicapped. This applies with Lantern Night on for the whole match, in Settings, too.
-- Resuming a match from a pause counts 3-2-1 first, so nobody is caught out: a quick one on your own, at the usual pace online, on both screens.
+- Resuming a match from a pause counts 3-2-1 first, at the same pace as the serve countdown, so nobody is caught out. Online, both screens show it.
 - Online, clicking away from the game pauses it for both players, and it only carries on while both of you are in the game. Turn Auto-Pause off if you'd rather your clicking away didn't pause it.
 - Court Dim is a slider, like the Dim Overlay's, instead of four steps. Your old setting keeps its darkness.
+- Max FPS starts at your screen's refresh rate (or the next step up), instead of 120 whatever the screen. A Max FPS you've already chosen is kept.
 - Smoother play: far fewer stutters mid-match. Pictures a match needs are got ready while the game loads and between points instead of the first time they're shown, the next background is got ready before it fades in, the end of a background fade and the start of a change of screen no longer catch, and the first pause no longer freezes for a moment. Nothing looks any different.
 - Online play needs both players on 1.6: it won't connect to 1.5 or earlier, and their rooms show "Other version".
-- 1.6 was updated after its first playtest. To get the update, uninstall 1.6 and install it again, both of you: a 1.6 installed before the update won't play online with one installed after.
+- 1.6 was updated after playtesting it. To get the latest, uninstall 1.6 and install it again, both of you: the first 1.6 won't play online with an updated one.
 
 ### Added
 - Clicking back into the game after Auto-Pause has paused it carries on by itself, after the 3-2-1. A pause you made yourself, or used (opened Settings from, say), stays until you resume.
