@@ -334,6 +334,13 @@ class App:
         """True while a match is on screen with nothing laid over it."""
         return getattr(self.state_manager.current(), "is_game", False)
 
+    def ball_resting(self):
+        """A match is on screen but the ball isn't in play: a serve countdown, or a goal being
+        announced.  Sprites can be warmed then, so starting a match straight from the menus
+        doesn't leave them to be built mid-rally."""
+        game = getattr(self.state_manager.current(), "game", None)
+        return game is not None and (game.countdown is not None or bool(getattr(game, "message_text", "")))
+
     def update_cursor(self, moved):
         # Out of the way during play; back as soon as the mouse moves
         if self.touch:
@@ -485,8 +492,8 @@ class App:
             # ---------- State-Specific Events ----------
             self.state_manager.handle_event(event)
 
-        # ---------- Warm sprites while nobody is playing ----------
-        if self.idle_jobs and not self.in_match():
+        # ---------- Warm sprites while nobody is playing (menus, a serve countdown, a goal) ----------
+        if self.idle_jobs and (not self.in_match() or self.ball_resting()):
             budget = time.perf_counter() + 0.0015
             while self.idle_jobs and time.perf_counter() < budget:
                 self.idle_jobs.pop()()

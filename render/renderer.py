@@ -532,6 +532,28 @@ class Renderer:
         for kind in POWERUPS.values():
             jobs.append(lambda k=kind: [art.power_icon(size, k.key, k.family) for size in self.ICON_SIZES])
         jobs.append(lambda: art.glow(48, (120, 54, 20)))
+
+        # What a match builds the first time it's shown, which stuttered play (1.6 profiling):
+        # each talisman on the court (32-38 ms the first time), its name rising as it's taken, the
+        # serve countdown's swelling digits and faint marks, the Firecracker's BANG and the swap banners
+        for kind in POWERUPS.values():
+            tint = FAMILY_COLOURS[kind.family]
+            jobs.append(lambda k=kind: art.power_icon(2 * PowerUps.RADIUS, k.key, k.family))
+            jobs.append(lambda k=kind, tint=tint: art.gilded(k.name, self.brush(0.04), top=mix(tint, white, .6),
+                                                             bottom=tint, glow=None))
+        for tint in set(FAMILY_COLOURS.values()):            # the glow behind a talisman, as it fades in
+            for level in range(1, 7):
+                jobs.append(lambda tint=tint, level=level: art.glow(64, scaled(tint, .1 * level)))
+        jobs.append(lambda: art.gilded("BANG!", self.brush(0.04), top=mix((255, 200, 80), white, .6),
+                                       bottom=(255, 200, 80), glow=None))
+        for mark in "三二一":
+            jobs.append(lambda mark=mark: art.get(("countdown_mark", mark), self._faint_mark, mark))
+        for text in ("3", "2", "1", "GO!"):
+            for step in range(round(40 * .55) + 1):          # every size draw_countdown swells it through
+                jobs.append(lambda text=text, step=step:
+                            art.get(("countdown_digit", text, step), self._swollen_digit, text, step))
+        for text in ("换 Switch!", "换 Swap!"):
+            jobs.append(lambda text=text: (art.plaque(520, 120), art.gilded(text, self.brush(0.075), glow=None)))
         return jobs
 
     def idle_jobs(self):
@@ -539,22 +561,49 @@ class Renderer:
         built a little at a time while the menus are up, so a match never waits on them."""
         art = self.art
         jobs = []
-        for size in (64, 40, 48):
-            for tint in ("red", "blue"):
+        g = self.app.settings.gameplay
+
+        # A paddle's flash as the ball hits it, at its own size (up to 14 ms the first time)
+        w, h = max(4, int(g.paddle_width / 2) * 2), max(8, int(g.paddle_height / 4) * 4)
+        for finish in ("red", "blue"):
+            for level in range(1, 5):
+                jobs.append(lambda finish=finish, level=level: art.paddle_flash(w, h, finish, level))
+
+        # Every size and colour of butterfly the game sends out, at every angle: goal bursts (64),
+        # hits (48, 40), talismans taken (44), the Firecracker's bang (80), the swarm (88) and the
+        # few drifting over a match (32)
+        for size, tints in ((64, ("red", "blue")), (48, ("red", "blue")), (44, ("red", "blue")),
+                            (40, ("red", "blue")), (80, ("red",)), (88, ("red",)), (32, ("red",))):
+            for tint in tints:
                 for frame in range(art.FLAP_FRAMES):
                     for turn in range(art.TURN_STEPS):
                         jobs.append(lambda size=size, frame=frame, turn=turn, tint=tint:
                                     art.butterfly(size, frame, turn, tint))
 
+        # Lantern Night's pools of light
+        for radius in (PowerUps.LANTERN_LIGHT, 150):          # round each paddle, and each ball (draw_night)
+            jobs.append(lambda radius=radius: art.get(("night_hole", radius), self._night_hole, radius))
+
         # Every paddle and ball size the Chaos modes can reach, in the steps draw_paddle uses
-        g = self.app.settings.gameplay
         for h in range(g.paddle_height_min, g.paddle_height_max + 1, 4):
             t = (h - g.paddle_height_min) / g.paddle_height_range
             w = int((g.paddle_width_min + t * g.paddle_width_range) / 2) * 2
             for finish in ("red", "blue"):
                 jobs.append(lambda w=w, h=h, finish=finish: (art.paddle(w, h, finish), art.paddle_glow(w, h, finish)))
+            for finish in ("gold", "violet"):                 # a Boon's or a Curse's aura at that size
+                jobs.append(lambda w=w, h=h, finish=finish: art.paddle_glow(w, h, finish))
         for d in range(g.ball_diameter_min, g.ball_diameter_max + 1, 2):
             jobs.append(lambda d=d: art.ball(d))
+
+        # Tombstones, in the two sizes raise_tomb makes, rising and sinking in their ten steps
+        for w, h in ((64, 124), (78, 148)):
+            def tomb(w=w, h=h):
+                sprite = art.stone(w, h, "tomb")
+                art.get(("stone_shadow", w, h), self._stone_shadow, w, h)
+                for level in range(1, 11):
+                    art.get(("stone_fade", w, h, "tomb", level), self._faded, sprite, level / 10)
+            jobs.append(tomb)
+        jobs.append(lambda: art.glow(64, (70, 26, 16)))       # a drifting one's glow
 
         # Your paddle as Giant Paddle and Shrink Curse leave it, with the power-up auras
         w = max(4, int(g.paddle_width / 2) * 2)
