@@ -20,6 +20,30 @@ def data_dir():
     return Path(os.environ.get("APPDATA") or (Path.home() / ".local" / "share")) / "HuTaong"
 
 
+def refresh_rate():
+    """The main screen's refresh rate in Hz, as Windows reports it (a 59.94 Hz screen says 59).
+    None when it can't be told: another system, or a driver that only says "the default"."""
+    if sys.platform != "win32" or ANDROID:
+        return None
+    try:
+        import ctypes
+        user32, gdi32 = ctypes.WinDLL("user32"), ctypes.WinDLL("gdi32")
+        user32.GetDC.restype = ctypes.c_void_p
+        user32.GetDC.argtypes = [ctypes.c_void_p]
+        user32.ReleaseDC.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        gdi32.GetDeviceCaps.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        screen = user32.GetDC(None)
+        if not screen:
+            return None
+        try:
+            hz = gdi32.GetDeviceCaps(screen, 116)       # VREFRESH
+        finally:
+            user32.ReleaseDC(None, screen)
+    except Exception:
+        return None
+    return hz if hz > 1 else None                      # 0 or 1: "the hardware's default"
+
+
 def prepare():
     """Ask SDL for phone behaviour, before pygame starts."""
     if not ANDROID:

@@ -58,7 +58,7 @@ TIPS = {
     "cycle_res": "Resolution\nThe window's size.\n~ Press Apply to use it",
     "cycle_mode": "Window Mode\nWindowed, borderless or fullscreen.\n~ Press Apply to use it",
     "apply": "Apply\nUse the resolution and window mode above.",
-    "cycle_max_fps": "Maximum FPS\nThe frame-rate cap.\n• Lower saves power, higher is smoother",
+    "cycle_max_fps": "Maximum FPS\nThe frame-rate cap.\n• Lower saves power, higher is smoother\n~ Starts at your screen's refresh rate",
     "toggle_show_fps": "Show FPS\nThe frame rate, in the bottom corner.",
     "background_thumb": "Background\nChoose the picture behind the game.",
     "toggle_rotate_bg": "Rotate\nFade to a different background every so often.",

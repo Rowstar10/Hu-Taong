@@ -4,7 +4,7 @@ from pathlib import Path
 import pygame
 
 from config import IMAGE_DIR
-from core.platform import ANDROID
+from core.platform import ANDROID, refresh_rate
 from game import courts
 from game.powerups import KINDS as POWERUP_KINDS
 
@@ -202,8 +202,19 @@ class DisplaySettings:
 
         self.reset()
 
+    def fps_for_screen(self, hz):
+        """The Max FPS option for a screen refreshing hz times a second: that rate if it's offered,
+        else the next one up (a cap under the screen's rate judders); 60 if the rate isn't known."""
+        if not hz:
+            return self.max_fps_options.index(60)
+        for i, option in enumerate(self.max_fps_options):
+            if option == "Unlimited" or option >= hz - 1:      # a 59.94 Hz screen reports 59
+                return i
+
     def reset(self):
-        self.max_fps = 1 if ANDROID else 2          # a phone: 60, which its battery thanks it for
+        # A phone: 60, which its battery thanks it for.  A PC: the screen's own refresh rate (it
+        # was 120 whatever the screen).  A saved choice is kept (see save_data).
+        self.max_fps = 1 if ANDROID else self.fps_for_screen(refresh_rate())
         self.show_fps = True
         self.dim = 0
         self.resolution = (1920, 1080)
