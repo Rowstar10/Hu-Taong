@@ -41,13 +41,14 @@ class Ball(GameObject):
     HELD_BY = 4                  # Sticky Goo: px of a held ball that stay beside the paddle's face
 
     def scores_in(self, nx):
-        """Can this ball score in the goal it just reached (nx 1: Red's goal on the left, -1: Blue's)?
-        Normally any ball can; under Twin Balls only in the other colour's goal."""
-        if self.side == "red":
-            return nx == -1
-        if self.side == "blue":
-            return nx == 1
-        return True
+        """Can this ball score in the goal it just reached (nx 1: the left goal, -1: the right)?
+        Normally any ball can; under Twin Balls only in the goal of the other colour's player (a
+        Switch hands goals and colours over together: the goal is its paddle's player's)."""
+        if self.side is None:
+            return True
+        defender = self.game.p1 if nx == 1 else self.game.p2
+        colour = getattr(defender, "colour", "red" if nx == 1 else "blue")
+        return colour != self.side
 
     def commit_position(self, dt):
         self.press_clock += dt
@@ -96,9 +97,9 @@ class Ball(GameObject):
                 if sound_manager.paddle_hit_sound:
                     sound_manager.play(paddle.sound)
 
-                impact = theme.EMBER if paddle.is_left else theme.SPIRIT_BLUE
+                impact = theme.EMBER if paddle.colour == "red" else theme.SPIRIT_BLUE
                 fx.spark(cx, cy, 22, impact, speed = 520)
-                fx.burst(cx, cy, 2, 40, "red" if paddle.is_left else "blue", life = (.7, 1.1))
+                fx.burst(cx, cy, 2, 40, paddle.colour, life = (.7, 1.1))
 
             self.last_paddle = paddle
 

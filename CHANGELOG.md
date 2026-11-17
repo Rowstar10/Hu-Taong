@@ -7,10 +7,10 @@ Every version of Hu Taong, newest first. Toki Hub shows each version's section o
 Game modes you can mix on Match Setup, a reworked Switch, match settings from the pause menu, tidier settings menus, and drifting portals.
 
 ### Added
-- Game modes, picked on Match Setup and in Match settings, any of them together:
+- Game modes, picked on Match Setup and in Match settings, any of them together. Chaos and Switch each have one button that steps through Off and their versions:
   - Chaos, Every point: new random sizes and speeds for the ball and paddles each point, fixed through the rally.
   - Chaos, Constant drift: the ball's and paddles' sizes keep drifting all match, both paddles together, as with Shape Shift. Speeds stay put.
-  - Switch, Every point, Mid-rally (at random moments, after a two-second warning) or Both.
+  - Switch, Every point (after each point you take over the other paddle as it is, colour and all) or Mid-rally (at random moments both paddles glow, and the next hit switches; each player keeps their colour).
   - Curveball and Lantern Night, for the whole match.
   - Twin Ball: every point is played with two balls, Red's and Blue's, under the Twin Balls rules.
   - Talisman Rush: talismans turn up three times as often, up to three at once, even with Power-Ups off.
@@ -20,15 +20,16 @@ Game modes you can mix on Match Setup, a reworked Switch, match settings from th
 
 ### Changed
 - Settings is now five menus. Match holds the rules, the same for both players: modes, points to win, the court, talismans, the ball and paddles, the AI and the serve countdown. The rest are your own: Gameplay (your keys and Auto-Pause), Display (now with Effects, Screen Shake and Ball Trail), Audio and UI (tooltips, the HUD, AI banter and replays; it was called Interface). The ball's and paddles' sizes and speeds have a screen of their own, under Match.
-- A Switch always works one way now: you take over the other paddle, and the goal it defends. Your keys and your score stay yours, and the paddles stay where they are. Mid-rally switches no longer swap the paddles' places or slow the ball to half speed, and none of it needs the Middle Wall down any more. The warning says who's about to take over each paddle.
-- Soul Swap: until the point ends, you and your opponent keep taking over each other's paddle, after a warning each time. It no longer takes the Middle Wall down.
+- A Switch always works one way now: you take over the other paddle, and the goal it defends. Your keys and your score stay yours, and the paddles stay where they are. Mid-rally switches no longer swap the paddles' places or slow the ball to half speed, and none of it needs the Middle Wall down any more.
+- Mid-rally switches go off at a hit: both paddles glow, each saying who takes it over, and the next hit switches. A ball you let through is always your point lost (with a switch on a timer, you could leave a ball for it to go in just after the switch, into what was then the other player's goal). Each player keeps their colour, too: the paddles, the scores and the goals change colour with them.
+- Soul Swap: until the point ends, you and your opponent keep taking over each other's paddle, at a hit once they glow, each keeping your colour. It no longer takes the Middle Wall down.
 - Chaos Mode + is now Chaos with Constant drift, and changes sizes only: speeds no longer drift mid-rally.
 - Chaos's every-point sizes and speeds no longer touch your own ball and paddle settings.
 - Settings changed mid-match come in at the next serve, never mid-rally.
 - Portal Pair: the portals drift slowly about the court and their arrows slowly turn, and they grow a little each time a ball goes through. A ball never leaves one steeper than before.
 - Pause has fewer buttons: Reset opens to show Reset Point (serve again, scores kept; it was Reset) and Reset Match (start again from 0-0; it was Reset Scores).
 - Replay is called View Replay, and after a match the highlights are in there, under a Highlights button, instead of on a button of their own.
-- Your Chaos Mode, Chaos Switch, Curveball and Lantern Night settings carry over as the matching modes, and 1.6 still reads the settings 1.7 saves.
+- Your Chaos Mode, Chaos Switch, Curveball and Lantern Night settings carry over as the matching modes (Chaos Switch & + becomes Switch, Mid-rally), and 1.6 still reads the settings 1.7 saves.
 - Online play needs both players on 1.7: it won't connect to 1.6 or earlier, and their rooms show "Other version".
 
 ## 1.6 — 2026-11-12

@@ -137,7 +137,7 @@ def _migrate_modes(m, saved):
     if _whole(chaos) and 1 <= chaos <= 2:
         m.mode_chaos, m.chaos_timing = True, chaos - 1
     if _whole(switch) and 1 <= switch <= 3:
-        m.mode_switch, m.switch_timing = True, switch - 1
+        m.mode_switch, m.switch_timing = True, min(switch - 1, 1)     # 1.6's Chaos Switch & +: Mid-rally
     m.mode_curveball = saved.get("curveball") is True
     m.mode_lantern_night = saved.get("lantern_night") is True
 

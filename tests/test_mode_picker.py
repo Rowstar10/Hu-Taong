@@ -2,6 +2,9 @@
 
 Every mode has an on/off, any of them together; Chaos and Switch have a timing beside them, and
 picking a timing turns its mode on.  A Match Settings button opens the rest of the rules.
+
+Rowan's playtest of 1.7 (same day): Chaos and Switch are one button each, cycling Off and their
+versions, instead of an on/off with the version beside it.
 """
 import unittest
 
@@ -36,29 +39,36 @@ class Picker(unittest.TestCase):
         self.screen.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button = 1, pos = pos))
         self.screen.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button = 1, pos = pos))
 
-    def test_every_mode_has_a_switch(self):
+    CYCLED = ("chaos", "switch")
+
+    def button(self, mode):
+        return f"cycle_mode_{mode}" if mode in self.CYCLED else f"toggle_mode_{mode}"
+
+    def test_every_mode_has_a_button(self):
         for mode in m.MODES:
-            self.assertIn(f"toggle_mode_{mode}", self.screen.ui_hitboxes)
+            self.assertIn(self.button(mode), self.screen.ui_hitboxes)
+        for mode in self.CYCLED:
+            self.assertNotIn(f"cycle_{mode}_timing_left", self.screen.ui_hitboxes, "no separate version selector")
 
     def test_any_of_them_together(self):
         for mode in m.MODES:
-            self.click(f"toggle_mode_{mode}")
+            self.click(self.button(mode))
         self.assertEqual(m.modes_on(), list(m.MODES))
         self.click("toggle_mode_curveball")
         self.assertNotIn("curveball", m.modes_on())
         self.assertEqual(len(m.modes_on()), len(m.MODES) - 1)
 
-    def test_picking_a_timing_turns_its_mode_on(self):
-        self.click("cycle_chaos_timing_right")
-        self.assertTrue(m.mode_chaos)
-        self.assertEqual(m.CHAOS_TIMINGS[m.chaos_timing], "Constant drift")
-        for name in ("Mid-rally", "Both", "Every point"):
-            self.click("cycle_switch_timing_right")
-            self.assertEqual(m.SWITCH_TIMINGS[m.switch_timing], name)
-        self.assertTrue(m.mode_switch)
-        self.click("toggle_mode_switch")
-        self.assertFalse(m.mode_switch)
-        self.assertEqual(m.switch_timing, 0, "it keeps its timing while off")
+    def test_chaos_and_switch_cycle_off_and_their_versions(self):
+        seen = []
+        for _ in range(3):
+            self.click("cycle_mode_chaos")
+            seen.append(m.CHAOS_TIMINGS[m.chaos_timing] if m.mode_chaos else "Off")
+        self.assertEqual(seen, ["Every point", "Constant drift", "Off"])
+        seen = []
+        for _ in range(3):
+            self.click("cycle_mode_switch")
+            seen.append(m.SWITCH_TIMINGS[m.switch_timing] if m.mode_switch else "Off")
+        self.assertEqual(seen, ["Every point", "Mid-rally", "Off"])
 
     def test_the_court_still_cycles(self):
         self.click("cycle_court_right")

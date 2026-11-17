@@ -105,7 +105,7 @@ class Stats:
             self.losses_vs_ai += 1
             self.win_streak = 0
         elif not winner.ai_enabled and not loser.ai_enabled:
-            if winner is p1:
+            if winner.color1 == "Red":                   # (a Switch can hand Red the right paddle)
                 self.wins_red += 1
             else:
                 self.wins_blue += 1

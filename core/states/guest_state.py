@@ -511,7 +511,7 @@ class GuestMatchState(State):
             return
         if not any(key == "teleport" and charges for key, _, charges in view.powerups.effect_list(paddle)):
             return
-        if getattr(ball, "side", None) == ("red" if paddle.is_left else "blue"):
+        if getattr(ball, "side", None) == paddle.colour:
             return                                  # Twin Balls: your own colour can't score on you
         toward = -1 if paddle.is_left else 1
         if ball.vx * toward <= 0:
@@ -532,7 +532,7 @@ class GuestMatchState(State):
         self.teleport_hold = self.clock + 1.0
         self.teleport_claim = True
         self.quiet_teleport_until = self.clock + 1.5
-        tint = "red" if paddle.is_left else "blue"
+        tint = paddle.colour
         for x, y in (old, (x0 + w / 2, y0 + h / 2)):
             self.app.fx.burst(x, y, 10, 48, tint, life = (.5, .9))
         self.app.sound_manager.play("hmyoop!.wav")

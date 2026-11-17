@@ -51,8 +51,9 @@ class Hud:
 
         left, right = 5 * BASE_W // 16, 11 * BASE_W // 16
         if live:                                 # a replay shows its score in its own bar instead
-            self.draw_score(screen, "p1", p1.score, left, "crimson")
-            self.draw_score(screen, "p2", p2.score, right, "azure")
+            finish = {"red": "crimson", "blue": "azure"}              # each player's colour, wherever they play
+            self.draw_score(screen, "p1", p1.score, left, finish[p1.colour])
+            self.draw_score(screen, "p2", p2.score, right, finish[p2.colour])
 
         # With Switch (or Soul Swap) the paddles change hands, so say who is playing each side
         powerups = getattr(game, "powerups", None)

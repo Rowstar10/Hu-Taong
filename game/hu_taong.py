@@ -22,7 +22,8 @@ BANTER_CONCEDED = ["Hmph. Lucky shot.", "Ooh, not bad~", "Again! Again!", "You'l
 
 
 class Hu_Taong(GameBase):
-    SWITCH_WARNING = 2.0        # seconds of warning before a mid-rally Switch
+    SWITCH_GRACE = 0.4          # a mid-rally Switch is armed this long before a hit sets it off
+    MESSAGE_COLOURS = {"red": (255, 80, 80), "blue": (60, 140, 255)}
 
     def __init__(self, app, width=BASE_W, height=BASE_H):
         super().__init__(app, width, height)
@@ -106,7 +107,7 @@ class Hu_Taong(GameBase):
         # Switch
         self.switch_after_point = False
         self.next_switch = self.switch_gap()
-        self.switch_warning = None      # seconds until a telegraphed swap, while one is coming
+        self.switch_warning = None      # seconds a mid-rally Switch has been armed, waiting for a hit
         self.switch_flash = 0.0         # time left on the "Switch!" banner
         self.switch_banner = "换 Switch!"
         self.switches = 0
@@ -136,6 +137,16 @@ class Hu_Taong(GameBase):
 
     def on_hit(self, ball, paddle, data):
         self.recorder.on_hit(ball, paddle, data)
+        # An armed mid-rally Switch goes off as a paddle meets a ball: whoever just hit it takes
+        # over the far paddle, and the goal that ball is heading for.  (Going off at a set time, it
+        # let a player leave a ball they could have saved, for it to go in just after the switch,
+        # into the goal that was then the other player's.)
+        if self.switch_warning is not None and self.switch_warning >= self.SWITCH_GRACE:
+            self.switch_warning = None
+            self.next_switch = self.switch_gap()
+            if not self.settings.switch_mid_rally:
+                self.next_switch = random.uniform(4, 8)     # Soul Swap's: sooner, as it only lasts the point
+            self.switch_sides(mid_rally = True)
 
     def on_bounce(self, ball, other):
         self.recorder.on_bounce(ball, other)
@@ -444,16 +455,16 @@ class Hu_Taong(GameBase):
         if nx != 0:
             cy = (obj.y0 + obj.y1) / 2
             arc = (-1.1, 1.1) if nx == 1 else (2.04, 4.24)
-            self.app.fx.burst(0 if nx == 1 else BASE_W, cy, 18, 64, "blue" if nx == 1 else "red",
-                              speed = (260, 620), arc = arc)
-            self.app.fx.spark(0 if nx == 1 else BASE_W, cy, 40, theme.SPIRIT_BLUE if nx == 1 else theme.EMBER,
+            tint = (self.p2 if nx == 1 else self.p1).colour       # the scorer's colour
+            self.app.fx.burst(0 if nx == 1 else BASE_W, cy, 18, 64, tint, speed = (260, 620), arc = arc)
+            self.app.fx.spark(0 if nx == 1 else BASE_W, cy, 40, theme.SPIRIT_BLUE if tint == "blue" else theme.EMBER,
                               speed = 720, life = .9, arc = arc)
 
         points = self.powerups.point_value()           # Double or Nothing makes it 2
         if nx == 1:
             self.p2.score += points
             self.message_text = f"{self.p2.color1} scored!" + (" x2" if points == 2 else "")
-            self.message_color = (60, 140, 255)
+            self.message_color = self.MESSAGE_COLOURS[self.p2.colour]
 
             if not win_score == "Endless Mode" and self.p2.score >= win_score:
                 if not settings.win_by_two or self.p2.score >= self.p1.score + 2:
@@ -466,7 +477,7 @@ class Hu_Taong(GameBase):
         elif nx == -1:
             self.p1.score += points
             self.message_text = f"{self.p1.color1} scored!" + (" x2" if points == 2 else "")
-            self.message_color = (255, 80, 80)
+            self.message_color = self.MESSAGE_COLOURS[self.p1.colour]
 
             if not win_score == "Endless Mode" and self.p1.score >= win_score:
                 if not settings.win_by_two or self.p1.score >= self.p2.score + 2:
@@ -612,12 +623,17 @@ class Hu_Taong(GameBase):
     def switch_gap():
         return random.uniform(6, 14)
 
-    def switch_sides(self):
+    def switch_sides(self, mid_rally = False):
         """Switch: each player takes over the other paddle, and the goal it defends.  Their keys
-        and their score go with them; the paddles stay where they are.  After a point (Switch,
-        every point), or mid-rally after a warning (Switch, mid-rally, and Soul Swap)."""
+        and their score go with them; the paddles stay where they are.  After a point (Switch, every
+        point: the paddle comes as it is, colour and all, as in 1.6), or mid-rally at the first hit
+        once one is armed (Switch, mid-rally, and Soul Swap: each player keeps their colour too, so
+        nobody loses track of which paddle is theirs)."""
         a, b = self.p1, self.p2
-        for name in ("up", "down", "left", "right", "ai_enabled", "controls_label", "score", "remote"):
+        names = ["up", "down", "left", "right", "ai_enabled", "controls_label", "score", "remote"]
+        if mid_rally:
+            names += ["color1", "color2"]           # mid-rally, each player keeps their colour too
+        for name in names:
             first, second = getattr(a, name), getattr(b, name)
             setattr(a, name, second)
             setattr(b, name, first)
@@ -635,36 +651,26 @@ class Hu_Taong(GameBase):
             self.app.fx.burst(cx, cy, 10, 48, tint, speed = (160, 380), life = (.6, 1.1))
 
     def start_switch_mode(self):
-        """Soul Swap: mid-rally switches until the point ends.  The first comes soon, so it happens
-        within the point."""
+        """Soul Swap: mid-rally switches until the point ends.  The first is armed soon, so it
+        happens within the point."""
         if self.switch_warning is None:
             self.next_switch = min(self.next_switch, random.uniform(1.5, 3.0))
 
     def start_swap_warning(self):
-        """The telegraphed countdown before a mid-rally switch (Switch, mid-rally, or Soul Swap)."""
+        """A mid-rally Switch (Switch, mid-rally, or Soul Swap) is armed: both paddles glow, and the
+        next hit, once SWITCH_GRACE has passed, sets it off (see on_hit)."""
         if self.switch_warning is None:
-            self.switch_warning = self.SWITCH_WARNING
+            self.switch_warning = 0.0
             self.app.sound_manager.play("countdown_tick.wav")
 
     def update_switch(self, dt):
-        if self.switch_warning is None:
-            if self.powerups.swapping():
-                self.next_switch -= dt
-                if self.next_switch <= 0:
-                    self.start_swap_warning()
+        if self.switch_warning is not None:
+            self.switch_warning += dt
             return
-
-        before = self.switch_warning
-        self.switch_warning -= dt
-        third = self.SWITCH_WARNING / 3
-        if int(before / third) != int(max(0, self.switch_warning) / third) and self.switch_warning > 0:
-            self.app.sound_manager.play("countdown_tick.wav")
-        if self.switch_warning <= 0:
-            self.switch_warning = None
-            self.next_switch = self.switch_gap()
-            if not self.settings.switch_mid_rally:
-                self.next_switch = random.uniform(4, 8)     # Soul Swap's: sooner, as it only lasts the point
-            self.switch_sides()
+        if self.powerups.swapping():
+            self.next_switch -= dt
+            if self.next_switch <= 0:
+                self.start_swap_warning()
 
     # ---------------- Chaos (Constant drift) and Shape Shift ----------------
 

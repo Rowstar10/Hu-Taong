@@ -203,8 +203,9 @@ class Recorder:
         last = ball.last_paddle
         flags |= 8 if last is g.p1 else 16 if last is g.p2 else 0
         state = (1 if g.wall_up else 0) | (2 if g.p1.ai_enabled else 0) | (4 if g.p2.ai_enabled else 0)
+        state |= 512 if g.p1.colour == "blue" else 0                        # 1.7: a Switch gave Blue the left paddle
         cd = g.countdown
-        message = 0 if not g.message_text else (1 if g.message_text.startswith(g.p1.color1) else 2)
+        message = 0 if not g.message_text else (1 if g.message_text.startswith("Red") else 2)
         if message and g.message_text.endswith("x2"):
             message += 2                     # Double or Nothing: 3 Red or 4 Blue scored 2 (older replays: 1 or 2)
         banter = g.banter
@@ -464,6 +465,10 @@ class ViewPaddle(_Box):
         self.speed = 1500
         self.effects = {}
 
+    @property
+    def colour(self):
+        return self.color1.lower()
+
 
 class ViewBall(_Box):
     is_paddle, is_ball, is_wall = False, True, False
@@ -552,7 +557,7 @@ class _Settings:
 
 class ReplayView:
     """Looks enough like a Hu_Taong match for Renderer.draw_world and Hud.draw to show a frame."""
-    SWITCH_WARNING = 2.0
+    SWITCH_GRACE = 0.4
 
     def __init__(self, clip, app):
         info = clip.info
@@ -611,6 +616,7 @@ class ReplayView:
         pu.flags = state
         self.wall_up = bool(state & 1)
         self.p1.ai_enabled, self.p2.ai_enabled = bool(state & 2), bool(state & 4)
+        self.p1.color1, self.p2.color1 = ("Blue", "Red") if state & 512 else ("Red", "Blue")
         self.countdown = _Countdown(a[20], int(a[21])) if a[20] >= 0 else None
         message = int(a[22])
         red = message in (1, 3)

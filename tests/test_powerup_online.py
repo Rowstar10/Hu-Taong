@@ -128,7 +128,7 @@ class TeleportOnFriendsScreen(unittest.TestCase):
     def friend(self, paddle_y0):
         def place_box(o, x0, y0, w, h):
             o.x0, o.y0, o.x1, o.y1 = x0, y0, x0 + w, y0 + h
-        paddle = SimpleNamespace(width = 40.0, height = 200.0, is_left = False, vx = 0.0, vy = 0.0)
+        paddle = SimpleNamespace(width = 40.0, height = 200.0, is_left = False, vx = 0.0, vy = 0.0, colour = "blue")
         paddle.place = lambda x0, y0, w, h: place_box(paddle, x0, y0, w, h)
         paddle.place(BASE_W - 90.0, paddle_y0, 40.0, 200.0)
         ball = SimpleNamespace(x0 = BASE_W - 160.0, x1 = BASE_W - 120.0, y0 = 780.0, y1 = 820.0, width = 40.0,

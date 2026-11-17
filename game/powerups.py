@@ -73,10 +73,10 @@ KINDS = (
          "• Lasts until the point ends\n"
          "• Only turns up while the wall is up"),
     Kind("swap", "Soul Swap", "换", "Wild", 0,
-         "Until the point ends, you and your opponent keep taking over each other's paddle.",
-         "Until the point ends, every few seconds, after a warning, you and your opponent take over "
-         "each other's paddle, and the goal it defends.\n"
-         "• Your keys and your score stay yours\n"
+         "Until the point ends, you and your opponent keep taking over each other's paddle, at a hit.",
+         "Until the point ends, every few seconds both paddles glow, and the next hit makes you and "
+         "your opponent take over each other's paddle, and the goal it defends.\n"
+         "• Your keys, your score and your colour stay yours\n"
          "• The paddles stay where they are\n"
          "• Doesn't turn up in a Switch match with mid-rally switches"),
     Kind("blink", "Blink Ball", "闪", "Wild", 10,
@@ -430,8 +430,9 @@ class PowerUps:
         blue = Ball(game, diameter = ball.diameter, x = ball.x0, y = ball.y0, speed = ball.speed, color = "white")
         blue.drift = getattr(ball, "drift", None)
         down = 1 if getattr(ball, "spawn_vy", 1) >= 0 else -1
-        ball.vx, ball.vy = ball.speed, down * ball.speed            # red: towards Blue's goal
-        blue.vx, blue.vy = -ball.speed, -down * ball.speed          # blue: towards Red's goal
+        way = -1 if game.p1.colour == "blue" else 1                 # where Blue's goal is (a Switch moves it)
+        ball.vx, ball.vy = way * ball.speed, down * ball.speed      # red: towards Blue's goal
+        blue.vx, blue.vy = -way * ball.speed, -down * ball.speed    # blue: towards Red's goal
         apart = r + 4                                               # each a little clear of the other, moving apart
         ball.y0 = clamp(cy - r + down * apart, 0, BASE_H - 2 * r)
         ball.y1 = ball.y0 + 2 * r
@@ -695,7 +696,7 @@ class PowerUps:
             self.open_portals(self.PORTAL_START_TALISMAN)
 
         app = self.game.app
-        app.fx.burst(item["x"], item["y"], 8, 44, "red" if owner.is_left else "blue", life=(.6, 1.0))
+        app.fx.burst(item["x"], item["y"], 8, 44, owner.colour, life=(.6, 1.0))
         app.fx.spark(item["x"], item["y"], 18, FAMILY_COLOURS[kind.family], speed=380, life=.6)
         app.sound_manager.play("countdown_go.wav")
         self.popups.append([kind.name, item["x"], item["y"], 0.0, FAMILY_COLOURS[kind.family]])
@@ -1033,7 +1034,7 @@ class PowerUps:
             if (centre < BASE_W / 2) == paddle.is_left:
                 continue
             x = BASE_W / 2 - paddle.width - 20 if paddle.is_left else BASE_W / 2 + 20
-            game.app.fx.burst(centre, (paddle.y0 + paddle.y1) / 2, 8, 44, "red" if paddle.is_left else "blue",
+            game.app.fx.burst(centre, (paddle.y0 + paddle.y1) / 2, 8, 44, paddle.colour,
                               life=(.5, .9))
             paddle.x0, paddle.x1 = x, x + paddle.width
             paddle.vx = 0.0
@@ -1328,7 +1329,7 @@ class PowerUps:
         paddle.charges["teleport"] -= 1
         if not paddle.charges["teleport"]:
             del paddle.charges["teleport"]
-        tint = "red" if paddle.is_left else "blue"
+        tint = paddle.colour
         for x, y in (old, ((paddle.x0 + paddle.x1) / 2, cy)):
             app.fx.burst(x, y, 10, 48, tint, life=(.5, .9))
         app.sound_manager.play("hmyoop!.wav")

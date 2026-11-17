@@ -76,7 +76,7 @@ class Modes(unittest.TestCase):
         m.mode_chaos = False
         self.assertFalse(m.chaos_drift, "a timing does nothing while its mode is off")
         m.mode_switch = True
-        for timing, each, mid in ((0, True, False), (1, False, True), (2, True, True)):
+        for timing, each, mid in ((0, True, False), (1, False, True)):
             m.switch_timing = timing
             self.assertEqual((m.switch_each_point, m.switch_mid_rally), (each, mid))
 
@@ -116,7 +116,7 @@ class OldSaves(unittest.TestCase):
     def test_its_chaos_settings_become_modes(self):
         cases = [({"chaos_mode": 1}, ("chaos", 0)), ({"chaos_mode": 2}, ("chaos", 1)),
                  ({"chaos_switch": 1}, ("switch", 0)), ({"chaos_switch": 2}, ("switch", 1)),
-                 ({"chaos_switch": 3}, ("switch", 2))]
+                 ({"chaos_switch": 3}, ("switch", 1))]          # 1.6's "Chaos Switch & +": Mid-rally (no Both since 1.7)
         for old, (mode, timing) in cases:
             with self.subTest(old = old):
                 data = self.released()
@@ -144,10 +144,10 @@ class SharedWith1_6(unittest.TestCase):
         s.gameplay.reset()
 
     def test_written_where_1_6_looks(self):
-        s.match.mode_switch, s.match.switch_timing = True, 2
+        s.match.mode_switch, s.match.switch_timing = True, 1
         s.match.mode_lantern_night = True
         data = save_data.collect(app)
-        self.assertEqual(data["gameplay"]["chaos_switch"], 3)
+        self.assertEqual(data["gameplay"]["chaos_switch"], 2)
         self.assertEqual(data["gameplay"]["chaos_mode"], 0)
         self.assertIs(data["gameplay"]["lantern_night"], True)
         for name in ("p1_up", "auto_pause", "countdown", "effects", "screen_shake", "ball_trail"):

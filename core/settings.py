@@ -62,7 +62,7 @@ class MatchSettings:
                   "lantern_night": "Lantern Night", "twin_ball": "Twin Ball", "talisman_rush": "Talisman Rush",
                   "portal_pair": "Portal Pair"}
     CHAOS_TIMINGS = ("Every point", "Constant drift")
-    SWITCH_TIMINGS = ("Every point", "Mid-rally", "Both")
+    SWITCH_TIMINGS = ("Every point", "Mid-rally")
     RUSH = 3.0                  # Talisman Rush: talismans come this many times as often
 
     def __init__(self, app):
@@ -138,7 +138,7 @@ class MatchSettings:
         self.chaos_timing = 0        # 0 every point, 1 constant drift
         # Switch: each player takes over the other's paddle and goal, keeping their own keys and score
         self.mode_switch = False
-        self.switch_timing = 0       # 0 after every point, 1 mid-rally at random moments (after a warning), 2 both
+        self.switch_timing = 0       # 0 after every point, 1 mid-rally (armed at random moments, set off by a hit)
         self.mode_curveball = False  # every hit bends the way the paddle was moving (the Curveball talisman, for good)
         self.mode_lantern_night = False   # the court is always dark but for lanterns (the Lantern Night talisman, for good)
         self.mode_twin_ball = False  # every point is played with two balls, Red's and Blue's (the Twin Balls rules)
@@ -153,12 +153,12 @@ class MatchSettings:
     @property
     def switch_each_point(self):
         """Switch, every point: the players take over each other's paddle after every point."""
-        return self.mode_switch and self.switch_timing in (0, 2)
+        return self.mode_switch and self.switch_timing == 0
 
     @property
     def switch_mid_rally(self):
-        """Switch, mid-rally: ...and at random moments during play, after a warning."""
-        return self.mode_switch and self.switch_timing in (1, 2)
+        """Switch, mid-rally: at random moments during play, the next hit once one is armed."""
+        return self.mode_switch and self.switch_timing == 1
 
     @property
     def switching(self):

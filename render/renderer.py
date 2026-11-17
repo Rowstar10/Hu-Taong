@@ -637,8 +637,8 @@ class Renderer:
         from core.state_manager import StateManager
         app = self.app
         state = StateManager.create("pause", app)
-        match = SimpleNamespace(net = None, p1 = SimpleNamespace(ai_enabled = False),
-                                p2 = SimpleNamespace(ai_enabled = True))
+        match = SimpleNamespace(net = None, p1 = SimpleNamespace(ai_enabled = False, color1 = "Red"),
+                                p2 = SimpleNamespace(ai_enabled = True, color1 = "Blue"))
         state.game_state = SimpleNamespace(game = match)
         offered = self.tips.offered
         app.pointer = lambda: (-10000, -10000)
@@ -724,13 +724,12 @@ class Renderer:
         "chaos": "Chaos\nShakes up the ball's and paddles' sizes and speeds.\n"
                  "• Every point: new random sizes and speeds each point, fixed through the rally\n"
                  "• Constant drift: sizes keep drifting all match, both paddles together and the ball on its own; speeds stay put\n"
-                 "~ The Shape Shift talisman doesn't turn up with Constant drift",
+                 "~ Click to step through. The Shape Shift talisman doesn't turn up with Constant drift",
         "switch": "Switch\nThe players take over each other's paddle, and the goal it defends.\n"
                   "• Your keys and your score stay yours; the paddles stay where they are\n"
-                  "• Every point: after each point\n"
-                  "• Mid-rally: at random moments, after a 2-second warning\n"
-                  "• Both: after each point and mid-rally\n"
-                  "~ The Soul Swap talisman doesn't turn up mid-rally",
+                  "• Every point: after each point, paddle colour and all\n"
+                  "• Mid-rally: at random moments both paddles glow, and the next hit switches; your colour stays yours\n"
+                  "~ Click to step through. The Soul Swap talisman doesn't turn up mid-rally",
         "curveball": "Curveball\nEvery hit bends the way the paddle was moving, all match.\n"
                      "~ The Curveball talisman doesn't turn up",
         "lantern_night": "Lantern Night\nThe court is always dark, lit only by lanterns round the paddles and the ball's glow.\n"
@@ -747,9 +746,8 @@ class Renderer:
                        "~ The Portal Pair talisman doesn't turn up"}
 
     def modes_section(self, ui, s, font, m=None):
-        """The game modes, any of them together: an on/off for each, with Chaos's and Switch's
-        timing beside them (greyed while the mode is off; picking one turns it on).  `m`: the rules
-        shown, if not your own (the host's, online)."""
+        """The game modes, any of them together: an on/off for each, and for Chaos and Switch one
+        button that cycles Off and each of their versions.  `m`: the rules shown, if not your own."""
         m = m or self.app.settings.match
         gap = int(BASE_W * 0.012 * s)
 
@@ -757,17 +755,17 @@ class Renderer:
             return self.toggle(font, f"toggle_mode_{key}", m.MODE_NAMES[key], lambda: getattr(m, "mode_" + key),
                                tip=self.MODE_TIPS[key])
 
-        def timed(key, timings):
-            on = lambda: getattr(m, "mode_" + key)
-            timing = Cycle(f"cycle_{key}_timing", lambda: timings[getattr(m, key + "_timing")], font, list(timings),
-                           lambda: theme.PARCHMENT if on() else theme.GRAY, tip=self.MODE_TIPS[key])
-            return Stack([mode(key), timing], vertical=False, gap=gap)
+        def cycled(key, versions, glyphs):
+            name = m.MODE_NAMES[key]
+            texts = [f"{name}: Off"] + [f"{name}: {v}" for v in versions]
+            level = lambda: (getattr(m, "mode_" + key) and getattr(m, key + "_timing") + 1) or 0
+            return CycleToggle(f"cycle_mode_{key}", texts, font, level, glyphs, tip=self.MODE_TIPS[key])
 
-        rows = Grid([[timed("chaos", m.CHAOS_TIMINGS), timed("switch", m.SWITCH_TIMINGS)],
-                     [Stack([mode("curveball"), mode("lantern_night")], vertical=False, gap=gap),
-                      Stack([mode("twin_ball"), mode("talisman_rush")], vertical=False, gap=gap)],
-                     [mode("portal_pair"), Space()]],
-                    gap_x=int(BASE_W * 0.03 * s), gap_y=self.vgap(ui, s, 0.6))
+        rows = Grid([[cycled("chaos", m.CHAOS_TIMINGS, "关乱狂"), cycled("switch", m.SWITCH_TIMINGS, "关换狂"),
+                      mode("portal_pair")],
+                     [mode("curveball"), mode("lantern_night"), mode("twin_ball")],
+                     [mode("talisman_rush"), Space(), Space()]],
+                    gap_x=int(BASE_W * 0.02 * s), gap_y=self.vgap(ui, s, 0.6))
         return self.section(ui, s, "Modes", rows)
 
     def draw_match_setup_menu(self, state, screen):
@@ -1980,21 +1978,23 @@ class Renderer:
 
     # ── Game world ─────────────────────────────────────────────────────────────
 
-    def draw_arena(self, screen, ox, oy, wall=True, cord=True):
-        """The court.  `cord` False leaves out the line down the middle (Open Court has taken the wall down)."""
+    def draw_arena(self, screen, ox, oy, wall=True, cord=True, flipped=False):
+        """The court.  `cord` False leaves out the line down the middle (Open Court has taken the wall down).
+        `flipped`: a Switch has given Blue the left paddle, so the goals' colours swap too."""
         W, H = BASE_W, BASE_H
         art = self.art
         t = self.app.fx.time
 
-        # Spirit fire along each goal
-        for side, tint in (("left", (150, 34, 22)), ("right", (26, 70, 170))):
+        # Spirit fire along each goal, in its player's colour
+        red, blue = (150, 34, 22), (26, 70, 170)
+        for side, tint in (("left", blue if flipped else red), ("right", red if flipped else blue)):
             level = 4 + round(2 * (math.sin(t * 2.6 + (side == "left") * 2) * .5 + .5))
             strip = art.goal_glow(side, tint, level)
             screen.blit(strip, (0 if side == "left" else W - strip.get_width(), 0), special_flags=ADD)
 
         if random.random() < 40 * self.app.dt:
-            x, col = random.choice(((random.uniform(0, 16), theme.EMBER),
-                                    (W - random.uniform(0, 16), theme.SPIRIT_BLUE)))
+            left, right = (theme.SPIRIT_BLUE, theme.EMBER) if flipped else (theme.EMBER, theme.SPIRIT_BLUE)
+            x, col = random.choice(((random.uniform(0, 16), left), (W - random.uniform(0, 16), right)))
             self.app.fx.spark(x, random.uniform(0, H), 1, col, speed=90, life=1.1,
                               arc=(-1.9, -1.2), gravity=-60)
 
@@ -2030,7 +2030,7 @@ class Renderer:
         return (track[-1][0] - track[0][0]) / (track[-1][2] - track[0][2])
 
     def draw_paddle(self, screen, paddle, rect):
-        finish = "red" if paddle.is_left else "blue"
+        finish = paddle.colour                  # the player's colour, wherever a Switch has put them
         # Sprites come in 2-4 px steps, so a size that keeps drifting (Chaos Mode +) reuses them.
         # They round down, so the paddle is never drawn bigger than its hitbox.
         centre = rect.center
@@ -2080,7 +2080,7 @@ class Renderer:
         pulse = .65 + .35 * math.sin(self.app.fx.time * 6)
         for key, finish in self.EFFECT_GLOWS:
             if powerups.has(paddle, key):
-                halo = art.paddle_glow(rect.w, rect.h, finish or ("red" if paddle.is_left else "blue"))
+                halo = art.paddle_glow(rect.w, rect.h, finish or paddle.colour)
                 halo.set_alpha(int(255 * pulse))
                 screen.blit(halo, halo.get_rect(center=rect.center), special_flags=ADD)
                 halo.set_alpha(255, pygame.RLEACCEL)
@@ -2146,7 +2146,7 @@ class Renderer:
 
         # Soul-fire tail in the colour of whoever hit it last, oldest and faintest first
         paddle = getattr(ball, "last_paddle", None)
-        fire = (40, 96, 220) if paddle and not paddle.is_left else (200, 60, 22)
+        fire = (40, 96, 220) if paddle and paddle.colour == "blue" else (200, 60, 22)
         side = getattr(ball, "side", None)
         if side:                                   # Twin Balls: each keeps its own colour, whoever hits it
             fire = (200, 60, 22) if side == "red" else (40, 96, 220)
@@ -2416,10 +2416,12 @@ class Renderer:
         t = self.app.fx.time
         court = {item[0] for item in powerups.court_list()}
         if "twin" in court:
-            # Red's goal (left) is where the blue ball scores, and Blue's where the red one does: a
-            # flashing band of that colour along each goal line
+            # Red's goal is where the blue ball scores, and Blue's where the red one does: a flashing
+            # band of that colour along each goal line (a Switch can put Blue's goal on the left)
             k = math.sin(t * 5) * .5 + .5
-            for side, tint in (("left", (60, 130, 255)), ("right", (232, 70, 40))):
+            red, blue = (232, 70, 40), (60, 130, 255)
+            left = red if game.p1.colour == "blue" else blue
+            for side, tint in (("left", left), ("right", blue if left == red else red)):
                 band = self.art.get(("goal_band", tint, side), self._goal_band, tint, side)
                 band.set_alpha(int(110 + 145 * k))
                 screen.blit(band, (0 if side == "left" else BASE_W - band.get_width(), 0))
@@ -2468,7 +2470,7 @@ class Renderer:
         ox, oy = self._shake_offset()
         powerups = getattr(game, "powerups", None)
         open_court = bool(powerups) and powerups.wall_open()
-        self.draw_arena(screen, ox, oy, game.wall_up, cord=not open_court)
+        self.draw_arena(screen, ox, oy, game.wall_up, cord=not open_court, flipped=game.p1.colour == "blue")
         if powerups:
             self.draw_goal_alerts(screen, game, powerups)
         for obj in game.objects:
@@ -2680,27 +2682,21 @@ class Renderer:
                             special_flags=ADD)
 
     def draw_switch_warning(self, screen, game):
-        """Two seconds of warning before a mid-rally Switch: both paddles pulse, and each says who
-        is about to take it over."""
+        """A mid-rally Switch is armed: both paddles glow, each saying who takes it over, and the
+        next hit sets it off."""
         art = self.art
         W, H = BASE_W, BASE_H
-        k = 1 - game.switch_warning / game.SWITCH_WARNING          # 0 to 1 as the swap nears
-        pulse = .5 + .5 * math.sin(self.app.fx.time * (9 + 16 * k))
+        pulse = .5 + .5 * math.sin(self.app.fx.time * 12)
 
         sign = art.gilded("换", art.brush(250), thickness=0, top=(255, 226, 170), bottom=(214, 96, 40))
         sign.set_alpha(int(70 + 120 * pulse))
         screen.blit(sign, sign.get_rect(center=(W // 2, H // 2 - 40)))
-
-        filled = min(3, int(k * 3) + 1)
-        for i in range(3):
-            centre = (W // 2 - 60 + i * 60, H // 2 + 110)
-            pygame.draw.circle(screen, theme.INK, centre, 15)
-            pygame.draw.circle(screen, theme.FLAME if i < filled else theme.GOLD_DARK, centre, 12)
+        self.text(screen, "Switch on the next hit", self.fnt(0.034), theme.FLAME, center=(W // 2, H // 2 + 110))
 
         font = self.fnt(0.024)
         for paddle, other in ((game.p1, game.p2), (game.p2, game.p1)):
             rect = pygame.Rect(int(paddle.x0), int(paddle.y0), int(paddle.width), int(paddle.height))
-            halo = art.paddle_glow(rect.w, rect.h, "red" if paddle.is_left else "blue")
+            halo = art.paddle_glow(rect.w, rect.h, paddle.colour)
             halo.set_alpha(int(255 * pulse))
             screen.blit(halo, halo.get_rect(center=rect.center), special_flags=ADD)
             halo.set_alpha(255, pygame.RLEACCEL)

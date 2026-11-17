@@ -13,6 +13,12 @@ class Paddle(GameObject):
     has_inputs = True
     soft_controls = True
 
+    @property
+    def colour(self):
+        """"red" or "blue": whose paddle it is now.  A Switch hands a paddle to the other player,
+        and their colour goes with them (color1, swapped in Hu_Taong.switch_sides)."""
+        return self.color1.lower()
+
     def __init__(self, game, width, height, x, y, speed,
                  up, down, left, right, color1, color2, sound):
 

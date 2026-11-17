@@ -70,8 +70,8 @@ class PauseState(JukeboxControls, State):
         online = self.game_state and self.game_state.game and self.game_state.game.net
         if self.game_state and self.game_state.game and not online:
             game = self.game_state.game
-            toggles = [("p1_ai", "Red AI", lambda: game.p1.ai_enabled),
-                       ("p2_ai", "Blue AI", lambda: game.p2.ai_enabled)]
+            toggles = [("p1_ai", f"{game.p1.color1} AI", lambda: game.p1.ai_enabled),     # (a Switch can
+                       ("p2_ai", f"{game.p2.color1} AI", lambda: game.p2.ai_enabled)]     # swap the colours)
         if online:
             # with a friend waiting: carry on, or leave; the match is paused for both
             buttons = [("resume", "Resume", theme.GREEN, theme.GREEN_HOVER),

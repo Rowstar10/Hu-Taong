@@ -16,7 +16,7 @@ import pygame                                                   # noqa: E402
 s = app.settings
 
 # What only the Match screens may show: anything that changes the match for both players
-MATCH_KEYS = ("toggle_mode_", "cycle_chaos_timing", "cycle_switch_timing", "cycle_win_score", "toggle_win_by_two",
+MATCH_KEYS = ("toggle_mode_", "cycle_mode_chaos", "cycle_mode_switch", "cycle_win_score", "toggle_win_by_two",
               "toggle_middle_wall", "cycle_countdown", "cycle_ai", "toggle_adaptive_ai", "toggle_powerups",
               "cycle_powerup_rate", "open_powerups", "cycle_court", "ball_speed_slider", "paddle_speed_slider",
               "ball_diameter_slider", "paddle_size_slider", "pace_slider", "randomise_all", "toggle_curveball",
@@ -78,7 +78,7 @@ class WhatGoesWhere(unittest.TestCase):
 
     def test_the_match_screen_has_the_rules(self):
         keys = open_screen("match").ui_hitboxes
-        for key in ("toggle_mode_chaos", "toggle_mode_twin_ball", "cycle_chaos_timing_left", "cycle_win_score_left",
+        for key in ("cycle_mode_chaos", "cycle_mode_switch", "toggle_mode_twin_ball", "cycle_win_score_left",
                     "toggle_win_by_two", "toggle_middle_wall", "cycle_countdown_left", "cycle_ai_left",
                     "cycle_ai_style_left", "toggle_adaptive_ai", "cycle_court_left", "toggle_powerups",
                     "cycle_powerup_rate_left", "open_powerups", "open_ball_paddles"):
@@ -137,7 +137,7 @@ class Clicks(unittest.TestCase):
         self.assertEqual(s.match.serve_seconds, 2)
         click(screen, "toggle_powerups")
         self.assertFalse(s.match.powerups)
-        click(screen, "cycle_switch_timing_right")
+        click(screen, "cycle_mode_switch")
         self.assertTrue(s.match.mode_switch)
         click(screen, "open_ball_paddles")
         harness.settle(app)

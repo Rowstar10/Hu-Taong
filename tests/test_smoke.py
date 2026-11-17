@@ -161,7 +161,7 @@ class EveryMode(unittest.TestCase):
         g.winning_score_index = g.winning_scores.index("Endless Mode")
         for mode in g.MODES:
             setattr(g, "mode_" + mode, True)
-        g.switch_timing = 2
+        g.switch_timing = 1                       # mid-rally
 
     def tearDown(self):
         self.g.reset()

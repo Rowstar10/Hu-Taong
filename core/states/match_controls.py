@@ -16,13 +16,15 @@ class MatchControls:
                 setattr(m, name, not getattr(m, name))
                 return True
 
-        # A timing's arrows step through it, and turn its mode on (that's what picking one means)
-        for mode, timings in (("chaos", m.CHAOS_TIMINGS), ("switch", m.SWITCH_TIMINGS)):
-            for suffix, step in (("_left", -1), ("_right", 1)):
-                if key == f"cycle_{mode}_timing{suffix}":
-                    setattr(m, mode + "_timing", (getattr(m, mode + "_timing") + step) % len(timings))
-                    setattr(m, "mode_" + mode, True)
-                    return True
+        # Chaos and Switch: one button each, cycling Off, then each version in turn, then Off
+        for mode, versions in (("chaos", m.CHAOS_TIMINGS), ("switch", m.SWITCH_TIMINGS)):
+            if key == f"cycle_mode_{mode}":
+                level = (getattr(m, "mode_" + mode) and getattr(m, mode + "_timing") + 1) or 0
+                level = (level + 1) % (len(versions) + 1)
+                setattr(m, "mode_" + mode, level > 0)
+                if level:
+                    setattr(m, mode + "_timing", level - 1)
+                return True
 
         count = len(m.court_options)
         if key == "cycle_court_left":
