@@ -417,14 +417,20 @@ class HostSession:
     def connected(self):
         return self.guest is not None and time.perf_counter() - self.link.heard < TIMEOUT
 
-    def settings_summary(self):
+    def settings_summary(self, modes=True):
+        """The match's rules in a line, for the friend's screen and the public list.  Chaos and
+        Switch say which version; past three modes, the rest are counted, so the line fits.  (The
+        host's own screen shows the modes as buttons: modes=False leaves them out.)"""
         g = self.app.settings.match
         from game import courts
         win = g.winning_scores[g.winning_score_index]
         parts = ["Endless" if win == "Endless Mode" else f"First to {win}",
                  f"Court: {courts.NAMES[g.court]}",
                  "Power-ups on" if g.powerups else "Power-ups off"]
-        parts += [g.MODE_NAMES[mode] for mode in g.modes_on()]
+        if modes:
+            versions = {"chaos": g.CHAOS_TIMINGS[g.chaos_timing], "switch": g.SWITCH_TIMINGS[g.switch_timing]}
+            names = [g.MODE_NAMES[mode] + (f": {versions[mode]}" if mode in versions else "") for mode in g.modes_on()]
+            parts += names if len(names) <= 3 else names[:2] + [f"{len(names) - 2} more modes"]
         return "  -  ".join(parts)
 
     def guest_side(self):

@@ -324,7 +324,7 @@ class Cycle(Node):
 
 
 class Slider(Node):
-    """[Reset]  ----o----  label  [Mute]"""
+    """[Reset]  [speaker]  ----o----  label   (the speaker mutes it: an icon, 1.7)"""
 
     def __init__(self, key, value, color, font, label, label_sample,
                  reset_key=None, reset_font=None, track_w=None, tip=None, mute_key=None, muted=None):
@@ -344,10 +344,9 @@ class Slider(Node):
             self.reset_w = self.reset_font.size("Reset")[0] + int(BASE_W * 0.018)
             self.reset_h = self.reset_font.size("Ag")[1] + int(BASE_H * 0.014)
         self.mute_w = self.mute_h = 0
-        if self.mute_key:
+        if self.mute_key:                           # a square button, as tall as Reset
             bf = self.reset_font or self.font
-            self.mute_w = bf.size("Unmute")[0] + int(BASE_W * 0.018)
-            self.mute_h = bf.size("Ag")[1] + int(BASE_H * 0.014)
+            self.mute_w = self.mute_h = bf.size("Ag")[1] + int(BASE_H * 0.014)
         samples = [self.label_sample] + (["Muted"] if self.mute_key else [])
         self.label_w = max(self.font.size(t)[0] for t in samples) + 28
         self.label_h = self.font.size("Ag")[1] + 6
@@ -361,13 +360,13 @@ class Slider(Node):
     def place(self, x, y, w, h):
         super().place(x, y, w, h)
         r = self.rect
-        x0 = r.left + self.reset_w + self.pad
         self.reset_rect = pygame.Rect(r.left, r.centery - self.reset_h // 2, self.reset_w, self.reset_h)
+        self.mute_rect = pygame.Rect(self.reset_rect.right + (self.gap if self.reset_key else 0),
+                                     r.centery - self.mute_h // 2, self.mute_w, self.mute_h)
+        x0 = (self.mute_rect.right if self.mute_key else self.reset_rect.right) + self.pad
         self.track = pygame.Rect(x0, r.centery - self.track_h // 2, self.track_w, self.track_h)
         self.plate = pygame.Rect(self.track.right + self.pad, r.centery - self.label_h // 2,
                                  self.label_w, self.label_h)
-        self.mute_rect = pygame.Rect(self.plate.right + self.gap, r.centery - self.mute_h // 2,
-                                     self.mute_w, self.mute_h)
         # grab area is as tall as the knob, not just the thin track
         self.grab = self.track.inflate(0, 2 * self.knob_r - self.track_h)
 
@@ -399,8 +398,10 @@ class Slider(Node):
             ui.renderer.draw_lacquer(screen, ui.mouse, self.reset_rect, "Reset", self.reset_font, "ink")
             ui.state.ui_hitboxes[self.reset_key] = self.reset_rect
         if self.mute_key:
-            ui.renderer.draw_lacquer(screen, ui.mouse, self.mute_rect, "Unmute" if muted else "Mute",
-                                     self.reset_font or self.font, "ink")
+            offset = ui.renderer.draw_face(screen, ui.mouse, self.mute_rect, "ink")
+            col = theme.GOLD_BRIGHT if self.mute_rect.collidepoint(ui.mouse) else theme.GOLD
+            icon = art.speaker(round(self.mute_h * .78), col, muted)
+            screen.blit(icon, icon.get_rect(center=(self.mute_rect.centerx, self.mute_rect.centery + offset - 1)))
             ui.state.ui_hitboxes[self.mute_key] = self.mute_rect
 
         ui.state.ui_hitboxes[self.key] = self.grab

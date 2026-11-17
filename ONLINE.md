@@ -5,8 +5,9 @@ You and your friend both need this same version of the game. Play → Online giv
 ## Host a Game
 
 1. Pick **Host a Game**.
-2. Choose the **Court**, and whether **You play** Red (left) or Blue (right). Your friend gets
-   the other side. The rest of the rules come from your **Match Settings**.
+2. Choose the **Court**, the **Modes** (any of them together, as on Match Setup), and whether
+   **You play** Red (left) or Blue (right). Your friend gets the other side. The rest of the
+   rules come from your **Match Settings**.
 3. Let people in, either way:
    - **Send your friend the code** shown, eight letters and numbers like `K7Q2-9FHD` (the
      **Copy** button puts it on the clipboard), or
@@ -52,14 +53,15 @@ server's address stays filled in for when it's back. The login is kept in your s
   from Pause > Settings > Match, and the changes come in at the next serve.
 - The match only carries on while both of you are in the game, and always after a 3-2-1 on both
   screens.
-- **Pause screen:** the host has Resume, Reset (serve again), Reset Scores, Replay (the match so
-  far), Settings, **Lobby** and Leave Match. The guest has Resume, Restart? (asks the host to start
-  again from 0-0), Replay, Settings and Leave Match.
-- **After the match:** both get the highlights (if Instant Replays is set to show them), a
-  Replay of the whole match, Settings, and the jukebox. The host has Play Again, Endless Mode,
+- **Pause screen:** the host has Resume, Reset (it opens to Reset Point, to serve again, and
+  Reset Match, to start again from 0-0), View Replay (the match so far), Settings, **Lobby** and
+  Leave Match. The guest has Resume, Restart? (asks the host to start again from 0-0), View Replay,
+  Settings and Leave Match.
+- **After the match:** both get the highlights (if Instant Replays is set to show them), View
+  Replay (the whole match, with the highlights in there too), Settings, and the jukebox. The host has Play Again, Endless Mode,
   **Lobby** and Leave; the guest has Rematch? (asks the host) and Leave.
 - **Lobby** takes the host back to the lobby with their friend still connected, to change the
-  court, sides or rules; the friend's game follows, and Start Match begins the next one.
+  court, sides, modes or rules; the friend's game follows, and Start Match begins the next one.
 - Online matches have their own lines on the Stats page.
 
 ## How the two games find each other

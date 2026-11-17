@@ -780,6 +780,33 @@ class Art:
         pygame.draw.lines(surf, theme.GOLD_BRIGHT, False, pts, 9)
         return shrink(surf, size, size)
 
+    def speaker(self, size, color, muted):
+        """A loudspeaker, `size` px square, for the volume sliders' mute buttons (1.7): sound waves
+        coming out of it, or a cross beside it while muted."""
+        return self.get(("speaker", size, tuple(color), muted), self._speaker, size, color, muted)
+
+    def _speaker(self, size, color, muted):
+        S = size * 4
+        surf = blank(S, S)
+        u, cy, dx = S / 10, S / 2, S / 10 * .7          # drawn on a 10 x 10 grid, nudged to the middle
+        pygame.draw.rect(surf, color, pygame.Rect(round(dx + u * .6), round(cy - u * 1.6), round(u * 1.9), round(u * 3.2)))
+        mouth = dx + u * 4.6
+        pygame.draw.polygon(surf, color, [(dx + u * 2.4, cy - u * 1.6), (mouth, cy - u * 3.6),
+                                          (mouth, cy + u * 3.6), (dx + u * 2.4, cy + u * 1.6)])
+        w = u * .8
+        if muted:
+            x0, x1, h = dx + u * 5.8, dx + u * 8.6, u * 1.5
+            pygame.draw.line(surf, color, (x0, cy - h), (x1, cy + h), round(w))
+            pygame.draw.line(surf, color, (x0, cy + h), (x1, cy - h), round(w))
+        else:
+            ox = mouth - u * 1.2
+            for r in (u * 2.6, u * 4.6):                   # each wave a thick arc, as a polygon
+                steps = [-0.8 + 1.6 * i / 16 for i in range(17)]
+                outer = [(ox + (r + w / 2) * math.cos(a), cy + (r + w / 2) * math.sin(a)) for a in steps]
+                inner = [(ox + (r - w / 2) * math.cos(a), cy + (r - w / 2) * math.sin(a)) for a in reversed(steps)]
+                pygame.draw.polygon(surf, color, outer + inner)
+        return shrink(surf, size, size)
+
     def inset(self, w, h):
         """Dark sunken plate that values sit on."""
         return self.get(("inset", w, h), self._inset, w, h)

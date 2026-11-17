@@ -4,6 +4,9 @@ Settings has five cards: Match (the rules, the same for both players: modes, poi
 court, talismans, the AI; the ball and paddles on a screen of their own), then your own Gameplay
 (the keys, Auto-Pause), Display (now with the effects), Audio and Interface (menus, the HUD).  No
 setting that changes the match is left on a personal screen.
+
+Rowan's playtest of 1.7 (same day): on Match, the line saying how many talismans are on, and the
+one giving the ball's and paddles' sizes, go under their buttons.
 """
 import unittest
 
@@ -122,6 +125,34 @@ class Layout(unittest.TestCase):
                 for b in keys[i + 1:]:
                     if not (a.startswith("music") or b.startswith("music")):      # (the jukebox's own bar)
                         self.assertFalse(boxes[a].colliderect(boxes[b]), f"{name}: {a} overlaps {b}")
+
+
+def laid_out(node):
+    """Every node of a laid-out screen."""
+    from render.ui.layout import Node
+    yield node
+    for value in vars(node).values():
+        for item in (value if isinstance(value, list) else [value]):
+            for child in (item if isinstance(item, list) else [item]):
+                if isinstance(child, Node):
+                    yield from laid_out(child)
+
+
+class Summaries(unittest.TestCase):
+    def tearDown(self):
+        app.state_manager.set_state("main_menu", mute = True)
+        harness.settle(app)
+
+    def test_under_their_buttons(self):
+        from render.ui.layout import Text, _val
+        screen = open_screen("match")
+        body, _ = screen._laid
+        texts = {_val(n.text): n.rect for n in laid_out(body) if isinstance(n, Text) and isinstance(_val(n.text), str)}
+        talismans = next(r for t, r in texts.items() if "talismans switched on" in t)
+        sizes = next(r for t, r in texts.items() if t.startswith("Ball ") and "Pace" in t)
+        boxes = screen.ui_hitboxes
+        self.assertGreaterEqual(talismans.top, boxes["open_powerups"].bottom)
+        self.assertGreaterEqual(sizes.top, boxes["open_ball_paddles"].bottom)
 
 
 class Clicks(unittest.TestCase):

@@ -745,9 +745,10 @@ class Renderer:
                        "• The ball leaves the way the arrows point, and they slowly turn\n"
                        "~ The Portal Pair talisman doesn't turn up"}
 
-    def modes_section(self, ui, s, font, m=None):
+    def modes_section(self, ui, s, font, m=None, columns=3):
         """The game modes, any of them together: an on/off for each, and for Chaos and Switch one
-        button that cycles Off and each of their versions.  `m`: the rules shown, if not your own."""
+        button that cycles Off and each of their versions.  `m`: the rules shown, if not your own;
+        `columns`: how many to a row (the online host's screen has room for fewer rows)."""
         m = m or self.app.settings.match
         gap = int(BASE_W * 0.012 * s)
 
@@ -761,10 +762,11 @@ class Renderer:
             level = lambda: (getattr(m, "mode_" + key) and getattr(m, key + "_timing") + 1) or 0
             return CycleToggle(f"cycle_mode_{key}", texts, font, level, glyphs, tip=self.MODE_TIPS[key])
 
-        rows = Grid([[cycled("chaos", m.CHAOS_TIMINGS, "关乱狂"), cycled("switch", m.SWITCH_TIMINGS, "关换狂"),
-                      mode("portal_pair")],
-                     [mode("curveball"), mode("lantern_night"), mode("twin_ball")],
-                     [mode("talisman_rush"), Space(), Space()]],
+        buttons = [cycled("chaos", m.CHAOS_TIMINGS, "关乱狂"), cycled("switch", m.SWITCH_TIMINGS, "关换狂"),
+                   mode("portal_pair"), mode("curveball"), mode("lantern_night"), mode("twin_ball"),
+                   mode("talisman_rush")]
+        buttons += [Space() for _ in range(-len(buttons) % columns)]
+        rows = Grid([buttons[i:i + columns] for i in range(0, len(buttons), columns)],
                     gap_x=int(BASE_W * 0.02 * s), gap_y=self.vgap(ui, s, 0.6))
         return self.section(ui, s, "Modes", rows)
 
@@ -899,7 +901,7 @@ class Renderer:
                 host = card("host_game", "Host a Game", (theme.GREEN, theme.GREEN_HOVER),
                             "Start a game: share its code, or list it publicly",
                             "Host a Game\nStart a game here.\n• Send a friend its code\n• Or list it, so anyone can find it\n"
-                            "• The match uses your Gameplay settings")
+                            "• The match uses your Match settings, and you pick the modes there")
                 join = card("join_game", "Join with a Code", (theme.BLUE, theme.BLUE_HOVER),
                             "Type the code your friend sent you",
                             "Join with a Code\nType the code your friend sent you.")
@@ -1014,10 +1016,11 @@ class Renderer:
                     Text(lambda: net.listing() if net else "", ty, theme.GOLD,
                          samples=["Can't list it: your router didn't open the port, so nobody outside could join"]),
                     choices,
-                    Text(lambda: net.settings_summary() if net else "", ty, theme.GOLD,
-                         samples=["First to 21  -  Court: Narrow Pass  -  Power-ups off  -  Chaos Mode +"]),
-                    Stack([Button("online_settings", "Gameplay Settings", sm, (theme.WHITE, theme.WHITE_HOVER),
-                                  tip="Gameplay Settings\nChoose the rules and power-ups for this match."),
+                    self.modes_section(ui, s, sm, columns=4),
+                    Text(lambda: net.settings_summary(modes=False) if net else "", ty, theme.GOLD,
+                         samples=["First to 21  -  Court: Narrow Pass  -  Power-ups off"]),
+                    Stack([Button("online_settings", "Match Settings", sm, (theme.BLUE, theme.BLUE_HOVER),
+                                  tip=TIPS["open_match_settings"]),
                            Button("start_online", "Start Match", f, ready,
                                   tip="Start Match\nStart playing once your friend has joined.")],
                           vertical=False, gap=int(BASE_W * 0.03 * s)),
@@ -1039,7 +1042,7 @@ class Renderer:
 
             joined = Text(lambda: (net.summary + ("  -  You play " + ("Red" if net.side == 1 else "Blue")))
                           if net and net.role == "guest" and net.summary else "", ty, theme.GOLD,
-                          samples=["First to 21  -  Court: Narrow Pass  -  Power-ups off  -  Chaos Mode +  -  You play Blue"])
+                          samples=["First to 21  -  Court: Narrow Pass  -  Power-ups off  -  Chaos: Constant drift  -  Switch: Mid-rally  -  3 more modes  -  You play Blue"])
             waiting = Text(status, f, theme.FLAME, samples=["In! Waiting for the host to start the match"])
 
             if state.mode == "browse":
@@ -1068,7 +1071,7 @@ class Renderer:
                     rows.append([Text(r.get("name", "A room") + lock, sm, theme.GOLD_BRIGHT,
                                       samples=["W" * 28 + "  (password)"], align="left"),
                                  Text(r.get("rules", ""), ty, theme.PARCHMENT,
-                                      samples=["First to 21  -  Court: Narrow Pass  -  Power-ups off  -  Chaos Mode +"],
+                                      samples=["First to 21  -  Court: Narrow Pass  -  Power-ups off  -  Chaos: Constant drift  -  Switch: Mid-rally  -  3 more modes"],
                                       align="left"),
                                  Button(f"join_room_{i}", word, sm,
                                         (theme.DARK_GRAY, theme.DARK_GRAY) if full else (theme.GREEN, theme.GREEN_HOVER),
@@ -1232,21 +1235,21 @@ class Renderer:
                                      Stack([self.toggle(sm, "toggle_powerups", "Power-Ups", lambda: g.powerups),
                                             Cycle("cycle_powerup_rate", lambda: rates[g.powerup_rate], sm, rates, tip=rate_tip)],
                                            vertical=False, gap=int(BASE_W * 0.012 * s)),
+                                     Button("open_powerups", "Choose Talismans", sm, (theme.ORANGE, theme.ORANGE_HOVER),
+                                            tip=TIPS["open_powerups"]),
                                      Text(lambda: f"{sum(getattr(g, 'pu_' + k.key) for k in POWERUP_KINDS)} of "
                                                   f"{len(POWERUP_KINDS)} talismans switched on", ty, theme.PARCHMENT,
-                                          samples=[f"{len(POWERUP_KINDS)} of {len(POWERUP_KINDS)} talismans switched on"]),
-                                     Button("open_powerups", "Choose Talismans", sm, (theme.ORANGE, theme.ORANGE_HOVER),
-                                            tip=TIPS["open_powerups"]))
+                                          samples=[f"{len(POWERUP_KINDS)} of {len(POWERUP_KINDS)} talismans switched on"]))
 
             def sizes():
                 return (f"Ball {int(g.ball_diameter)} px, speed {int(g.ball_speed)}   -   "
                         f"Paddles {int(g.paddle_height)} x {int(g.paddle_width)}, speed {int(g.paddle_speed)}   -   "
                         f"Pace {g.pace:.2f}x")
             ball = self.section(ui, s, "Ball & Paddles",
-                                Text(sizes, ty, theme.PARCHMENT,
-                                     samples=["Ball 100 px, speed 800   -   Paddles 300 x 60, speed 2000   -   Pace 1.50x"]),
                                 Button("open_ball_paddles", "Ball & Paddles", sm, (theme.GREEN, theme.GREEN_HOVER),
-                                       tip=TIPS["open_ball_paddles"]))
+                                       tip=TIPS["open_ball_paddles"]),
+                                Text(sizes, ty, theme.PARCHMENT,
+                                     samples=["Ball 100 px, speed 800   -   Paddles 300 x 60, speed 2000   -   Pace 1.50x"]))
 
             wide = int(BASE_W * 0.05 * s)
             body = [Grid([[rules, ai, court]], gap_x=wide),

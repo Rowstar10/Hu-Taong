@@ -17,6 +17,7 @@ Game modes you can mix on Match Setup, a reworked Switch, match settings from th
   - Portal Pair: the Portal Pair talisman's portals, all match. They open small and grow a little each time a ball goes through, and keep their size from point to point, up to the full size.
 - Change the rules mid-match from Pause > Settings > Match. Changes come in at the next serve. Online only the host has Match settings: the host's rules are the match's.
 - A Match Settings button on Match Setup.
+- Hosting online has the game modes too, as on Match Setup, and its Match Settings button (it said Gameplay Settings) opens the rules. The line of rules your friend sees, and the public room list, name Chaos's and Switch's versions.
 
 ### Changed
 - Settings is now five menus. Match holds the rules, the same for both players: modes, points to win, the court, talismans, the ball and paddles, the AI and the serve countdown. The rest are your own: Gameplay (your keys and Auto-Pause), Display (now with Effects, Screen Shake and Ball Trail), Audio and UI (tooltips, the HUD, AI banter and replays; it was called Interface). The ball's and paddles' sizes and speeds have a screen of their own, under Match.
@@ -29,6 +30,8 @@ Game modes you can mix on Match Setup, a reworked Switch, match settings from th
 - Portal Pair: the portals drift slowly about the court and their arrows slowly turn, and they grow a little each time a ball goes through. A ball never leaves one steeper than before.
 - Pause has fewer buttons: Reset opens to show Reset Point (serve again, scores kept; it was Reset) and Reset Match (start again from 0-0; it was Reset Scores).
 - Replay is called View Replay, and after a match the highlights are in there, under a Highlights button, instead of on a button of their own.
+- The volume sliders' Mute buttons are speaker icons now, to the left of the sliders.
+- In Match settings, the lines saying how many talismans are on and how big and fast the ball and paddles are sit under their buttons.
 - Your Chaos Mode, Chaos Switch, Curveball and Lantern Night settings carry over as the matching modes (Chaos Switch & + becomes Switch, Mid-rally), and 1.6 still reads the settings 1.7 saves.
 - Online play needs both players on 1.7: it won't connect to 1.6 or earlier, and their rooms show "Other version".
 

@@ -2,6 +2,9 @@
 
 Each of Master, Music and SFX Volume has a Mute button.  Muting silences it but leaves the slider
 where it was, so unmuting brings back that level; the mute is saved between sessions.
+
+Rowan's playtest of 1.7 (2026-11-17): the mute buttons are speaker icons, not the words, and sit
+to the left of their sliders.
 """
 import json
 import unittest
@@ -68,6 +71,27 @@ class MuteButtons(unittest.TestCase):
         self.click("mute_sfx_volume")
         self.click("sfx_volume_slider")
         self.assertFalse(sound.sfx_muted)
+
+    def test_an_icon_left_of_its_slider(self):
+        drawn, said = [], []
+        real_icon, real_lacquer = app.art.speaker, app.renderer.draw_lacquer
+        app.art.speaker = lambda size, color, muted: drawn.append(muted) or real_icon(size, color, muted)
+        app.renderer.draw_lacquer = lambda screen, mouse, rect, text, *a, **k: (
+            said.append(text) or real_lacquer(screen, mouse, rect, text, *a, **k))
+        sound.sfx_muted = True
+        try:
+            self.screen.draw(app.virtual)
+        finally:
+            app.art.speaker, app.renderer.draw_lacquer = real_icon, real_lacquer
+        self.assertEqual(sorted(drawn), [False, False, True], "a speaker on each, crossed out on the muted one")
+        self.assertNotIn("Mute", said)
+        self.assertNotIn("Unmute", said)
+        boxes = self.screen.ui_hitboxes
+        for name in ("master", "music", "sfx"):
+            mute, reset = boxes[f"mute_{name}_volume"], boxes[f"reset_{name}_volume"]
+            self.assertLess(mute.right, boxes[f"{name}_volume_slider"].left, f"{name}: left of the slider")
+            self.assertLessEqual(reset.right, mute.left, f"{name}: Reset stays at the left end")
+            self.assertEqual(mute.w, mute.h, f"{name}: a square button")
 
     def test_reset_unmutes(self):
         self.click("mute_master_volume")

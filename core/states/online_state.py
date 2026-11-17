@@ -8,6 +8,7 @@ import pygame
 from core import files, rooms, save_data
 from core import net as netcode
 from core.states.base_state import State
+from core.states.match_controls import MatchControls
 
 CODE_CHARS = set("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.:- ")
 FIELDS = {"code": 24, "join_password": 24, "room_name": 28, "password": 24, "room_password": 24,
@@ -15,7 +16,7 @@ FIELDS = {"code": 24, "join_password": 24, "room_name": 28, "password": 24, "roo
 SERVER_FIELDS = ("server_address", "server_user", "server_password")
 
 
-class OnlineState(State):
+class OnlineState(MatchControls, State):
     NAME = "online"
     is_menu = True
     ROOMS_SHOWN = 6
@@ -320,9 +321,8 @@ class OnlineState(State):
                 self.toggle_public()
             elif key == "online_settings":
                 self.push_state("match")
-            elif key in ("cycle_court_left", "cycle_court_right"):
-                g = self.app.settings.match
-                g.court = (g.court + (1 if key.endswith("right") else -1)) % len(g.court_options)
+            elif self.mode == "host" and self.handle_match_key(key):      # the modes and the court, as on Match Setup
+                pass
             elif key == "host_red":
                 self.app.settings.match.online_host_blue = False
             elif key == "host_blue":
