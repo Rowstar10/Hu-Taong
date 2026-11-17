@@ -32,6 +32,9 @@ Game modes you can mix on Match Setup, a reworked Switch, match settings from th
 - Your Chaos Mode, Chaos Switch, Curveball and Lantern Night settings carry over as the matching modes (Chaos Switch & + becomes Switch, Mid-rally), and 1.6 still reads the settings 1.7 saves.
 - Online play needs both players on 1.7: it won't connect to 1.6 or earlier, and their rooms show "Other version".
 
+### Fixed
+- Portal Pair: the talisman always opens its portals now. On a court with stones it sometimes opened none, and was used up for nothing.
+
 ## 1.6 — 2026-11-12
 
 Power-up fixes and changes, from a review of every power-up, then two rounds of changes from playtesting it.

@@ -819,17 +819,32 @@ class PowerUps:
         game, ball = self.game, self.game.ball
         bx, by = (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2
         stones = [o for o in game.objects if getattr(o, "is_obstacle", False)]
-        placed = []
-        for _ in range(200):
+        room = self.portal_room(start)              # as far from stones as they keep as they drift
+        # Clear spots first, then two of them: (1.7) picking the first portal's spot before the
+        # second's could leave nowhere far enough from it on a court with stones, and no portals
+        spots = []
+        for _ in range(400):
             x = random.uniform(BASE_W * 0.27, BASE_W * 0.73)
             y = random.uniform(190, BASE_H - 190)
             if math.hypot(x - bx, y - by) < 220:
                 continue
-            if any(math.hypot(x - p["x"], y - p["y"]) < 520 for p in placed):
-                continue
-            room = self.portal_room(start)          # as far from stones as they keep as they drift
             if any(o.x0 - room < x < o.x1 + room and o.y0 - room < y < o.y1 + room for o in stones):
                 continue
+            spots.append((x, y))
+            if len(spots) == 40:
+                break
+        pair, far = None, -1.0                      # two at least 520 px apart, or else the farthest apart
+        for i, (ax, ay) in enumerate(spots):
+            for cx, cy in spots[i + 1:]:
+                gap = math.hypot(ax - cx, ay - cy)
+                if gap > far:
+                    pair, far = ((ax, ay), (cx, cy)), gap
+                if gap >= 520:
+                    break
+            if far >= 520:
+                break
+        placed = []
+        for x, y in pair or ():
             while True:
                 angle = random.uniform(0, math.tau)
                 if abs(math.cos(angle)) >= 0.45:
@@ -839,8 +854,6 @@ class PowerUps:
             placed.append({"x": x, "y": y, "angle": angle, "r": float(start),
                            "vx": drift * math.cos(heading), "vy": drift * math.sin(heading),
                            "spin": random.choice((-1, 1)) * random.uniform(*self.PORTAL_TURN)})
-            if len(placed) == 2:
-                break
         if len(placed) == 2:
             self.portals = placed
             self.portal_trips = 0

@@ -9,6 +9,10 @@ friend's screen flies the ball through them by the same rule.
 Rowan's playtest (same day): a Portal Pair game mode too, its portals open all match and growing
 all match (never shrinking back between points); and the talisman's, which only last the point,
 open bigger (but not too big).
+
+Found in the full test run (same day): on a court with stones, the talisman sometimes opened no
+portals at all (about one time in eight on the Graveyard with the ball by a goal), because the first
+portal's spot was picked before the second's and could leave nowhere far enough from it.
 """
 import math
 import random
@@ -253,6 +257,40 @@ class FriendsScreen(unittest.TestCase):
         speed = math.hypot(vx, vy)
         self.assertGreaterEqual(abs(vx) / speed, PowerUps.PORTAL_STEEPEST - 1e-6)
         self.assertGreater(y, 300)
+
+
+class AlwaysOpen(unittest.TestCase):
+    """Every court, every size they open at, the ball anywhere along the middle: two portals, well
+    apart, clear of the stones and the ball."""
+
+    def test_two_every_time(self):
+        for court in range(5):
+            random.seed(court)
+            m.reset()
+            m.court = court
+            game = Hu_Taong(app)
+            game.start()
+            pu, ball = game.powerups, game.ball
+            stones = [o for o in game.objects if getattr(o, "is_obstacle", False)]
+            try:
+                for start in (PowerUps.PORTAL_START, PowerUps.PORTAL_START_TALISMAN, PowerUps.PORTAL_R):
+                    room = pu.portal_room(start)
+                    for i in range(150):
+                        x = (100, 960, 1800)[i % 3]
+                        ball.x0, ball.x1 = x, x + ball.width
+                        pu.portals = []
+                        pu.open_portals(start)
+                        with self.subTest(court = court, start = start, try_ = i):
+                            self.assertEqual(len(pu.portals), 2, "no portals opened")
+                            a, b = pu.portals
+                            self.assertGreaterEqual(math.hypot(a["x"] - b["x"], a["y"] - b["y"]), 520)
+                            for door in pu.portals:
+                                for o in stones:
+                                    self.assertFalse(o.x0 - room < door["x"] < o.x1 + room
+                                                     and o.y0 - room < door["y"] < o.y1 + room, "on a stone")
+            finally:
+                game.stop()
+                m.reset()
 
 
 class BuiltAhead(unittest.TestCase):
