@@ -73,13 +73,12 @@ KINDS = (
          "• Lasts until the point ends\n"
          "• Only turns up while the wall is up"),
     Kind("swap", "Soul Swap", "换", "Wild", 0,
-         "Until the point ends the wall comes down and the paddles keep swapping places.",
-         "Until the point ends, the Middle Wall comes down, and every few seconds, after a warning, "
-         "the paddles swap places.\n"
-         "• Your goal stays put: run back and defend it!\n"
-         "• Every ball slows to half speed at each swap\n"
-         "• Your keys and score stay put too\n"
-         "• Doesn't turn up if Chaos Switch + is on in Settings"),
+         "Until the point ends, you and your opponent keep taking over each other's paddle.",
+         "Until the point ends, every few seconds, after a warning, you and your opponent take over "
+         "each other's paddle, and the goal it defends.\n"
+         "• Your keys and your score stay yours\n"
+         "• The paddles stay where they are\n"
+         "• Doesn't turn up in a Switch match with mid-rally switches"),
     Kind("blink", "Blink Ball", "闪", "Wild", 10,
          "For 10 seconds the ball blinks to a nearby spot every so often, swerving a little each time.",
          "The ball blinks to a random spot close by, every 0.1 to 0.5 seconds.\n"
@@ -218,7 +217,7 @@ class PowerUps:
         self.wall_down = 0.0     # seconds Open Court keeps the Middle Wall down (UNTIL_POINT)
         self.snow = None         # Snowball: {"size": times the ball's own diameter}
         self.twin = None         # Twin Balls: {"left": seconds, "ball": the blue ball}; the main ball is red
-        self.switch_plus = False # Soul Swap: Chaos Switch + is on until the point ends
+        self.switch_plus = False # Soul Swap: mid-rally switches until the point ends
         self.shape_shift = False # Shape Shift: sizes drift until the point ends
         self.curve_on = False    # Curveball until the point ends
         self.double = False      # Double or Nothing: the point being played is worth 2
@@ -285,11 +284,11 @@ class PowerUps:
         return factor
 
     def wall_open(self):
-        """Open Court, or Soul Swap's Chaos Switch +, has the Middle Wall down."""
-        return self.wall_down > 0 or self.switch_plus
+        """Open Court has the Middle Wall down."""
+        return self.wall_down > 0
 
     def swapping(self):
-        """Chaos Switch + is on: from Settings, or from Soul Swap until the point ends."""
+        """Mid-rally switches: Switch, mid-rally (Settings), or Soul Swap until the point ends."""
         return self.settings.switch_mid_rally or self.switch_plus
 
     def sizes_drifting(self):
@@ -489,7 +488,7 @@ class PowerUps:
         if self.twin:
             items.append(("twin", self.twin["left"], "Red and blue balls: each scores only in the other's goal"))
         if self.switch_plus:
-            items.append(("swap", UNTIL_POINT, "Chaos Switch +: the paddles keep swapping places"))
+            items.append(("swap", UNTIL_POINT, "Soul Swap: you keep taking over each other's paddle"))
         if self.shape_shift:
             items.append(("shape", UNTIL_POINT, "Shape Shift: sizes drifting"))
         if self.curve_on:
@@ -966,7 +965,6 @@ class PowerUps:
         self.blink = None
         self.snow = None
         self.end_twin()
-        walled = self.switch_plus
         self.switch_plus = False
         if self.shape_shift:
             self.shape_shift = False
@@ -985,8 +983,6 @@ class PowerUps:
         self.portal_trips = 0
         for b in self.balls():
             b.curve = 0.0
-        if walled:
-            self.send_home()
         for paddle in (self.game.p1, self.game.p2):
             paddle.shoved = 0.0
         for tomb in self.tombs:
@@ -996,7 +992,7 @@ class PowerUps:
             self.send_home()
 
     def swap_owners(self):
-        """Chaos Switch: players take each other's paddles, and their power-ups go with them."""
+        """Switch: players take each other's paddles, and their power-ups go with them."""
         a, b = self.game.p1, self.game.p2
         a.effects, b.effects = b.effects, a.effects
         a.charges, b.charges = b.charges, a.charges

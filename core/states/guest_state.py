@@ -164,7 +164,7 @@ class GuestMatchState(State):
         # pictures come again the clock is ahead of its target and eases back, running a touch slow.
         self.clock = min(self.clock, newest + RUN_ON)
 
-        side = info.get("guest", 2)                 # Chaos Switch can hand you the other paddle
+        side = info.get("guest", 2)                 # a Switch can hand you the other paddle
         self.view.p1.controls_label = "You" if side == 1 else "Friend"
         self.view.p2.controls_label = "You" if side == 2 else "Friend"
         self.take_events()
@@ -247,6 +247,9 @@ class GuestMatchState(State):
         frozen = a[20] >= 0 or a[22] != 0 or info.get("paused")    # countdown, a goal, or paused
         self.own_box = (auth[0], auth[1], w, h)
         self.own_speed = info.get("speed", [1500, 1500])[side - 1]
+        if side != getattr(self, "pred_side", side):
+            self.pred = None                       # a Switch: your paddle is the other one now
+        self.pred_side = side
         if frozen or self.pred is None:
             self.pred = [auth[0], auth[1], 0.0, 0.0]
             self.history.clear()

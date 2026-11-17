@@ -2486,7 +2486,7 @@ class Renderer:
             self.draw_countdown(screen, game.countdown)
             self.draw_point_plaque(screen, game)
 
-            # first serve, or just after a Chaos Switch: remind players who has which paddle
+            # first serve, or just after a Switch: remind players who has which paddle
             if game.p1.score + game.p2.score == 0 or game.settings.switch_each_point:
                 self._draw_controls_hint(screen, game)
 
@@ -2648,7 +2648,8 @@ class Renderer:
                             special_flags=ADD)
 
     def draw_switch_warning(self, screen, game):
-        """Two seconds of warning before Chaos Switch + swaps the paddles."""
+        """Two seconds of warning before a mid-rally Switch: both paddles pulse, and each says who
+        is about to take it over."""
         art = self.art
         W, H = BASE_W, BASE_H
         k = 1 - game.switch_warning / game.SWITCH_WARNING          # 0 to 1 as the swap nears
@@ -2672,10 +2673,8 @@ class Renderer:
             screen.blit(halo, halo.get_rect(center=rect.center), special_flags=ADD)
             halo.set_alpha(255, pygame.RLEACCEL)
 
-            # where this paddle is about to land
-            target = (int((other.x0 + other.x1) / 2), int((other.y0 + other.y1) / 2))
-            pygame.draw.line(screen, theme.FLAME, rect.center, target, 2)
-            text = "Swapping places"
+            # who takes this paddle over: whoever plays the other one now
+            text = f"{'AI' if other.ai_enabled else other.controls_label} takes over"
             tw = font.size(text)[0] + 30
             plate = pygame.Rect(0, 0, tw, 40)
             plate.midbottom = (rect.centerx, rect.top - 14)

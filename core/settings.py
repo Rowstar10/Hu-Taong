@@ -159,6 +159,11 @@ class MatchSettings:
         return self.mode_switch and self.switch_timing in (1, 2)
 
     @property
+    def switching(self):
+        """Switch is on: the paddles change hands in this match."""
+        return self.mode_switch
+
+    @property
     def chaos_each_point(self):
         """Chaos, every point: new random sizes and speeds each point."""
         return self.mode_chaos and self.chaos_timing == 0

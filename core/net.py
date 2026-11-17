@@ -630,6 +630,7 @@ class HostSession:
                 "info": {"labels": [p.controls_label if not getattr(p, "remote", False) else "Friend"
                                     for p in (game.p1, game.p2)],
                          "pace": game.settings.pace, "switch_each_point": game.settings.switch_each_point,
+                         "switching": game.settings.switching,
                          "court": game.court.name}}
         head = pack_json(info)
         self.snap_seq += 1

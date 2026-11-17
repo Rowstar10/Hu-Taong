@@ -54,20 +54,21 @@ class Hud:
             self.draw_score(screen, "p1", p1.score, left, "crimson")
             self.draw_score(screen, "p2", p2.score, right, "azure")
 
-        # With Chaos Switch the paddles change hands, so say who is playing each side
-        if game.settings.switch_each_point:
+        # With Switch (or Soul Swap) the paddles change hands, so say who is playing each side
+        powerups = getattr(game, "powerups", None)
+        court_keys = {item[0] for item in powerups.court_list()} if powerups else set()
+        owners = getattr(game.settings, "switching", game.settings.switch_each_point) or "swap" in court_keys
+        if owners:
             self.draw_owner(screen, p1, left)
             self.draw_owner(screen, p2, right)
 
-        powerups = getattr(game, "powerups", None)
         if powerups:
-            court_keys = {item[0] for item in powerups.court_list()}
             if live and "double" in court_keys:        # Double or Nothing: a big x2 by both scores
                 self.draw_double(screen, left - 130)
                 self.draw_double(screen, right + 130)
             force = powerups.wind_force() if hasattr(powerups, "wind_force") else 0.0
             self._wind_way = (1 if force > 0 else -1) if force else 0
-            top = 196 if game.settings.switch_each_point else 150
+            top = 196 if owners else 150
             self.draw_effects(screen, powerups.effect_list(p1), left, top)
             self.draw_effects(screen, powerups.effect_list(p2), right, top)
             court = [(key, seconds, 0) for key, seconds, _ in powerups.court_list()

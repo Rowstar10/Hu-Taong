@@ -153,6 +153,7 @@ class Recorder:
         return {"labels": ["AI" if g.p1.ai_enabled else g.p1.controls_label,
                            "AI" if g.p2.ai_enabled else g.p2.controls_label],
                 "pace": g.settings.pace, "switch_each_point": g.settings.switch_each_point,
+                "switching": g.settings.switching,
                 "court": g.court.name, "strings": self.strings,
                 "title": f"{datetime.datetime.now():%d %b %Y, %H:%M}"}
 
@@ -543,6 +544,7 @@ class _Countdown:
 class _Settings:
     def __init__(self, info):
         self.switch_each_point = bool(info.get("switch_each_point"))
+        self.switching = bool(info.get("switching", self.switch_each_point))   # (1.6's replays: every point only)
         self.pace = float(info.get("pace", 1.0))
         self.powerups = False
 

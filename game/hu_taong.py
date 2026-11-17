@@ -22,7 +22,7 @@ BANTER_CONCEDED = ["Hmph. Lucky shot.", "Ooh, not bad~", "Again! Again!", "You'l
 
 
 class Hu_Taong(GameBase):
-    SWITCH_WARNING = 2.0        # seconds of warning before a Chaos Switch + swap
+    SWITCH_WARNING = 2.0        # seconds of warning before a mid-rally Switch
 
     def __init__(self, app, width=BASE_W, height=BASE_H):
         super().__init__(app, width, height)
@@ -103,7 +103,7 @@ class Hu_Taong(GameBase):
         # Chaos (Constant drift) and Shape Shift: the paddles' sizes drift together and the ball's on its own
         self.reset_drift()
 
-        # Chaos Switch
+        # Switch
         self.switch_after_point = False
         self.next_switch = self.switch_gap()
         self.switch_warning = None      # seconds until a telegraphed swap, while one is coming
@@ -602,14 +602,16 @@ class Hu_Taong(GameBase):
         lines = BANTER_SCORED if scorer is ai[0] else BANTER_CONCEDED
         self.banter = [random.choice(lines), ai[0], 2.2]
 
-    # ---------------- Chaos Switch ----------------
+    # ---------------- Switch ----------------
 
     @staticmethod
     def switch_gap():
         return random.uniform(6, 14)
 
     def switch_sides(self):
-        """Each player takes over the other paddle.  Their keys, and their score, go with them."""
+        """Switch: each player takes over the other paddle, and the goal it defends.  Their keys
+        and their score go with them; the paddles stay where they are.  After a point (Switch,
+        every point), or mid-rally after a warning (Switch, mid-rally, and Soul Swap)."""
         a, b = self.p1, self.p2
         for name in ("up", "down", "left", "right", "ai_enabled", "controls_label", "score", "remote"):
             first, second = getattr(a, name), getattr(b, name)
@@ -628,63 +630,19 @@ class Hu_Taong(GameBase):
             cx, cy = (paddle.x0 + paddle.x1) / 2, (paddle.y0 + paddle.y1) / 2
             self.app.fx.burst(cx, cy, 10, 48, tint, speed = (160, 380), life = (.6, 1.1))
 
-    def swap_positions(self):
-        """Chaos Switch +: the two paddles trade places on the court.  Keys, scores and goals stay
-        with their players, so each one has to scramble back to defend their own end."""
-        a, b = self.p1, self.p2
-        centres = [((p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2) for p in (a, b)]
-        for paddle, (cx, cy) in ((a, centres[1]), (b, centres[0])):
-            paddle.x0, paddle.x1 = cx - paddle.width / 2, cx + paddle.width / 2
-            paddle.y0, paddle.y1 = cy - paddle.height / 2, cy + paddle.height / 2
-            paddle.vx = paddle.vy = 0.0
-            Physics.clamp_to_world(paddle)
-            paddle.ai.reset()
-            self.app.fx.burst(cx, cy, 10, 48, "red" if paddle.is_left else "blue", life = (.6, .9))
-
-            # Landed on the ball: push it clear out of the paddle's front, never through a wall
-            b = self.ball
-            if b.x0 < paddle.x1 and b.x1 > paddle.x0 and b.y0 < paddle.y1 and b.y1 > paddle.y0:
-                forward = 1 if paddle.is_left else -1
-                x0 = paddle.x1 + 2 if forward > 0 else paddle.x0 - 2 - b.width
-                if not 0 <= x0 <= BASE_W - b.width:
-                    x0 = paddle.x0 - 2 - b.width if forward > 0 else paddle.x1 + 2
-                    forward = -forward
-                b.x0, b.x1 = x0, x0 + b.width
-                b.vx = forward * max(abs(b.vx), b.speed * 0.5)
-
-        # Every ball on the court slows to half its speed, giving both players a moment to get
-        # back and defend (a stuck ball leaves at half speed too)
-        for ball in self.powerups.balls():
-            ball.vx *= 0.5
-            ball.vy *= 0.5
-            if getattr(ball, "stuck", None):
-                ball.stuck["vx"] *= 0.5
-                ball.stuck["vy"] *= 0.5
-            self.app.fx.spark((ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2, 14, (200, 230, 255), speed = 240, life = .5)
-
-        self.switches += 1
-        self.switch_flash = 1.3
-        self.switch_banner = "换 Swap!"
-        self.recorder.on_swap(1)
-        self.app.sound_manager.play("hmyoop!.wav")
-
     def start_switch_mode(self):
-        """Soul Swap: Chaos Switch + until the point ends.  The wall has come down; the first swap
-        comes soon, so it happens within the point."""
+        """Soul Swap: mid-rally switches until the point ends.  The first comes soon, so it happens
+        within the point."""
         if self.switch_warning is None:
             self.next_switch = min(self.next_switch, random.uniform(1.5, 3.0))
 
     def start_swap_warning(self):
-        """The telegraphed countdown before the paddles swap places (Chaos Switch + or Soul Swap)."""
-        if self.switch_warning is None and not self.wall_up:
+        """The telegraphed countdown before a mid-rally switch (Switch, mid-rally, or Soul Swap)."""
+        if self.switch_warning is None:
             self.switch_warning = self.SWITCH_WARNING
             self.app.sound_manager.play("countdown_tick.wav")
 
     def update_switch(self, dt):
-        if self.wall_up:
-            self.switch_warning = None           # swapping places needs the wall down
-            return
-
         if self.switch_warning is None:
             if self.powerups.swapping():
                 self.next_switch -= dt
@@ -700,9 +658,9 @@ class Hu_Taong(GameBase):
         if self.switch_warning <= 0:
             self.switch_warning = None
             self.next_switch = self.switch_gap()
-            if not self.app.settings.match.switch_mid_rally:
+            if not self.settings.switch_mid_rally:
                 self.next_switch = random.uniform(4, 8)     # Soul Swap's: sooner, as it only lasts the point
-            self.swap_positions()
+            self.switch_sides()
 
     # ---------------- Chaos (Constant drift) and Shape Shift ----------------
 

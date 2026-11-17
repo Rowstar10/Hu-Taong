@@ -335,7 +335,7 @@ class TouchControls:
         for finger in self.fingers.values():
             if finger.kind == "steer" and self.steer.get(finger.slot) == finger.id:
                 slots = self.slots() if slots is None else slots
-                if finger.slot not in slots:          # Chaos Switch handed its paddle to the AI
+                if finger.slot not in slots:          # a Switch handed its paddle to the AI
                     del self.steer[finger.slot]
                     self.take_paddle(finger)
 

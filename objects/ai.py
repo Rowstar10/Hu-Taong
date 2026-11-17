@@ -566,7 +566,7 @@ class PaddleAI:
         if behind and (self.chase or not p.game.wall_up):
             # The ball got past: keep clear of it so it isn't knocked in, and race back goal-side
             # of it (a touch on the paddle's end still sends it back).  With the wall down every AI
-            # does this, as Chaos Switch + can drop it anywhere.
+            # does this, as Open Court lets the ball get anywhere.
             target = self.recover(bx, by, r, k)
         elif behind:
             # Too late to play it: step aside rather than knock it into its own goal
