@@ -38,7 +38,7 @@ Power-up fixes and changes, from a review of every power-up, then two rounds of 
 - Wind Gust: bolder, busier leaves, and an arrow by its icon showing which way it blows.
 - Portal Pair: bigger, brighter exit arrows, and the portals glow at night.
 - Clearer descriptions for Soul Swap.
-- The Chaos Mode + talisman is now Shape Shift: for the rest of the point the paddles and the ball keep growing and shrinking, but their speeds no longer change. If you'd switched it off, it stays off. The Chaos Mode + setting is unchanged.
+- The Chaos Mode + talisman is now Shape Shift: for the rest of the point the paddles grow and shrink together, always the same size as each other, and the ball grows and shrinks on its own. Their speeds no longer change. If you'd switched it off, it stays off. The Chaos Mode + setting is unchanged.
 - The computer player reads where a Sticky Goo ball will be slung, as the aim arrow shows. It expected the ball to leave on its old return, so any flick of the paddle fooled it.
 - Lantern Night: the computer player misjudges a ball out in the dark, as it does a Ghost Ball. It used to see perfectly, so only you were handicapped. This applies with Lantern Night on for the whole match, in Settings, too.
 - Resuming a match from a pause counts 3-2-1 first, at the same pace as the serve countdown, so nobody is caught out. Online, both screens show it.

@@ -101,7 +101,7 @@ class Hu_Taong(GameBase):
         self.ball = Ball(self, diameter = settings.ball_diameter, x = (BASE_W - settings.ball_diameter) / 2, y = (BASE_H - settings.ball_diameter) / 2, speed = settings.ball_speed, color = "white")
 
         # Chaos Mode +: each paddle and the ball drift through sizes and speeds on their own
-        # (Shape Shift: through sizes only)
+        # (Shape Shift: through sizes only, the two paddles together)
         for obj in (self.p1, self.p2, self.ball):
             obj.drift = {"size": self.drift_track(obj, "size"), "speed": self.drift_track(obj, "speed")}
 
@@ -748,11 +748,12 @@ class Hu_Taong(GameBase):
         # Chaos Mode + (Settings) drifts sizes and speeds; Shape Shift sizes only
         sizes = powerups.sizes_drifting() if powerups else s.chaos_mode == 2
         speeds = powerups.speeds_drifting() if powerups else s.chaos_mode == 2
+        linked = bool(powerups) and powerups.paddles_linked()     # Shape Shift: one size for both
 
         for obj in self.objects:
             if obj.is_paddle:
                 if sizes:
-                    t = obj.drift["size"][0]
+                    t = (self.p1 if linked else obj).drift["size"][0]
                     width = s.paddle_width_min + t * s.paddle_width_range
                     height = s.paddle_height_min + t * s.paddle_height_range
                 else:

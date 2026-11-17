@@ -4,9 +4,13 @@ The Chaos Mode + talisman is now Shape Shift: for the rest of the point the padd
 drift bigger and smaller, each on its own, but their speeds no longer drift.  Everything is back to
 normal for the next serve.  The Chaos Mode + setting is unchanged (sizes and speeds).  Saves and
 replays from before, which call it "chaos", still load, and know it as Shape Shift.
+
+Rowan's playtest of it (same day): the two paddles now grow and shrink together, always the same
+size as each other; the ball still drifts on its own.
 """
 import json
 import os
+import random
 import unittest
 
 from tests import harness
@@ -28,7 +32,8 @@ class Named(unittest.TestCase):
         self.assertEqual(kind.name, "Shape Shift")
         self.assertEqual(kind.glyph, "变")
         self.assertNotIn("chaos", BY_KEY)
-        self.assertIn("growing and shrinking", kind.blurb)
+        self.assertIn("grow and shrink together", kind.blurb)
+        self.assertIn("same size as each other", kind.about)
         self.assertIn("Speeds stay as they are", kind.about)
         self.assertNotIn("faster", kind.about)
         self.assertEqual(SHORT["shape"], "Sizes drifting")
@@ -44,6 +49,7 @@ class Drifting(Match):
         self.s = self.game.settings
         self.was_mode = self.s.chaos_mode
         self.s.chaos_mode = 0
+        random.seed(16)                           # the same drift every run
         place(self.ball, 960, 540)
         self.ball.vx, self.ball.vy = 500.0, 300.0
 
@@ -71,6 +77,21 @@ class Drifting(Match):
         self.assertEqual({f[5] for f in seen}, {self.s.ball_speed})
         self.assertEqual({f[6] for f in seen}, {(500.0, 300.0)}, "the ball in play kept its speed")
 
+    def test_the_paddles_together_the_ball_on_its_own(self):
+        self.pu.collect({"kind": "shape", "x": 900, "y": 500}, self.p1)
+        seen = self.drift(8.0)
+        self.assertTrue(all(f[0] == f[1] for f in seen), "the paddles were different sizes")
+        s = self.s
+        paddle = [(f[0] - s.paddle_height_min) / s.paddle_height_range for f in seen]
+        ball = [(f[2] - s.ball_diameter_min) / s.ball_diameter_range for f in seen]
+        self.assertGreater(max(abs(a - b) for a, b in zip(paddle, ball)), 0.15, "the ball followed the paddles")
+
+    def test_giant_paddle_still_acts_on_top(self):
+        self.pu.collect({"kind": "shape", "x": 900, "y": 500}, self.p1)
+        self.p1.effects["giant"] = 10.0
+        for f in self.drift(3.0):
+            self.assertGreater(f[0], f[1])
+
     def test_shown_until_the_point_ends(self):
         self.pu.collect({"kind": "shape", "x": 900, "y": 500}, self.p1)
         self.assertIn(("shape", UNTIL_POINT, "Shape Shift: sizes drifting"), self.pu.court_list())
@@ -92,6 +113,7 @@ class Drifting(Match):
         seen = self.drift(8.0)
         speeds = [f[3] for f in seen]
         self.assertGreater(max(speeds) - min(speeds), 10)
+        self.assertTrue(any(f[0] != f[1] for f in seen), "each paddle on its own, as before")
         self.assertFalse(self.pu.spawnable(BY_KEY["shape"]), "no Shape Shift on top of Chaos Mode +")
 
     def test_recorded_for_replays_and_online(self):

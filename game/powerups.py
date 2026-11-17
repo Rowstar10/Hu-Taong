@@ -109,10 +109,11 @@ KINDS = (
          "• Red scores only by getting the red ball into Blue's goal, and Blue the blue ball into Red's\n"
          "• A ball that reaches its own colour's goal just bounces off it"),
     Kind("shape", "Shape Shift", "变", "Wild", 0,
-         "Until the point ends, both paddles and the ball keep growing and shrinking.",
-         "For the rest of the point, both paddles and the ball keep drifting bigger and smaller, "
-         "each on its own.\n"
+         "Until the point ends, the paddles grow and shrink together, and the ball on its own.",
+         "For the rest of the point, the paddles keep drifting bigger and smaller together, always "
+         "the same size as each other, and the ball drifts bigger and smaller on its own.\n"
          "• Speeds stay as they are\n"
+         "• Giant Paddle and Shrink Curse still act on top\n"
          "• Everything goes back to normal for the next serve\n"
          "• Doesn't turn up if Chaos Mode + is on in Settings"),
     Kind("curve", "Curveball", "旋", "Wild", 0,
@@ -292,6 +293,10 @@ class PowerUps:
         """Paddles and ball drift bigger and smaller: with Chaos Mode + on in Settings, or from
         Shape Shift until the point ends."""
         return self.settings.chaos_mode == 2 or self.shape_shift
+
+    def paddles_linked(self):
+        """Shape Shift drifts both paddles' sizes together (the Chaos Mode + setting, each on its own)."""
+        return self.shape_shift and self.settings.chaos_mode != 2
 
     def speeds_drifting(self):
         """Their speeds drift too: only with Chaos Mode + on in Settings (Shape Shift leaves them be)."""
