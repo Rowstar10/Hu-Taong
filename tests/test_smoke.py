@@ -1,6 +1,6 @@
 """A smoke test: every screen draws a real frame, the ways in and out of a match work, and a long
-computer-v-computer match with every power-up runs without a hitch, and (1.7) another with every
-game mode on at once.  Kept in the repo (1.6) so it outlives the scratch copies that kept getting
+computer-v-computer match with every power-up runs without a hitch, (1.7) another with every
+game mode on at once, and (1.8) more under each physics and the Speed Cap.  Kept in the repo (1.6) so it outlives the scratch copies that kept getting
 cleared away; run it after any change to the screens.
 """
 import unittest
@@ -149,6 +149,54 @@ class LongMatch(unittest.TestCase):
                 self.assertGreater(points, 4)
                 self.assertLess(longest, 90, "a point that never ends")
                 self.assertGreater(len(taken), 12, sorted(taken))
+
+
+class EveryPhysics(unittest.TestCase):
+    """1.8: computer v computer under Classic and v0.9 physics, and with the Speed Cap, every
+    talisman on, Chaotic, the Middle Wall up and down, recorded and played back as it goes."""
+
+    def setUp(self):
+        self.g = g = app.settings.match
+        g.reset_powerups()
+        g.powerup_rate = 3
+        g.winning_score_index = g.winning_scores.index("Endless Mode")
+
+    def tearDown(self):
+        self.g.reset()
+        self.g.reset_powerups()
+
+    def test_each_physics_with_every_talisman(self):
+        from game.replay import ReplayView
+        for physics, cap, wall in ((1, False, True), (2, False, False), (0, True, False), (2, True, True)):
+            with self.subTest(physics = self.g.PHYSICS[physics], cap = cap, middle_wall = wall):
+                self.g.physics, self.g.speed_cap, self.g.middle_wall = physics, cap, wall
+                game = Hu_Taong(app)
+                game.start()
+                game.p1.ai_enabled = game.p2.ai_enabled = True
+                taken, points, longest, t_point, last = set(), 0, 0.0, 0.0, (0, 0)
+                collect = game.powerups.collect
+
+                def noting(item, owner):
+                    taken.add(item["kind"])
+                    return collect(item, owner)
+                game.powerups.collect = noting
+                for i in range(120 * 60):
+                    game.update(1 / 60)
+                    game.recorder.capture(1 / 60)
+                    if i % 900 == 0:
+                        app.renderer.draw_world(app.virtual, game)
+                    t_point += 1 / 60
+                    score = (game.p1.score, game.p2.score)
+                    if score != last:
+                        points, last = points + 1, score
+                        longest, t_point = max(longest, t_point), 0.0
+                game.stop()
+                self.assertGreater(points, 1)                   # (Classic's rallies between computers run long)
+                self.assertLess(longest, 90, "a point that never ends")
+                self.assertGreater(len(taken), 8, sorted(taken))
+                view = ReplayView(game.recorder.clip(), app)
+                view.show(len(view.clip.frames) - 1)
+                app.renderer.draw_world(app.virtual, view)
 
 
 class EveryMode(unittest.TestCase):

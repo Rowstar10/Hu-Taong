@@ -1,8 +1,8 @@
-# Hu Taong 1.7
+# Hu Taong 1.8
 
-Pong, the Wangsheng Funeral Parlor way. Version 1.7, 17 November 2026.
+Pong, the Wangsheng Funeral Parlor way. Version 1.8, 17 November 2026.
 
-Game modes you can mix on Match Setup, a reworked Switch, match settings from the pause menu, tidier settings menus, and drifting portals.
+Three physics to choose from, and a Speed Cap so a charge shot can always be reached.
 
 ## Play it
 
@@ -27,7 +27,7 @@ The .exe appears in `dist`.
 ## Android
 
 Hu Taong also plays on Android phones and tablets, with touch controls: Toki Hub for Android
-installs it, or get the APK from the version's release (`Hu-Taong-1.7-android.apk` on `v1.7`). It
+installs it, or get the APK from the version's release (`Hu-Taong-1.8-android.apk` on `v1.8`). It
 plays online with the PC version of the same number.
 
 GitHub builds the APK (`.github/workflows/android.yml`, with `android/build.sh` and

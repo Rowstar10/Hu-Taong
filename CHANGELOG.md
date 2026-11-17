@@ -2,6 +2,22 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 1.8 — 2026-11-17
+
+Three physics to choose from, and a Speed Cap so a charge shot can always be reached.
+
+### Added
+- Physics, in Match settings under Ball & Paddles (online, the host's choice counts). Changes come in at the next serve:
+  - Current: as in 1.7. A hit's speed comes from how hard the paddle drives into the ball, easing off towards a top speed.
+  - Classic: the angle comes from where the ball meets the paddle, and every hit of a rally is a little faster, up to the usual top speed. Moving the paddle adds no speed.
+  - v0.9: Hu Taong 0.9's. Drive into the ball to speed it up, a still paddle slows it, off an end the ball goes mostly up or down, and there's no top speed. Only two things are added, so a point can't freeze: it never slows below a quarter of the serve's speed, and never goes quite straight up and down.
+- Speed Cap, in the same place: a paddle hands on its speed to the ball only up to a limit (a little under the usual paddle speed), and gives way rather than catching its own ball again. Tapping the ball softly, running after it and hitting it again by the Middle Wall no longer makes a shot nobody could reach. Classic physics never hands on a paddle's speed, so it makes no difference there.
+- Match settings shows the physics and the Speed Cap under Ball & Paddles.
+
+### Changed
+- The Trickster AI doesn't try its pounce (that same charge shot) under Classic physics or with the Speed Cap, where it can't work.
+- Online play needs both players on 1.8: it won't connect to 1.7 or earlier.
+
 ## 1.7 — 2026-11-17
 
 Game modes you can mix on Match Setup, a reworked Switch, match settings from the pause menu, tidier settings menus, and drifting portals.

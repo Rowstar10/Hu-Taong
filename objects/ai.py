@@ -17,6 +17,7 @@ import math, random
 from collections import deque
 
 from config import BASE_W, BASE_H, MAX_BOUNCE_ANGLE
+from game import engines
 from helpers import clamp, lerp, reflect_in_range
 
 # One column per difficulty: Baby, Easy, Normal, Hard, Insane.  Adaptive AI slides between them.
@@ -234,14 +235,33 @@ class PaddleAI:
                 roll -= share
                 if roll <= 0:
                     break
-            if plan == "pounce" and speed > self.POUNCE_FASTEST:
-                plan = None                 # too quick to tap softly and chase down: just disguise it
+            if plan == "pounce" and (speed > self.POUNCE_FASTEST or not self.pounce_pays()):
+                plan = None                 # too quick to tap softly and chase down (or, under Classic
+                                            # physics or the Speed Cap, no use): just disguise it
             self.plan = plan
             if plan in ("pounce", "drop"):
                 self.power = 0.15
                 self.fake = plan == "drop"
             elif plan in ("rush", "drive"):
                 self.power = 1.6
+
+    def pounce_pays(self):
+        """Can a pounce work?  Not under Classic physics or the Speed Cap (1.8): the paddle's speed
+        doesn't go into the ball, and it gives way rather than catching its own ball again."""
+        rules = self.paddle.game.settings
+        physics = getattr(rules, "physics", engines.CURRENT)
+        return physics != engines.CLASSIC and not getattr(rules, "speed_cap", False)
+
+    def return_speed(self, speed):
+        """About how fast its return will go, to aim it: under Classic physics the rally's next step
+        (1.8); otherwise about as fast as the ball came."""
+        game = self.paddle.game
+        if getattr(game.settings, "physics", engines.CURRENT) == engines.CLASSIC:
+            ball = game.ball
+            serve = getattr(ball, "speed", 0)
+            if serve:
+                return engines.classic_speed(serve, getattr(ball, "rally_value", 0) + 1)
+        return speed
 
     def reach(self, r, k):
         """How far off-centre it dares meet the ball: a sure hand cuts it fine, a shaky one plays safe."""
@@ -323,7 +343,7 @@ class PaddleAI:
         y += self.noise * (k["misread"] * min(t_hit, 1.5) + k["wobble"])
 
         if self.aim is None and t_hit < 0.6:
-            self.aim = self.choose_aim(contact_x, y, math.hypot(vx, vy), r, k)
+            self.aim = self.choose_aim(contact_x, y, self.return_speed(math.hypot(vx, vy)), r, k)
         offset = self.aim or 0.0
 
         # A trickster lines up for the opposite angle and only switches at the last moment it safely can
@@ -583,7 +603,8 @@ class PaddleAI:
             threat = self.opponent_threat(bx, by, r)
             if threat > 0:
                 target = (target[0], lerp(target[1], lerp(BASE_H / 2, by, 0.5), 0.45 * threat))
-            # The paddle's speed goes into the return, so a lined-up shot is driven, not just blocked.
+            # The paddle's speed goes into the return, so a lined-up shot is driven, not just blocked
+            # (under Classic physics it adds nothing, and the Speed Cap limits it: no harm in trying).
             # A charging Striker (wall down) winds up sooner and hits harder; a Trickster's drop shot
             # gives with the ball instead, often after lunging as if to drive it.
             forward = 1 if p.is_left else -1

@@ -26,7 +26,7 @@ from xml.etree import ElementTree
 from core import rooms
 
 PORT = 47620
-PROTOCOL = 11                 # raised whenever the messages or the shared rules change, so old and new builds turn each other away clearly
+PROTOCOL = 12                 # raised whenever the messages or the shared rules change, so old and new builds turn each other away clearly
 MAGIC = b"HT"
 TIMEOUT = 6.0                 # seconds of silence before the other side is taken as gone
 SEND_RATE = 60                # packets a second each way
@@ -631,6 +631,7 @@ class HostSession:
                 "paused": paused, "host_menu": host_menu, "focus": 1 if self.app.focused() else 0,
                 "events": [[first + i, *e[1:]] for i, e in enumerate(events)],
                 "speed": [game.p1.speed, game.p2.speed], "serve": game.ball.speed,
+                "physics": game.settings.physics, "cap": 1 if game.settings.speed_cap else 0,
                 "guest": 1 if getattr(game.p1, "remote", False) else 2,
                 "over": self.over, "rematch": self.rematch_asked,
                 "acks": [[k, v] for k, v in list(self.acks.items())[-8:]],
