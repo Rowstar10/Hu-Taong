@@ -3,7 +3,7 @@ import pygame
 from core.states.base_state import State
 
 class InterfaceSettingsState(State):
-    """Settings > Interface: menus, the HUD and tooltips."""
+    """Settings > UI: menus, the HUD and tooltips."""
     NAME = "interface"
     is_menu = True
 
@@ -36,7 +36,7 @@ class InterfaceSettingsState(State):
                     setattr(settings, name, (getattr(settings, name) + 1) % count)
 
             if key == "reset_defaults":
-                self.confirm_reset("Reset interface settings?", self.app.reset_interface_settings)
+                self.confirm_reset("Reset UI settings?", self.app.reset_interface_settings)
 
             if key == "back":
                 self.pop_state()

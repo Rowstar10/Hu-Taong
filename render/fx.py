@@ -114,7 +114,7 @@ class Ambience:
         self.fade_total = 1.0
         self.fade_surf = pygame.Surface((BASE_W, BASE_H))
         self.fade_surf.fill((22, 4, 6))
-        self.level = 0          # Settings > Interface > Effects: Full, Reduced, Off
+        self.level = 0          # Settings > Display > Effects: Full, Reduced, Off
         self.amount = 1.0
         self.set_scene("title")
 

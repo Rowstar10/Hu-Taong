@@ -11,7 +11,7 @@ from game.powerups import KINDS as POWERUP_KINDS
 # now: "gameplay" holds the Match rules, "interface" the keys, the countdown and the effects as
 # well.  Every version shares the one save, so 1.6 still reads what 1.7 writes, and the other way.
 MODES = ["mode_chaos", "chaos_timing", "mode_switch", "switch_timing", "mode_curveball",
-         "mode_lantern_night", "mode_twin_ball", "mode_talisman_rush"]
+         "mode_lantern_night", "mode_twin_ball", "mode_talisman_rush", "mode_portal_pair"]
 GAMEPLAY = ["paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "ball_speed",
             "winning_score_index", "win_by_two", "ai_difficulty", "adaptive_ai",
             "vs_ai", "play_as_blue", "middle_wall", "ai_style", "pace",

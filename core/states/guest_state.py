@@ -776,15 +776,6 @@ class GuestMatchState(State):
                 net.request("pause")
 
 
-def show_host_rules(state):
-    """The friend who joined sees the host's Match settings, read only (once they've arrived)."""
-    net = state.app.net
-    if net is not None and getattr(net, "rules", None):
-        state.push_state("match", read_only = True)
-    else:
-        state.app.renderer.show_toast("Your friend's rules haven't reached you yet")
-
-
 class GuestPauseState(JukeboxControls, State):
     """The match is paused (by either player): resume it for both, or leave."""
     NAME = "guest_pause"
@@ -833,8 +824,7 @@ class GuestPauseState(JukeboxControls, State):
         super().draw(screen)
         buttons = [("resume", "Resume", theme.GREEN, theme.GREEN_HOVER),
                    ("restart", "Restart?", theme.BLUE, theme.BLUE_HOVER),
-                   ("watch_replay", "Replay", theme.ORANGE, theme.ORANGE_HOVER),
-                   ("match_settings", "Match Settings", theme.ORANGE, theme.ORANGE_HOVER),
+                   ("watch_replay", "View Replay", theme.ORANGE, theme.ORANGE_HOVER),
                    ("settings", "Settings", theme.ORANGE, theme.ORANGE_HOVER),
                    ("leave", "Leave Match", theme.RED, theme.RED_HOVER)]
         net = self.app.net
@@ -846,11 +836,9 @@ class GuestPauseState(JukeboxControls, State):
                                        buttons = buttons, mark = "停", jukebox = True,
                                        tips = {"resume": "Resume\nCarry on the match, for both of you.\n~ Esc",
                                                "restart": "Restart\nAsk your friend to start this match again from 0-0.",
-                                               "watch_replay": "Replay\nWatch the match so far, and save all or part of it.",
-                                               "match_settings": "Match Settings\nSee the rules your friend's game is set to.\n"
-                                                                 "• Only the host can change them",
-                                               "settings": "Settings\nYour controls, display, sound and interface. The match waits.\n"
-                                                           "• The match's rules are the host's: see Match Settings",
+                                               "watch_replay": "View Replay\nWatch the match so far, and save all or part of it.",
+                                               "settings": "Settings\nYour controls, display, sound and UI. The match waits.\n"
+                                                           "• The match's rules are the host's",
                                                "leave": "Leave Match\nStop playing and go back to the menu."})
         self.draw_jukebox_extras(screen)
 
@@ -879,8 +867,6 @@ class GuestPauseState(JukeboxControls, State):
                     self.push_state("replay", clip = clip, mode = "viewer", mute = True)
             if key == "settings":
                 self.push_state("settings")
-            if key == "match_settings":
-                show_host_rules(self)
             if key == "leave":
                 action = lambda: self.set_state("main_menu", mute = True)
                 self.push_state("confirm_choice", action = action, header = "Leave the match?", mute = True)
@@ -942,7 +928,7 @@ class GuestResultState(JukeboxControls, State):
             self.app.sound_manager.set_mood("game")
             self.pop_state(mute = True)               # the host started the rematch
             return
-        # the match's highlights play by themselves, as after any match (Settings > Interface > Replays)
+        # the match's highlights play by themselves, as after any match (Settings > UI > Replays)
         if not self.reel_shown:
             self.reel_shown = True
             clip = self.clip()
@@ -959,15 +945,13 @@ class GuestResultState(JukeboxControls, State):
         header = [("Red: ", theme.color("Red")), (f"{score[0]}      ", theme.PARCHMENT),
                   ("Blue: ", theme.color("Blue")), (f"{score[1]}", theme.PARCHMENT)]
         buttons = [("rematch", "Rematch?" if not self.asked else "Asked...", theme.GREEN, theme.GREEN_HOVER),
-                   ("watch_replay", "Replay", theme.ORANGE, theme.ORANGE_HOVER),
-                   ("highlights", "Highlights", theme.ORANGE, theme.ORANGE_HOVER),
+                   ("watch_replay", "View Replay", theme.ORANGE, theme.ORANGE_HOVER),
                    ("settings", "Settings", theme.WHITE, theme.WHITE_HOVER),
                    ("leave", "Leave", theme.RED, theme.RED_HOVER)]
         gone = self.host_gone()
         if gone:                                    # nobody to ask for a rematch: watch, save, then go
             buttons = [b for b in buttons if b[0] != "rematch"]
-            if self.left:                           # highlights come from the host, at the end of a match
-                buttons = [b for b in buttons if b[0] != "highlights"]
+            if self.left:
                 buttons[-1] = ("leave", "Main Menu", theme.RED, theme.RED_HOVER)
         drawn = (self.asked, gone)
         self._laid = None if getattr(self, "_asked_drawn", None) != drawn else getattr(self, "_laid", None)
@@ -980,10 +964,10 @@ class GuestResultState(JukeboxControls, State):
             title_size = 0.1, title_color = theme.PARCHMENT if self.left else theme.color(winner),
             mark = "离" if self.left else "胜" if self.won else "败", jukebox = True,
             tips = {"rematch": "Rematch\nAsk your friend for another match. It starts when they agree.",
-                    "watch_replay": ("Replay\nWatch the match so far, and save all or part of it." if self.left else
-                                     "Replay\nWatch this match again, and save all or part of it."),
-                    "highlights": "Highlights\nThe best moments of this match.",
-                    "settings": "Settings\nDisplay, sound and interface, then back here.",
+                    "watch_replay": ("View Replay\nWatch the match so far, and save all or part of it." if self.left else
+                                     "View Replay\nWatch this match again, and save all or part of it.\n"
+                                     "• Its highlights are in there too"),
+                    "settings": "Settings\nDisplay, sound and UI, then back here.",
                     "leave": "Leave\nStop playing and go back to the menu."})
         self.draw_jukebox_extras(screen)
 
@@ -1001,16 +985,12 @@ class GuestResultState(JukeboxControls, State):
                 net.request("rematch")
                 self.asked = True
                 self.app.renderer.show_toast("Asked your friend for a rematch")
-            if key in ("watch_replay", "highlights"):
+            if key == "watch_replay":
                 clip = self.clip()
                 if clip is None:
                     self.app.renderer.show_toast("Nothing was recorded")
-                elif key == "watch_replay":
-                    self.push_state("replay", clip = clip, mode = "viewer", mute = True)
-                elif clip.moments:
-                    self.push_state("replay", clip = clip, mode = "reel", mute = True)
-                else:
-                    self.app.renderer.show_toast("No highlights this time")
+                else:                               # the host's highlights, to play from in there
+                    self.push_state("replay", clip = clip, mode = "viewer", highlights = clip.moments, mute = True)
             if key == "settings":
                 self.push_state("settings")
             if key == "leave":

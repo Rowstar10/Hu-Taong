@@ -25,13 +25,8 @@ class SettingsState(State):
             mouse_pos = self.app.window_to_base(event.pos)
             key = self.hit_test(mouse_pos)
             
-            if key == "match":
-                net = self.app.net
-                if net and net.role == "guest":   # online, the host's game sets the rules: see them, read only
-                    from core.states.guest_state import show_host_rules
-                    show_host_rules(self)
-                else:
-                    self.push_state("match")
+            if key == "match":                # (not there for the friend who joined: the host's rules count)
+                self.push_state("match")
             if key == "gameplay":
                 self.push_state("gameplay")
             if key == "display":

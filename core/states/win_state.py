@@ -82,12 +82,9 @@ class WinState(JukeboxControls, State):
         
         buttons = [("play_again", "Play Again?", theme.GREEN, theme.GREEN_HOVER),
                    ("continue", "Endless Mode...", theme.BLUE, theme.BLUE_HOVER),
-                   ("watch_replay", "Replay", theme.ORANGE, theme.ORANGE_HOVER),
-                   ("highlights", "Highlights", theme.ORANGE, theme.ORANGE_HOVER),
+                   ("watch_replay", "View Replay", theme.ORANGE, theme.ORANGE_HOVER),
                    ("settings", "Settings", theme.WHITE, theme.WHITE_HOVER),
                    ("main_menu", "Main Menu", theme.RED, theme.RED_HOVER)]
-        if not self.reel():
-            buttons.remove(buttons[3])
         gone = self.friend_gone()
         if gone:                                   # the friend has left: watch, save, then go
             buttons = [b for b in buttons if b[0] not in ("play_again", "continue")]
@@ -108,8 +105,8 @@ class WinState(JukeboxControls, State):
             mark="离" if self.left else "败" if self.lost else "胜",
             tips={"play_again": "Play Again\nA new match with the same setup.",
                   "continue": "Endless Mode\nKeep playing this match with no score limit.",
-                  "watch_replay": "Replay\nWatch this match again, and save all or part of it.",
-                  "highlights": "Highlights\nThe best moments of this match.",
+                  "watch_replay": "View Replay\nWatch this match again, and save all or part of it.\n"
+                                  "• Its highlights are in there too",
                   "settings": "Settings\nChange settings, then come back here.",
                   "lobby": "Lobby\nBack to the lobby with your friend, to change the court or sides.\n"
                            "• They stay connected",
@@ -138,15 +135,17 @@ class WinState(JukeboxControls, State):
         recorder = self.recorder()
         if recorder is None or not recorder.frames:
             return
-        moments = self.reel() if mode == "reel" else None
-        if mode == "reel" and not moments:
+        reel = self.reel()
+        if mode == "reel":
+            if reel:
+                self.push_state("replay", clip = recorder.clip(), mode = "reel", moments = reel, mute = True)
             return
-        self.push_state("replay", clip = recorder.clip(), mode = mode, moments = moments, mute = True)
+        self.push_state("replay", clip = recorder.clip(), mode = mode, highlights = reel, mute = True)
 
     def update(self, dt):
         if self.net and not self.friend_gone() and self.net.request("rematch"):
             self.app.renderer.show_toast("Your friend would like a rematch: Play Again starts it")
-        # After the match, its highlights play once on their own (Settings > Interface > Instant Replay)
+        # After the match, its highlights play once on their own (Settings > UI > Instant Replay)
         # (not after a friend left: they're there under Highlights)
         if not getattr(self, "reel_shown", False) and not self.left:
             self.reel_shown = True
@@ -204,8 +203,6 @@ class WinState(JukeboxControls, State):
                         
                     if key == "watch_replay":
                         self.watch("viewer")
-                    if key == "highlights":
-                        self.watch("reel")
 
                     if key == "settings":
                         self.push_state("settings")

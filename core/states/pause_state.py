@@ -11,16 +11,16 @@ class PauseState(JukeboxControls, State):
     is_overlay = True
 
     TIPS = {"resume": "Resume\nBack to the match.\n~ Esc",
-            "reset": "Reset\nServe again from the middle.\n• Scores and everything else stay as they are",
-            "reset_scores": "Reset Scores\nRestart this match from 0-0.",
-            "settings": "Settings\nChange settings without leaving the match.",
-            "match_settings": "Match Settings\nChange the rules of this match: modes, points to win, talismans and the rest.\n"
-                              "• Changes come in at the next serve",
+            "reset": "Reset\nStart this point, or the whole match, over.\n~ Click to show or hide the two",
+            "reset_point": "Reset Point\nServe again from the middle.\n• Scores and everything else stay as they are",
+            "reset_match": "Reset Match\nRestart this match from 0-0.",
+            "settings": "Settings\nChange settings without leaving the match.\n"
+                        "• Match settings changed here come in at the next serve",
             "main_menu": "Main Menu\nLeave this match.",
             "lobby": "Lobby\nBack to the lobby with your friend, to change the court or sides.\n"
                      "• They stay connected; the match so far ends",
             "leave": "Leave Match\nStop playing. Your friend goes back to their menu.",
-            "watch_replay": "Replay\nWatch the match so far, and save all or part of it.",
+            "watch_replay": "View Replay\nWatch the match so far, and save all or part of it.",
             "p1_ai": "Red AI\nLet the AI play the red paddle, or take it back.",
             "p2_ai": "Blue AI\nLet the AI play the blue paddle, or take it back."}
 
@@ -30,6 +30,7 @@ class PauseState(JukeboxControls, State):
         self.auto = auto              # opened by the window losing focus: ends by itself when it's back
         self.game_state = self.app.state_manager.get_state(GameState)
         self.ui_cols = 2
+        self.reset_open = False       # Reset shows Reset Point and Reset Match beneath it while open
         self.init_jukebox()
 
     def enter(self, **kwargs):
@@ -59,9 +60,7 @@ class PauseState(JukeboxControls, State):
         super().draw(screen)
         buttons = [("resume", "Resume", theme.GREEN, theme.GREEN_HOVER),
                    ("reset", "Reset", theme.BLUE, theme.BLUE_HOVER),
-                   ("reset_scores", "Reset Scores", theme.BLUE, theme.BLUE_HOVER),
-                   ("watch_replay", "Replay", theme.ORANGE, theme.ORANGE_HOVER),
-                   ("match_settings", "Match Settings", theme.ORANGE, theme.ORANGE_HOVER),
+                   ("watch_replay", "View Replay", theme.ORANGE, theme.ORANGE_HOVER),
                    ("settings", "Settings", theme.ORANGE, theme.ORANGE_HOVER),
                    ("main_menu", "Main Menu", theme.RED, theme.RED_HOVER)]
 
@@ -77,9 +76,7 @@ class PauseState(JukeboxControls, State):
             # with a friend waiting: carry on, or leave; the match is paused for both
             buttons = [("resume", "Resume", theme.GREEN, theme.GREEN_HOVER),
                        ("reset", "Reset", theme.BLUE, theme.BLUE_HOVER),
-                       ("reset_scores", "Reset Scores", theme.BLUE, theme.BLUE_HOVER),
-                       ("watch_replay", "Replay", theme.ORANGE, theme.ORANGE_HOVER),
-                       ("match_settings", "Match Settings", theme.ORANGE, theme.ORANGE_HOVER),
+                       ("watch_replay", "View Replay", theme.ORANGE, theme.ORANGE_HOVER),
                        ("settings", "Settings", theme.ORANGE, theme.ORANGE_HOVER),
                        ("lobby", "Lobby", theme.WHITE, theme.WHITE_HOVER),
                        ("main_menu", "Leave Match", theme.RED, theme.RED_HOVER)]
@@ -87,6 +84,12 @@ class PauseState(JukeboxControls, State):
             header = lambda: ("Your friend is in the settings..." if net.guest_menu == 2 and net.connected() else
                               "Waiting for your friend to come back to the game" if net.connected() and not net.guest_focus else
                               "Your friend paused the match" if self.by_friend else "Paused for both of you")
+
+        if self.reset_open:          # the two kinds of reset, on the row beneath Resume and Reset
+            buttons[2:2] = [("reset_point", "Reset Point", theme.BLUE, theme.BLUE_HOVER),
+                            ("reset_match", "Reset Match", theme.BLUE, theme.BLUE_HOVER)]
+        if getattr(self, "_reset_drawn", None) != self.reset_open:
+            self._reset_drawn, self._laid = self.reset_open, None      # the buttons changed: lay out again
 
         tips = dict(self.TIPS, main_menu = self.TIPS["leave"]) if online else self.TIPS
         self.app.renderer.draw_overlay(self, screen,
@@ -140,7 +143,10 @@ class PauseState(JukeboxControls, State):
             if key == "resume":
                 self.resume()
 
-            if key == "reset" and self.game_state:
+            if key == "reset":
+                self.reset_open = not self.reset_open
+
+            if key == "reset_point" and self.game_state:
                 # just this moment, not the match: serve again and keep the scores
                 game = self.game_state.game
                 game.powerups.on_point()
@@ -148,7 +154,7 @@ class PauseState(JukeboxControls, State):
                 self.pop_state(mute = True)
                 sound_manager.play("enter_state.wav")
 
-            if key == "reset_scores":
+            if key == "reset_match":
                 if self.game_state:
                     action = lambda: (self.game_state.restart(),
                                       self.pop_state(mute = True),
@@ -164,8 +170,6 @@ class PauseState(JukeboxControls, State):
 
             if key == "settings":
                 self.push_state("settings")
-            if key == "match_settings":
-                self.push_state("match")
 
             if key == "lobby" and self.game_state:
                 self.push_state("confirm_choice", action = self.game_state.back_to_lobby,

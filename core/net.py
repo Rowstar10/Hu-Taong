@@ -32,8 +32,7 @@ TIMEOUT = 6.0                 # seconds of silence before the other side is take
 SEND_RATE = 60                # packets a second each way
 
 # Packet kinds (PUNCH only opens the way through a router; nobody reads it)
-HELLO, WELCOME, REFUSE, INPUT, SNAP, BYE, PUNCH, RULES = range(1, 9)
-RULES_EVERY = 0.5             # seconds between the host's copies of its match rules, for its friend to see
+HELLO, WELCOME, REFUSE, INPUT, SNAP, BYE, PUNCH = range(1, 8)
 
 # Public STUN servers: they answer "your address is ..." and nothing else
 STUN_SERVERS = [("stun.l.google.com", 19302), ("stun1.l.google.com", 19302), ("stun.cloudflare.com", 3478)]
@@ -513,9 +512,6 @@ class HostSession:
             # more than one period behind, so a hitch doesn't bank up a burst
             self.last_send = max(self.last_send + 1 / SEND_RATE, now - 1 / SEND_RATE)
             self.send_snapshot()
-        if self.guest is not None and now - getattr(self, "last_rules", 0.0) >= RULES_EVERY:
-            self.last_rules = now
-            self.link.send(RULES, pack_json(self.app.settings.match.rules()))
 
     # ---------------- Public listing ----------------
 
@@ -720,7 +716,6 @@ class GuestSession:
         self.played = -1             # the last event id played
         self.ping = None
         self.info = {}
-        self.rules = None            # the host's match rules, as its next serve will use them (to show, read only)
         self.frames = []             # every row, for the highlights afterwards
         self.closed = False
         self.notice = None
@@ -774,10 +769,6 @@ class GuestSession:
                 self.needs_password = bool(refusal.get("password"))
             elif kind == SNAP:
                 self.read_snapshot(payload)
-            elif kind == RULES:
-                rules = unpack_json(payload)
-                if isinstance(rules, dict):
-                    self.rules = rules
             elif kind == BYE:
                 self.status = "lost"
                 self.reason = "The host left the game."

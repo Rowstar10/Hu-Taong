@@ -19,7 +19,7 @@ def find_backgrounds():
 
 class Settings:
     """Match: the rules of a match, the same for both players (online, the host's).  The rest
-    are each player's own: Gameplay (controls), Display, Audio and Interface."""
+    are each player's own: Gameplay (controls), Display, Audio and UI (`interface`)."""
 
     def __init__(self, app):
         self.app = app
@@ -57,9 +57,10 @@ class MatchSettings:
     """The rules of a match (Settings > Match, and Match Setup): the same for both players."""
 
     # Game modes, any of them together (see reset).  Chaos and Switch each come at a timing.
-    MODES = ("chaos", "switch", "curveball", "lantern_night", "twin_ball", "talisman_rush")
+    MODES = ("chaos", "switch", "curveball", "lantern_night", "twin_ball", "talisman_rush", "portal_pair")
     MODE_NAMES = {"chaos": "Chaos", "switch": "Switch", "curveball": "Curveball",
-                  "lantern_night": "Lantern Night", "twin_ball": "Twin Ball", "talisman_rush": "Talisman Rush"}
+                  "lantern_night": "Lantern Night", "twin_ball": "Twin Ball", "talisman_rush": "Talisman Rush",
+                  "portal_pair": "Portal Pair"}
     CHAOS_TIMINGS = ("Every point", "Constant drift")
     SWITCH_TIMINGS = ("Every point", "Mid-rally", "Both")
     RUSH = 3.0                  # Talisman Rush: talismans come this many times as often
@@ -142,6 +143,7 @@ class MatchSettings:
         self.mode_lantern_night = False   # the court is always dark but for lanterns (the Lantern Night talisman, for good)
         self.mode_twin_ball = False  # every point is played with two balls, Red's and Blue's (the Twin Balls rules)
         self.mode_talisman_rush = False   # talismans on, and coming RUSH times as often
+        self.mode_portal_pair = False     # the Portal Pair talisman's portals, all match, growing all match
 
         self.court = 0               # Classic: an open court
         self.online_host_blue = False    # online: the host plays Blue and the friend Red
@@ -201,45 +203,11 @@ class MatchSettings:
         for kind in POWERUP_KINDS:
             setattr(self, "pu_" + kind.key, True)
 
-    # What a host sends its friend, to see (read only) the rules its next serve will be played by
-    RULES = ("paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "ball_speed", "pace",
-             "winning_score_index", "win_by_two", "middle_wall", "ai_difficulty", "ai_style", "adaptive_ai",
-             "court", "countdown", "powerups", "powerup_rate", "mode_chaos", "chaos_timing", "mode_switch",
-             "switch_timing", "mode_curveball", "mode_lantern_night", "mode_twin_ball", "mode_talisman_rush")
-
     def copy(self):
         """The rules a match plays by: a copy, so what you change mid-match (from Pause) only comes
         in when the next serve takes a fresh one, and Chaos's every-point sizes and speeds are
         rolled into it, never into your own settings."""
         return copy.copy(self)
-
-    def rules(self):
-        """These rules as plain values (a host sends them to its friend)."""
-        out = {name: getattr(self, name) for name in self.RULES}
-        out["off"] = [kind.key for kind in POWERUP_KINDS if not getattr(self, "pu_" + kind.key)]
-        return out
-
-    def take_rules(self, rules):
-        """Set these rules from a host's, ignoring anything unknown or mistyped."""
-        if not isinstance(rules, dict):
-            return
-        choices = {"winning_score_index": self.winning_scores, "ai_difficulty": self.ai_difficulties,
-                   "ai_style": self.ai_styles, "court": self.court_options, "countdown": self.countdown_options,
-                   "powerup_rate": self.powerup_rate_options, "chaos_timing": self.CHAOS_TIMINGS,
-                   "switch_timing": self.SWITCH_TIMINGS}
-        for name in self.RULES:
-            value, current = rules.get(name), getattr(self, name)
-            if isinstance(current, bool):
-                if isinstance(value, bool):
-                    setattr(self, name, value)
-            elif isinstance(value, (int, float)) and not isinstance(value, bool):
-                if name in choices:                    # a choice: a whole number, one of the options
-                    value = max(0, min(len(choices[name]) - 1, int(value)))
-                setattr(self, name, value)
-        off = rules.get("off")
-        if isinstance(off, list):
-            for kind in POWERUP_KINDS:
-                setattr(self, "pu_" + kind.key, kind.key not in off)
 
     def chaos_roll(self):
         """Chaos, every point: new random sizes and speeds (on the match's copy: see copy)."""

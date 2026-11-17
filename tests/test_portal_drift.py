@@ -5,6 +5,10 @@ apart from each other), their arrows slowly turn, and they open small and grow a
 a ball goes through, up to a full size.  A ball never leaves steeper than before, even as the
 arrows turn through straight up or down.  Replays and the friend's screen show the same, and the
 friend's screen flies the ball through them by the same rule.
+
+Rowan's playtest (same day): a Portal Pair game mode too, its portals open all match and growing
+all match (never shrinking back between points); and the talisman's, which only last the point,
+open bigger (but not too big).
 """
 import math
 import random
@@ -39,7 +43,7 @@ class Portals(unittest.TestCase):
         self.pu.wait = 999.0
         ball = self.game.ball
         ball.x0, ball.x1 = 100, 100 + ball.width                  # (well away from where they open)
-        self.pu.open_portals()
+        self.pu.open_portals(PowerUps.PORTAL_START_TALISMAN)
         self.assertEqual(len(self.pu.portals), 2)
 
     def tearDown(self):
@@ -53,16 +57,25 @@ class Portals(unittest.TestCase):
             seen.append([dict(p) for p in self.pu.portals])
         return seen
 
-    def test_they_open_small(self):
+    def test_the_talismans_open_not_so_small(self):
+        self.pu.portals = []
+        self.pu.collect({"kind": "portal", "x": 900, "y": 500}, self.game.p1)
         for door in self.pu.portals:
-            self.assertEqual(door["r"], PowerUps.PORTAL_START)
+            self.assertEqual(door["r"], PowerUps.PORTAL_START_TALISMAN)
+        self.assertLess(PowerUps.PORTAL_START, PowerUps.PORTAL_START_TALISMAN)
+        self.assertLess(PowerUps.PORTAL_START_TALISMAN, PowerUps.PORTAL_R, "but not full size")
+
+    def test_the_talismans_close_with_the_point(self):
+        self.pu.on_point()
+        self.assertEqual(self.pu.portals, [])
 
     def test_they_drift_and_turn(self):
-        start = [dict(p) for p in self.pu.portals]
-        after = self.drift(5.0)[-1]
-        for a, b in zip(start, after):
-            self.assertGreater(math.hypot(b["x"] - a["x"], b["y"] - a["y"]), 50, "it didn't drift")
-            turned = abs((b["angle"] - a["angle"] + math.pi) % math.tau - math.pi)
+        """How far each goes, not where it ends up: one can bounce off an edge and come back."""
+        frames = [[dict(p) for p in self.pu.portals]] + self.drift(5.0)
+        for i in range(2):
+            path = sum(math.hypot(b[i]["x"] - a[i]["x"], b[i]["y"] - a[i]["y"]) for a, b in zip(frames, frames[1:]))
+            self.assertGreater(path, PowerUps.PORTAL_DRIFT[0] * 5 * 0.9, "it didn't drift (or stuck)")
+            turned = abs((frames[-1][i]["angle"] - frames[0][i]["angle"] + math.pi) % math.tau - math.pi)
             self.assertGreater(turned, 0.8, "its arrows didn't turn")
 
     def test_slowly(self):
@@ -102,7 +115,7 @@ class Portals(unittest.TestCase):
         for _ in range(10):
             self.go_through(self.pu.portals[0])
             sizes.append([p["r"] for p in self.pu.portals])
-        self.assertEqual(sizes[0], [PowerUps.PORTAL_START + PowerUps.PORTAL_GROW] * 2)
+        self.assertEqual(sizes[0], [PowerUps.PORTAL_START_TALISMAN + PowerUps.PORTAL_GROW] * 2)
         self.assertEqual(sizes[-1], [PowerUps.PORTAL_R] * 2)
         self.assertTrue(all(b >= a for (a, _), (b, _) in zip(sizes, sizes[1:])))
 
@@ -140,6 +153,81 @@ class Portals(unittest.TestCase):
         for _ in range(2):
             self.game.recorder.capture(1 / 60)
         self.assertEqual(ReplayView(self.game.recorder.clip(), app).portal_fields, 4)
+
+
+class PortalPairMode(unittest.TestCase):
+    """The mode: the talisman's portals, open all match, growing all match."""
+
+    def setUp(self):
+        random.seed(23)
+        m.reset()
+        m.mode_portal_pair = True
+        self.game = Hu_Taong(app)
+        self.game.start()
+        self.game.countdown, self.game.paused = None, False
+        self.pu = self.game.powerups
+        self.pu.wait = 999.0
+
+    def tearDown(self):
+        self.game.stop()
+        m.reset()
+
+    def next_point(self):
+        g = self.game
+        g.on_score(g.ball, {"normal": (1, 0)})
+        g.message_timer = 0.001
+        g.update(0.01)
+
+    def grow(self, times):
+        ball = self.game.ball
+        for _ in range(times):
+            door = self.pu.portals[0]
+            ball.x0, ball.y0 = door["x"] - ball.width / 2, door["y"] - ball.height / 2
+            ball.x1, ball.y1 = ball.x0 + ball.width, ball.y0 + ball.height
+            ball.vx, ball.vy, ball.portal_cool = 600.0, 0.0, 0.0
+            self.pu.portal_trips = 0
+            self.pu.update_portals(1 / 60)
+
+    def test_open_from_the_first_serve_small(self):
+        self.assertEqual(len(self.pu.portals), 2)
+        self.assertEqual([p["r"] for p in self.pu.portals], [PowerUps.PORTAL_START] * 2)
+
+    def test_they_last_the_match_and_keep_their_size(self):
+        self.grow(2)
+        size = self.pu.portals[0]["r"]
+        self.assertGreater(size, PowerUps.PORTAL_START)
+        for _ in range(3):
+            self.next_point()
+            self.assertEqual(len(self.pu.portals), 2, "closed at the end of a point")
+            self.assertEqual(self.pu.portals[0]["r"], size, "shrank back between points")
+
+    def test_still_no_bigger_than_full_size(self):
+        self.grow(4)
+        self.next_point()
+        self.grow(10)
+        self.assertEqual([p["r"] for p in self.pu.portals], [PowerUps.PORTAL_R] * 2)
+
+    def test_a_loop_shuts_them_till_the_next_serve_as_big_as_they_were(self):
+        self.grow(3)
+        size = self.pu.portals[0]["r"]
+        self.pu.close_portals()
+        self.assertEqual(self.pu.portals, [])
+        self.next_point()
+        self.assertEqual([p["r"] for p in self.pu.portals], [size] * 2)
+
+    def test_no_portal_pair_talisman(self):
+        self.assertFalse(self.pu.spawnable(BY_KEY["portal"]))
+        self.assertIn("in a Portal Pair match", BY_KEY["portal"].about)
+
+    def test_switched_off_mid_match_they_go_at_the_next_serve(self):
+        m.mode_portal_pair = False
+        self.next_point()
+        self.assertEqual(self.pu.portals, [])
+
+    def test_saved_and_on_match_setup(self):
+        from core import save_data
+        self.assertIn("mode_portal_pair", save_data.collect(app)["gameplay"])
+        self.assertIn("portal_pair", app.renderer.MODE_TIPS)
 
 
 class FriendsScreen(unittest.TestCase):

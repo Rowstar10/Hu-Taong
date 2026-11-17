@@ -120,6 +120,7 @@ class Hu_Taong(GameBase):
         self.stones = courts.build(self, self.court)
         if settings.mode_twin_ball:
             self.powerups.twin_serve()            # Twin Ball: the first serve is with both balls too
+        self.powerups.serve_portals()             # Portal Pair: open from the first serve
 
         self.recorder = Recorder(self)           # every match is recorded, for replays and highlights
 
@@ -516,6 +517,7 @@ class Hu_Taong(GameBase):
             obj.reset()
         if self.settings.mode_twin_ball:
             self.powerups.twin_serve()          # Twin Ball: both balls, every point
+        self.powerups.serve_portals()           # Portal Pair: open all match (and none left over otherwise)
 
         if self.switch_after_point:
             self.switch_after_point = False

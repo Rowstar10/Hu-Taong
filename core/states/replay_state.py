@@ -20,8 +20,12 @@ class ReplayState(State):
     is_menu = True
     dims_court = True
 
-    def __init__(self, app, clip = None, mode = "viewer", moments = None, saved = None):
+    def __init__(self, app, clip = None, mode = "viewer", moments = None, saved = None, highlights = None):
         super().__init__(app)
+        # The match's highlights (from the win screen), to play from the viewer: the reel, which
+        # comes back to the viewer at its end
+        self.highlights = list(highlights or [])
+        self.reel_from_viewer = False
         self.clip = clip
         self.mode = mode
         self.saved = saved                       # the file a saved replay came from
@@ -99,12 +103,29 @@ class ReplayState(State):
         self.app.sound_manager.play("shutdown.wav")
         self.pop_state(mute = True)
 
+    def play_highlights(self):
+        """From the viewer: the match's highlights one after another, then back to the viewer."""
+        if not self.highlights:
+            return
+        self.viewer_moments = self.moments
+        self.mode, self.moments, self.reel_from_viewer = "reel", list(self.highlights), True
+        self.playing = True
+        self.start_moment(0)
+
+    def back_to_viewer(self):
+        self.mode, self.moments, self.reel_from_viewer = "viewer", self.viewer_moments, False
+        self.end = len(self.clip.frames) - 1
+        self.playing = False
+        self.reset_effects()
+
     def finished(self):
         if self.mode == "instant":
             self.leave()
         elif self.mode == "reel":
             if self.reel_index + 1 < len(self.moments):
                 self.start_moment(self.reel_index + 1)
+            elif self.reel_from_viewer:
+                self.back_to_viewer()
             else:
                 self.leave()
         else:
@@ -209,7 +230,7 @@ class ReplayState(State):
             self.idle = 0.0
             key = event.key
             if key == pygame.K_ESCAPE:
-                self.leave()
+                self.back_to_viewer() if self.reel_from_viewer else self.leave()
             elif self.mode != "viewer":
                 if key in (pygame.K_SPACE, pygame.K_RETURN, pygame.K_RIGHT):
                     self.finished() if self.mode == "reel" else self.leave()
@@ -237,7 +258,7 @@ class ReplayState(State):
                 if key == "replay_save":
                     self.save("moment")
                 elif key == "replay_back":
-                    self.leave()
+                    self.back_to_viewer() if self.reel_from_viewer else self.leave()
                 else:
                     self.finished() if self.mode == "reel" else self.leave()
                 return
@@ -254,6 +275,8 @@ class ReplayState(State):
                 self.jump_moment(1)
             elif key == "replay_speed":
                 self.speed = (self.speed + 1) % len(SPEEDS)
+            elif key == "replay_highlights":
+                self.play_highlights()
             elif key == "replay_in":
                 self.mark_in = self.position
                 if self.mark_out is not None and self.mark_out < self.mark_in:

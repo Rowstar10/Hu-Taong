@@ -152,9 +152,10 @@ KINDS = (
          "Two linked portals open on the court, drifting slowly about, each facing its own way.\n"
          "• A ball that goes into one comes out of the other at the same speed\n"
          "• It leaves the way that portal's arrows point, and they slowly turn\n"
-         "• They open small and grow a little each time a ball goes through\n"
+         "• They grow a little each time a ball goes through\n"
          "• Paddles pass straight through them\n"
-         "• Lasts until the point ends"),
+         "• Lasts until the point ends\n"
+         "• Doesn't turn up in a Portal Pair match"),
 )
 BY_KEY = {kind.key: kind for kind in KINDS}
 
@@ -192,8 +193,9 @@ class PowerUps:
     WIND = 500                              # Wind Gust: px/s^2 at the height of a gust (360 was too gentle to notice)
     CRACKER_TOP = 2600                      # Firecracker: its bang shoots the ball off at double speed, up to this (3600 was unreturnable)
     PORTAL_R = 96                           # Portal Pair: a portal's radius at its biggest...
-    PORTAL_START = 48                       # ...as it opens; every ball through grows both by...
-    PORTAL_GROW = 8                         # ...this much (six trips to full size; 1.6's were 80 all along)
+    PORTAL_START = 48                       # ...as they open in a Portal Pair match (they grow all match)...
+    PORTAL_START_TALISMAN = 72              # ...or from the talisman, for one point: not so small
+    PORTAL_GROW = 8                         # every ball through grows both by this much (1.6's were 80 all along)
     PORTAL_DRIFT = (35.0, 60.0)             # px/s a portal drifts about the court...
     PORTAL_TURN = (0.25, 0.45)              # ...and radians/s its arrows turn
     PORTAL_AREA = (0.24, 0.76, 170)         # where they keep to: this share of the court's width, and px from top and bottom
@@ -235,6 +237,7 @@ class PowerUps:
         self.blasts = []         # Firecracker explosions for the renderer: [x, y, age]
         self.portals = []        # Portal Pair: two {"x", "y", "angle", "r", "vx", "vy", "spin"}
         self.portal_trips = 0    # trips through them since a paddle last touched a ball
+        self.portal_grown = 0.0  # Portal Pair match: how big they'd grown when a loop shut them
         self.ball_v = (game.ball.vx, game.ball.vy)   # the ball's velocity last frame, before any hit
         self.wait = self.next_wait()
         for paddle in (game.p1, game.p2):
@@ -366,7 +369,7 @@ class PowerUps:
         if kind.key == "lantern":
             return self.lantern is None and not self.settings.mode_lantern_night
         if kind.key == "portal":
-            return not self.portals
+            return not self.portals and not self.settings.mode_portal_pair
         if kind.key == "tomb":
             return len(self.tombs) < self.TOMBS_MOST
         if kind.key == "snowball":
@@ -689,7 +692,7 @@ class PowerUps:
         elif key == "lantern":
             self.lantern = {"age": 0.0, "lifting": None}
         elif key == "portal":
-            self.open_portals()
+            self.open_portals(self.PORTAL_START_TALISMAN)
 
         app = self.game.app
         app.fx.burst(item["x"], item["y"], 8, 44, "red" if owner.is_left else "blue", life=(.6, 1.0))
@@ -809,7 +812,7 @@ class PowerUps:
 
     # ---------------- Portal Pair ----------------
 
-    def open_portals(self):
+    def open_portals(self, start):
         """Two linked portals open somewhere mid-court, well apart and small, each facing its own way
         (never straight up or down), and set off drifting, their arrows slowly turning."""
         game, ball = self.game, self.game.ball
@@ -823,7 +826,8 @@ class PowerUps:
                 continue
             if any(math.hypot(x - p["x"], y - p["y"]) < 520 for p in placed):
                 continue
-            if any(o.x0 - 90 < x < o.x1 + 90 and o.y0 - 90 < y < o.y1 + 90 for o in stones):
+            room = self.portal_room(start)          # as far from stones as they keep as they drift
+            if any(o.x0 - room < x < o.x1 + room and o.y0 - room < y < o.y1 + room for o in stones):
                 continue
             while True:
                 angle = random.uniform(0, math.tau)
@@ -831,7 +835,7 @@ class PowerUps:
                     break
             heading = random.uniform(0, math.tau)
             drift = random.uniform(*self.PORTAL_DRIFT)
-            placed.append({"x": x, "y": y, "angle": angle, "r": float(self.PORTAL_START),
+            placed.append({"x": x, "y": y, "angle": angle, "r": float(start),
                            "vx": drift * math.cos(heading), "vy": drift * math.sin(heading),
                            "spin": random.choice((-1, 1)) * random.uniform(*self.PORTAL_TURN)})
             if len(placed) == 2:
@@ -853,6 +857,11 @@ class PowerUps:
             dy = math.copysign(math.sqrt(1 - dx * dx), dy or 1.0)
         return dx, dy
 
+    @staticmethod
+    def portal_room(r):
+        """How far a portal of radius r keeps from any stone (opening, and drifting)."""
+        return r + 30
+
     def drift_portals(self, dt):
         """The portals drift about mid-court: off the edges of their area and any stone (with room
         to spare), and apart from each other; their arrows slowly turn."""
@@ -867,16 +876,26 @@ class PowerUps:
                 vx, x = -vx, clamp(x, lo, hi)
             if not top <= y <= bottom:
                 vy, y = -vy, clamp(y, top, bottom)
-            room = door.get("r", self.PORTAL_R) + 30
+            room = self.portal_room(door.get("r", self.PORTAL_R))
             for o in stones:
-                if o.x0 - room < x < o.x1 + room and o.y0 - room < y < o.y1 + room:
+                near = lambda px, py: o.x0 - room < px < o.x1 + room and o.y0 - room < py < o.y1 + room
+                if not near(x, y):
+                    continue
+                speed = math.hypot(vx, vy)
+                if near(door["x"], door["y"]):
+                    # already too close (a drifting stone came to it, or it grew): head straight away
+                    cx, cy = (o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2
+                    away = math.hypot(door["x"] - cx, door["y"] - cy) or 1.0
+                    vx, vy = (door["x"] - cx) / away * speed, (door["y"] - cy) / away * speed
+                    x, y = door["x"] + vx * dt, door["y"] + vy * dt
+                else:
                     # bounce off the side it came at, and stay where it was
                     if door["x"] <= o.x0 - room or door["x"] >= o.x1 + room:
                         vx = -vx
                     else:
                         vy = -vy
                     x, y = door["x"], door["y"]
-                    break
+                break
             door["x"], door["y"], door["vx"], door["vy"] = x, y, vx, vy
         if len(self.portals) == 2:
             a, b = self.portals
@@ -931,11 +950,21 @@ class PowerUps:
                 break
 
     def close_portals(self):
-        """The portals snap shut (a ball was looping through them with no paddle near)."""
+        """The portals snap shut (a ball was looping through them with no paddle near).  In a Portal
+        Pair match they open again at the next serve, as big as they'd grown."""
         for p in self.portals:
             self.game.app.fx.spark(p["x"], p["y"], 24, (170, 120, 255), speed = 300, life = .6)
+            self.portal_grown = max(self.portal_grown, p.get("r", 0.0))
         self.portals = []
         self.portal_trips = 0
+
+    def serve_portals(self):
+        """At each serve: a Portal Pair match has its portals (opened at the first serve, and again
+        after a loop shut them, never smaller than they'd grown); otherwise none stay open."""
+        if not self.settings.mode_portal_pair:
+            self.portals = []
+        elif not self.portals:
+            self.open_portals(max(self.PORTAL_START, self.portal_grown))
 
     # ---------------- Snowball ----------------
 
@@ -1044,7 +1073,8 @@ class PowerUps:
             if getattr(stone, "is_obstacle", False) and stone not in self.tombs and \
                     (stone.broken or stone.hp < stone.max_hp):
                 stone.restore()
-        self.portals = []
+        if not self.settings.mode_portal_pair:
+            self.portals = []                       # the talisman's last the point; the mode's, the match
         self.portal_trips = 0
         for b in self.balls():
             b.curve = 0.0
