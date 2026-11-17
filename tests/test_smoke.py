@@ -1,6 +1,7 @@
 """A smoke test: every screen draws a real frame, the ways in and out of a match work, and a long
-computer-v-computer match with every power-up runs without a hitch.  Kept in the repo (1.6) so it
-outlives the scratch copies that kept getting cleared away; run it after any change to the screens.
+computer-v-computer match with every power-up runs without a hitch, and (1.7) another with every
+game mode on at once.  Kept in the repo (1.6) so it outlives the scratch copies that kept getting
+cleared away; run it after any change to the screens.
 """
 import unittest
 
@@ -148,6 +149,50 @@ class LongMatch(unittest.TestCase):
                 self.assertGreater(points, 4)
                 self.assertLess(longest, 90, "a point that never ends")
                 self.assertGreater(len(taken), 12, sorted(taken))
+
+
+class EveryMode(unittest.TestCase):
+    """1.7: computer v computer with every game mode on at once (each Chaos timing in turn, Switch
+    both ways), every talisman, drawn and recorded as it goes."""
+
+    def setUp(self):
+        self.g = g = app.settings.match
+        g.reset_powerups()
+        g.winning_score_index = g.winning_scores.index("Endless Mode")
+        for mode in g.MODES:
+            setattr(g, "mode_" + mode, True)
+        g.switch_timing = 2
+
+    def tearDown(self):
+        self.g.reset()
+        self.g.reset_powerups()
+
+    def test_all_at_once(self):
+        from game.replay import ReplayView
+        for timing in (0, 1):
+            with self.subTest(chaos = self.g.CHAOS_TIMINGS[timing]):
+                self.g.chaos_timing = timing
+                game = Hu_Taong(app)
+                game.start()
+                game.p1.ai_enabled = game.p2.ai_enabled = True
+                points, longest, t_point, last = 0, 0.0, 0.0, (0, 0)
+                for i in range(120 * 60):
+                    game.update(1 / 60)
+                    game.recorder.capture(1 / 60)
+                    if i % 600 == 0:
+                        app.renderer.draw_world(app.virtual, game)
+                    t_point += 1 / 60
+                    score = (game.p1.score, game.p2.score)
+                    if score != last:
+                        points, last = points + 1, score
+                        longest, t_point = max(longest, t_point), 0.0
+                game.stop()
+                self.assertGreater(points, 3)
+                self.assertLess(longest, 90, "a point that never ends")
+                self.assertGreater(game.switches, 2, "no switches")
+                view = ReplayView(game.recorder.clip(), app)
+                view.show(len(view.clip.frames) - 1)
+                app.renderer.draw_world(app.virtual, view)
 
 
 if __name__ == "__main__":

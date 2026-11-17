@@ -6,7 +6,7 @@ You and your friend both need this same version of the game. Play → Online giv
 
 1. Pick **Host a Game**.
 2. Choose the **Court**, and whether **You play** Red (left) or Blue (right). Your friend gets
-   the other side. The rest of the rules come from **Gameplay Settings**.
+   the other side. The rest of the rules come from your **Match Settings**.
 3. Let people in, either way:
    - **Send your friend the code** shown, eight letters and numbers like `K7Q2-9FHD` (the
      **Copy** button puts it on the clipboard), or
@@ -46,8 +46,10 @@ server's address stays filled in for when it's back. The login is kept in your s
 
 - Either of you can pause (Esc); it pauses for both, and the match waits while either of you is
   in a menu. Clicking away from the game (to type to your friend, say) pauses it for both of
-  you too, and it carries on by itself once you're both back. Turn **Auto-Pause** off (Interface
+  you too, and it carries on by itself once you're both back. Turn **Auto-Pause** off (Gameplay
   settings) if you'd rather your clicking away didn't pause it.
+- Only the host's **Match Settings** count. The host can change them from Pause, and the changes
+  come in at the next serve. Your friend can see them there too, but can't change them.
 - The match only carries on while both of you are in the game, and always after a 3-2-1 on both
   screens.
 - **Pause screen:** the host has Resume, Reset (serve again), Reset Scores, Replay (the match so
