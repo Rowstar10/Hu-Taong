@@ -200,7 +200,7 @@ class App:
         return mx, my
 
     def reset_gameplay_settings(self):
-        self.settings.gameplay.reset()
+        self.settings.match.reset()
 
     def reset_display_settings(self):
         self.settings.display.reset()
@@ -330,7 +330,7 @@ class App:
     def focused(self):
         """Is the player here?  The window is in front, or Auto-Pause is off (then clicking away
         doesn't count).  Online, the match only plays while both players are."""
-        return self.has_focus or not self.settings.interface.auto_pause
+        return self.has_focus or not self.settings.gameplay.auto_pause
 
     def in_match(self):
         """True while a match is on screen with nothing laid over it."""
@@ -502,7 +502,7 @@ class App:
                     self.touch.reset()
                 self.keys_down.clear()
                 # online, clicking away (to chat, say) mustn't stop the match for both players
-                if self.settings.interface.auto_pause and self.in_match() and not self.net:
+                if self.settings.gameplay.auto_pause and self.in_match() and not self.net:
                     self.state_manager.push_state("pause", mute = True, auto = True)
             if event.type == pygame.WINDOWFOCUSGAINED:
                 self.has_focus = True     # an auto-pause sees it and resumes (PauseState.update)

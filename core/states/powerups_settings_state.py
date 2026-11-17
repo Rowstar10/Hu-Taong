@@ -12,7 +12,7 @@ class PowerUpsSettingsState(State):
 
     def handle_event(self, event):
         super().handle_event(event)
-        settings = self.app.settings.gameplay
+        settings = self.app.settings.match
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.pop_state()

@@ -388,7 +388,7 @@ class Recorder:
 
         # The score makes a point matter more: the winning point, a match point saved, a late equaliser
         bonus = 0.0
-        win = g.app.settings.gameplay.winning_scores[g.app.settings.gameplay.winning_score_index]
+        win = g.app.settings.match.winning_scores[g.app.settings.match.winning_score_index]
         mine, theirs = (g.p1.score, g.p2.score) if side == 1 else (g.p2.score, g.p1.score)
         if isinstance(win, int):
             if theirs >= win - 1 and mine - 1 < theirs:

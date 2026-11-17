@@ -27,7 +27,7 @@ class Gone(unittest.TestCase):
         self.assertEqual(len(KINDS), 20)
 
     def test_no_switch_for_them(self):
-        g = app.settings.gameplay
+        g = app.settings.match
         for key in GONE:
             self.assertFalse(hasattr(g, "pu_" + key))
         sm = app.state_manager
@@ -46,13 +46,13 @@ class Gone(unittest.TestCase):
 
 class OldSave(unittest.TestCase):
     def tearDown(self):
-        app.settings.gameplay.reset_powerups()
+        app.settings.match.reset_powerups()
 
     def test_a_save_from_before_loads(self):
         save_data.save_path().parent.mkdir(parents = True, exist_ok = True)
         shutil.copy(os.path.join(DATA, "save_1.6.json"), save_data.save_path())
         save_data.load(app)
-        g = app.settings.gameplay
+        g = app.settings.match
         self.assertFalse(g.pu_fire, "the other switches come through")
         self.assertTrue(g.pu_wind)
         save_data.save(app)                       # and saving again leaves the old ones behind

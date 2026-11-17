@@ -223,14 +223,14 @@ class TouchControls:
         finger.slot = slot
         self.steer[slot] = finger.id                 # the newest finger on a side has its paddle
         centre = self.paddle_centre(slot)
-        if self.app.settings.interface.touch_steer == 0 and centre is not None:
+        if self.app.settings.gameplay.touch_steer == 0 and centre is not None:
             finger.tx, finger.ty = centre            # Drag: the paddle moves on from where it is
         else:
             finger.tx, finger.ty = finger.x, finger.y
 
     def slide(self, finger, dx, dy):
-        if self.app.settings.interface.touch_steer == 0:
-            gain = SENSITIVITY[self.app.settings.interface.touch_sensitivity]
+        if self.app.settings.gameplay.touch_steer == 0:
+            gain = SENSITIVITY[self.app.settings.gameplay.touch_sensitivity]
             finger.tx = min(BASE_W, max(0.0, finger.tx + dx * gain))
             finger.ty = min(BASE_H, max(0.0, finger.ty + dy * gain))
         else:
@@ -384,7 +384,7 @@ class TouchControls:
     # ================================================================ feel
 
     def buzz(self, ms, strength = 110):
-        if not self.app.settings.interface.vibration:
+        if not self.app.settings.gameplay.vibration:
             return
         now = time.monotonic()
         if now - self.buzzed < 0.06:

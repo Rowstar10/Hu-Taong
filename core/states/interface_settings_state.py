@@ -21,11 +21,12 @@ class InterfaceSettingsState(State):
 
     def handle_event(self, event):
         settings = self.app.settings.interface
+        group = self.app.settings.group_of
 
         # While a binding is waiting, the next key press is the new key (Esc cancels)
         if self.listening and event.type == pygame.KEYDOWN:
             if event.key != pygame.K_ESCAPE:
-                settings.bind(self.listening, event.key)
+                self.app.settings.gameplay.bind(self.listening, event.key)
                 self.app.sound_manager.play("click.wav")
             self.listening = None
             return
@@ -41,14 +42,14 @@ class InterfaceSettingsState(State):
 
             if key and key.startswith("toggle_") and key[7:] in self.TOGGLES:
                 name = key[7:]
-                setattr(settings, name, not getattr(settings, name))
+                setattr(group(name), name, not getattr(group(name), name))
 
             for name, options in self.CYCLES.items():
-                count = len(getattr(settings, options))
+                count = len(getattr(group(name), options))
                 if key == f"cycle_{name}_left":
-                    setattr(settings, name, (getattr(settings, name) - 1) % count)
+                    setattr(group(name), name, (getattr(group(name), name) - 1) % count)
                 if key == f"cycle_{name}_right":
-                    setattr(settings, name, (getattr(settings, name) + 1) % count)
+                    setattr(group(name), name, (getattr(group(name), name) + 1) % count)
 
             if key and key.startswith("key_"):
                 field = key[4:]

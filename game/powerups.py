@@ -115,7 +115,7 @@ KINDS = (
          "• Speeds stay as they are\n"
          "• Giant Paddle and Shrink Curse still act on top\n"
          "• Everything goes back to normal for the next serve\n"
-         "• Doesn't turn up if Chaos Mode + is on in Settings"),
+         "• Doesn't turn up in a Chaos match with Constant drift"),
     Kind("curve", "Curveball", "旋", "Wild", 0,
          "Until the point ends, every hit curves the way the paddle was moving as it hit.",
          "Curveball is on until the point ends.\n"
@@ -290,21 +290,13 @@ class PowerUps:
         return self.settings.switch_mid_rally or self.switch_plus
 
     def sizes_drifting(self):
-        """Paddles and ball drift bigger and smaller: with Chaos Mode + on in Settings, or from
-        Shape Shift until the point ends."""
-        return self.settings.chaos_mode == 2 or self.shape_shift
-
-    def paddles_linked(self):
-        """Shape Shift drifts both paddles' sizes together (the Chaos Mode + setting, each on its own)."""
-        return self.shape_shift and self.settings.chaos_mode != 2
-
-    def speeds_drifting(self):
-        """Their speeds drift too: only with Chaos Mode + on in Settings (Shape Shift leaves them be)."""
-        return self.settings.chaos_mode == 2
+        """The paddles (together) and the ball drift bigger and smaller: all match in Chaos with
+        Constant drift, or from Shape Shift until the point ends.  Speeds never drift."""
+        return self.settings.chaos_drift or self.shape_shift
 
     def curving(self):
         """Curveball is on: for the whole match (Settings), or from the power-up until the point ends."""
-        return getattr(self.settings, "curveball", False) or self.curve_on
+        return self.settings.mode_curveball or self.curve_on
 
     def wind_force(self):
         """Wind Gust: the wind's push on the ball now, px/s^2 (down is positive), gusting."""
@@ -321,7 +313,7 @@ class PowerUps:
     def lantern_level(self):
         """Lantern Night: 0 (day) to 1 (full night), easing in and out.  Always night if it's on
         for the whole match in Settings."""
-        if getattr(self.settings, "lantern_night", False):
+        if self.settings.mode_lantern_night:
             return 1.0
         if not self.lantern:
             return 0.0
@@ -362,7 +354,7 @@ class PowerUps:
         if kind.key == "cracker":
             return self.cracker is None
         if kind.key == "lantern":
-            return self.lantern is None and not getattr(self.settings, "lantern_night", False)
+            return self.lantern is None and not self.settings.mode_lantern_night
         if kind.key == "portal":
             return not self.portals
         if kind.key == "tomb":

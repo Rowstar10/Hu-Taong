@@ -418,19 +418,18 @@ class HostSession:
         return self.guest is not None and time.perf_counter() - self.link.heard < TIMEOUT
 
     def settings_summary(self):
-        g = self.app.settings.gameplay
+        g = self.app.settings.match
         from game import courts
         win = g.winning_scores[g.winning_score_index]
         parts = ["Endless" if win == "Endless Mode" else f"First to {win}",
                  f"Court: {courts.NAMES[g.court]}",
                  "Power-ups on" if g.powerups else "Power-ups off"]
-        if g.chaos_mode:
-            parts.append(["", "Chaos Mode", "Chaos Mode +"][g.chaos_mode])
+        parts += [g.MODE_NAMES[mode] for mode in g.modes_on()]
         return "  -  ".join(parts)
 
     def guest_side(self):
         """1 if the friend plays Red (the left paddle), 2 for Blue."""
-        return 1 if self.app.settings.gameplay.online_host_blue else 2
+        return 1 if self.app.settings.match.online_host_blue else 2
 
     def welcome(self):
         return pack_json({"summary": self.settings_summary(), "started": self.game is not None,

@@ -199,7 +199,7 @@ class Ambience:
         self.time += dt
 
         scene = self.current_scene()
-        level = self.app.settings.interface.effects
+        level = self.app.settings.display.effects
         if scene != self.scene or level != self.level:
             self.level = level
             self.set_scene(scene)

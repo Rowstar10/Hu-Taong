@@ -102,8 +102,8 @@ class Hud:
         """Tab is down, and isn't one of the paddle keys."""
         if pygame.K_TAB not in self.app.keys_down:
             return False
-        interface = self.app.settings.interface
-        return pygame.K_TAB not in [getattr(interface, f) for f in interface.KEY_FIELDS]
+        controls = self.app.settings.gameplay
+        return pygame.K_TAB not in [getattr(controls, f) for f in controls.KEY_FIELDS]
 
     def draw_overview(self, screen, game, powerups):
         renderer, art = self.app.renderer, self.art

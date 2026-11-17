@@ -77,8 +77,8 @@ class FakeLink:
 class HostedMatch(unittest.TestCase):
     """A match hosted here, power-ups off, the friend's link faked."""
     def setUp(self):
-        self.powerups = app.settings.gameplay.powerups
-        app.settings.gameplay.powerups = False
+        self.powerups = app.settings.match.powerups
+        app.settings.match.powerups = False
         self.net = app.net = FakeLink()
         self.game = Hu_Taong(app)
         self.game.start()
@@ -90,7 +90,7 @@ class HostedMatch(unittest.TestCase):
 
     def tearDown(self):
         app.net = None
-        app.settings.gameplay.powerups = self.powerups
+        app.settings.match.powerups = self.powerups
 
     def frame(self, dt = 0.01):
         """One frame of the host's match, in the order GameState.update runs it."""

@@ -17,13 +17,24 @@ def find_backgrounds():
     return [numbered[number] for number in sorted(numbered)]
 
 class Settings:
+    """Match: the rules of a match, the same for both players (online, the host's).  The rest
+    are each player's own: Gameplay (controls), Display, Audio and Interface."""
+
     def __init__(self, app):
         self.app = app
+        self.match = MatchSettings(app)
         self.gameplay = GameplaySettings(app)
         self.display = DisplaySettings(app)
         self.audio = AudioSettings(app)
         self.interface = InterfaceSettings(app)
         self.online = OnlineSettings(app)
+
+    def group_of(self, name):
+        """The group a setting belongs to (each name is in one group only), or None."""
+        for group in (self.match, self.gameplay, self.display, self.audio, self.interface):
+            if name in vars(group):
+                return group
+        return None
 
 
 class OnlineSettings:
@@ -41,7 +52,17 @@ class OnlineSettings:
         from core import rooms
         rooms.use_server(self.server_address if self.own_server else None, self.server_user, self.server_password)
 
-class GameplaySettings:
+class MatchSettings:
+    """The rules of a match (Settings > Match, and Match Setup): the same for both players."""
+
+    # Game modes, any of them together (see reset).  Chaos and Switch each come at a timing.
+    MODES = ("chaos", "switch", "curveball", "lantern_night", "twin_ball", "talisman_rush")
+    MODE_NAMES = {"chaos": "Chaos", "switch": "Switch", "curveball": "Curveball",
+                  "lantern_night": "Lantern Night", "twin_ball": "Twin Ball", "talisman_rush": "Talisman Rush"}
+    CHAOS_TIMINGS = ("Every point", "Constant drift")
+    SWITCH_TIMINGS = ("Every point", "Mid-rally", "Both")
+    RUSH = 3.0                  # Talisman Rush: talismans come this many times as often
+
     def __init__(self, app):
         self.app = app
 
@@ -85,6 +106,9 @@ class GameplaySettings:
         # Courts: the stones a match starts with (see game/courts.py); the last one is Random
         self.court_options = courts.NAMES
 
+        # The countdown before each serve, in seconds
+        self.countdown_options = [3, 2, 1]
+
         self.reset()
 
     def reset(self):
@@ -102,18 +126,22 @@ class GameplaySettings:
         self.ai_style = 0
         self.adaptive_ai = False
 
-        # Chaos mode: 0 off, 1 new random ball/paddle settings every round, 2 (Chaos Mode +)
-        # sizes and speeds drift during play.  For 1 the player's own values are kept in
-        # _chaos_backup and put back when the match ends.
-        self.chaos_mode = 0
-        self._chaos_backup = None
+        self.countdown = 0           # the serve countdown: 3 s
 
-        # Chaos switch: 0 off, 1 players swap paddles after every point (Chaos Switch),
-        # 2 the paddles swap places at random, telegraphed moments mid-rally (Chaos Switch +,
-        # which needs the Middle Wall off), 3 both.
-        self.chaos_switch = 0
-        self.curveball = False       # every hit bends the way the paddle was moving (the Curveball power-up, for good)
-        self.lantern_night = False   # the court is always dark but for lanterns (the Lantern Night power-up, for good)
+        # Game modes (Match Setup), any of them together.  Each mode remembers its timing while off.
+        # Chaos, every point: new random sizes and speeds for the ball and paddles each point (the
+        # player's own values are kept in _chaos_backup and put back when the match ends).
+        # Chaos, constant drift: Shape Shift's drift for the whole match, sizes only.
+        self.mode_chaos = False
+        self.chaos_timing = 0        # 0 every point, 1 constant drift
+        self._chaos_backup = None
+        # Switch: each player takes over the other's paddle and goal, keeping their own keys and score
+        self.mode_switch = False
+        self.switch_timing = 0       # 0 after every point, 1 mid-rally at random moments (after a warning), 2 both
+        self.mode_curveball = False  # every hit bends the way the paddle was moving (the Curveball talisman, for good)
+        self.mode_lantern_night = False   # the court is always dark but for lanterns (the Lantern Night talisman, for good)
+        self.mode_twin_ball = False  # every point is played with two balls, Red's and Blue's (the Twin Balls rules)
+        self.mode_talisman_rush = False   # talismans on, and coming RUSH times as often
 
         self.court = 0               # Classic: an open court
         self.online_host_blue = False    # online: the host plays Blue and the friend Red
@@ -122,13 +150,36 @@ class GameplaySettings:
 
     @property
     def switch_each_point(self):
-        """Chaos Switch: players take each other's paddles after every point."""
-        return self.chaos_switch in (1, 3)
+        """Switch, every point: the players take over each other's paddle after every point."""
+        return self.mode_switch and self.switch_timing in (0, 2)
 
     @property
     def switch_mid_rally(self):
-        """Chaos Switch +: the paddles swap places mid-rally."""
-        return self.chaos_switch in (2, 3)
+        """Switch, mid-rally: ...and at random moments during play, after a warning."""
+        return self.mode_switch and self.switch_timing in (1, 2)
+
+    @property
+    def chaos_each_point(self):
+        """Chaos, every point: new random sizes and speeds each point."""
+        return self.mode_chaos and self.chaos_timing == 0
+
+    @property
+    def chaos_drift(self):
+        """Chaos, constant drift: sizes drift all match, as Shape Shift's do for a point."""
+        return self.mode_chaos and self.chaos_timing == 1
+
+    @property
+    def talismans_on(self):
+        """Talismans turn up: Power-Ups on, or Talisman Rush."""
+        return self.powerups or self.mode_talisman_rush
+
+    @property
+    def serve_seconds(self):
+        return self.countdown_options[self.countdown]
+
+    def modes_on(self):
+        """The game modes this match is played with, by name."""
+        return [mode for mode in self.MODES if getattr(self, "mode_" + mode)]
 
     def reset_ball_and_paddles(self):
         """The ball's and paddles' sizes and speeds back to their defaults (what Randomise changes)."""
@@ -182,11 +233,64 @@ class GameplaySettings:
         """AI difficulty to use right now, as a whole level."""
         return round(self.ai_skill(own_score, opponent_score))
 
+def key_name(key):
+    """How a key is shown on screen: W, Up, Left Shift..."""
+    name = pygame.key.name(key)
+    return name.upper() if len(name) == 1 else name.title()
+
+class GameplaySettings:
+    """Your own controls: the keys, Auto-Pause, and on a phone the touch steering."""
+
+    ACTIONS = ("up", "down", "left", "right")
+    KEY_FIELDS = ("p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right")
+    DEFAULT_KEYS = {"p1_up": pygame.K_w, "p1_down": pygame.K_s, "p1_left": pygame.K_a, "p1_right": pygame.K_d,
+                    "p2_up": pygame.K_UP, "p2_down": pygame.K_DOWN, "p2_left": pygame.K_LEFT, "p2_right": pygame.K_RIGHT}
+
+    def __init__(self, app):
+        self.app = app
+        # On a phone (core/touch.py): how a finger steers, and how far Drag moves the paddle
+        self.touch_steer_options = ["Drag", "Follow"]
+        self.touch_sensitivity_options = ["Low", "Normal", "High", "Very High"]
+        self.reset()
+
+    def reset(self):
+        self.auto_pause = True       # pause a match when the window loses focus
+        self.touch_steer = 0         # (a phone) Drag
+        self.touch_sensitivity = 1   # (a phone) Normal
+        self.vibration = True        # (a phone) a buzz when your paddle hits the ball, and at each point
+        self.reset_keys()
+
+    def reset_keys(self):
+        for field, key in self.DEFAULT_KEYS.items():
+            setattr(self, field, key)
+
+    def keys(self, player):
+        return {action: getattr(self, f"{player}_{action}") for action in self.ACTIONS}
+
+    def keys_label(self, player):
+        keys = self.keys(player)
+        if keys == {a: self.DEFAULT_KEYS[f"p2_{a}"] for a in self.ACTIONS}:
+            return "Arrow Keys"
+        return " ".join(key_name(keys[a]) for a in ("up", "left", "down", "right"))
+
+    def bind(self, field, key):
+        """Give `field` this key.  A binding that already had it swaps, so no key is used twice."""
+        for other in self.KEY_FIELDS:
+            if other != field and getattr(self, other) == key:
+                setattr(self, other, getattr(self, field))
+        setattr(self, field, key)
+
+    def keys_valid(self):
+        keys = [getattr(self, f) for f in self.KEY_FIELDS]
+        named = all(isinstance(k, int) and pygame.key.name(k) for k in keys)
+        return named and len(set(keys)) == len(keys) and pygame.K_ESCAPE not in keys
+
 class DisplaySettings:
     def __init__(self, app):
         self.app = app
 
         self.max_fps_options = [30, 60, 120, 144, 165, 240, "Unlimited"]
+        self.effects_options = ["Full", "Reduced", "Off"]
 
         # How far the menu background drifts against the mouse, for a sense of depth
         self.parallax_options = ["Off", "Gentle", "Full"]
@@ -224,6 +328,9 @@ class DisplaySettings:
         # How much the background is darkened during a match (0-1), on top of the Dim Overlay,
         # so the ball and paddles stand out.  The default is the old Court Dim: Medium.
         self.court_dim_level = 100 / 255
+        self.effects = 0             # butterflies, embers and bursts: Full
+        self.screen_shake = True
+        self.ball_trail = True
 
 class AudioSettings:
     def __init__(self, app):
@@ -323,16 +430,8 @@ class AudioSettings:
         """Display name: file name without its extension."""
         return Path(track).stem if track else ""
 
-def key_name(key):
-    """How a key is shown on screen: W, Up, Left Shift..."""
-    name = pygame.key.name(key)
-    return name.upper() if len(name) == 1 else name.title()
-
 class InterfaceSettings:
-    ACTIONS = ("up", "down", "left", "right")
-    KEY_FIELDS = ("p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right")
-    DEFAULT_KEYS = {"p1_up": pygame.K_w, "p1_down": pygame.K_s, "p1_left": pygame.K_a, "p1_right": pygame.K_d,
-                    "p2_up": pygame.K_UP, "p2_down": pygame.K_DOWN, "p2_left": pygame.K_LEFT, "p2_right": pygame.K_RIGHT}
+    """Menus, the HUD and tooltips."""
 
     def __init__(self, app):
         self.app = app
@@ -340,56 +439,12 @@ class InterfaceSettings:
         self.hud_options = ["Full", "Minimal"]
         # When a match's best moments replay on their own: after a great point, after the match, both
         self.instant_replay_options = ["Off", "Great Points", "After the Match", "Both"]
-        self.effects_options = ["Full", "Reduced", "Off"]
-        self.countdown_options = [3, 2, 1]
-        # On a phone (core/touch.py): how a finger steers, and how far Drag moves the paddle
-        self.touch_steer_options = ["Drag", "Follow"]
-        self.touch_sensitivity_options = ["Low", "Normal", "High", "Very High"]
 
         self.reset()
 
     def reset(self):
         self.tooltips = True
         self.ai_banter = True
-        self.screen_shake = True
-        self.ball_trail = True
-        self.auto_pause = True       # pause a match when the window loses focus
         self.hide_cursor = True      # hide the mouse during a match until it moves
-        self.touch_steer = 0         # (a phone) Drag
-        self.touch_sensitivity = 1   # (a phone) Normal
-        self.vibration = True        # (a phone) a buzz when your paddle hits the ball, and at each point
-
         self.hud = 0
         self.instant_replay = 2      # the highlights after the match
-        self.effects = 0
-        self.countdown = 0
-        self.reset_keys()
-
-    def reset_keys(self):
-        for field, key in self.DEFAULT_KEYS.items():
-            setattr(self, field, key)
-
-    def keys(self, player):
-        return {action: getattr(self, f"{player}_{action}") for action in self.ACTIONS}
-
-    def keys_label(self, player):
-        keys = self.keys(player)
-        if keys == {a: self.DEFAULT_KEYS[f"p2_{a}"] for a in self.ACTIONS}:
-            return "Arrow Keys"
-        return " ".join(key_name(keys[a]) for a in ("up", "left", "down", "right"))
-
-    def bind(self, field, key):
-        """Give `field` this key.  A binding that already had it swaps, so no key is used twice."""
-        for other in self.KEY_FIELDS:
-            if other != field and getattr(self, other) == key:
-                setattr(self, other, getattr(self, field))
-        setattr(self, field, key)
-
-    def keys_valid(self):
-        keys = [getattr(self, f) for f in self.KEY_FIELDS]
-        named = all(isinstance(k, int) and pygame.key.name(k) for k in keys)
-        return named and len(set(keys)) == len(keys) and pygame.K_ESCAPE not in keys
-
-    @property
-    def serve_seconds(self):
-        return self.countdown_options[self.countdown]

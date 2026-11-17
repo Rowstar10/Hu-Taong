@@ -20,7 +20,7 @@ from core.state_manager import StateManager                                     
 class Hosting(unittest.TestCase):
     def setUp(self):
         app.has_focus = True
-        app.settings.interface.auto_pause = True
+        app.settings.gameplay.auto_pause = True
         self.net = HostSession(app, port = 0, upnp = False)
         app.net = self.net
         self.friend = Link(0)                                   # the friend's end of the line
@@ -116,7 +116,7 @@ class Hosting(unittest.TestCase):
         self.assertEqual(self.frame().NAME, "pause")
 
     def test_auto_pause_off_lets_you_click_away(self):
-        app.settings.interface.auto_pause = False
+        app.settings.gameplay.auto_pause = False
         app.has_focus = False
         self.friend_says(focus = 1)
         self.assertEqual(self.frame().NAME, "game")
@@ -125,7 +125,7 @@ class Hosting(unittest.TestCase):
 class Joining(unittest.TestCase):
     def setUp(self):
         app.has_focus = True
-        app.settings.interface.auto_pause = True
+        app.settings.gameplay.auto_pause = True
         self.net = GuestSession(app, address = ("127.0.0.1", 9))
         app.net = self.net
         self.sent = []

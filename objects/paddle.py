@@ -56,7 +56,7 @@ class Paddle(GameObject):
             dvx = self.speed * ((self.right in keys) - (self.left in keys))
             dvy = self.speed * ((self.down in keys) - (self.up in keys))
             if net:                          # online, either set of keys moves your paddle
-                other = self.game.app.settings.interface.keys("p2" if self.up == self.game.app.settings.interface.p1_up else "p1")
+                other = self.game.app.settings.gameplay.keys("p2" if self.up == self.game.app.settings.gameplay.p1_up else "p1")
                 dvx = dvx or self.speed * ((other["right"] in keys) - (other["left"] in keys))
                 dvy = dvy or self.speed * ((other["down"] in keys) - (other["up"] in keys))
             touch = getattr(self.game.app, "touch", None)     # on a phone, a finger on this paddle (core/touch.py)

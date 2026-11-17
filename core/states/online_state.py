@@ -321,12 +321,12 @@ class OnlineState(State):
             elif key == "online_settings":
                 self.push_state("gameplay")
             elif key in ("cycle_court_left", "cycle_court_right"):
-                g = self.app.settings.gameplay
+                g = self.app.settings.match
                 g.court = (g.court + (1 if key.endswith("right") else -1)) % len(g.court_options)
             elif key == "host_red":
-                self.app.settings.gameplay.online_host_blue = False
+                self.app.settings.match.online_host_blue = False
             elif key == "host_blue":
-                self.app.settings.gameplay.online_host_blue = True
+                self.app.settings.match.online_host_blue = True
             elif key == "paste_code":
                 self.paste()
             elif key == "join_now":

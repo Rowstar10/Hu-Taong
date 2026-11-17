@@ -40,7 +40,7 @@ class PauseAndResume(unittest.TestCase):
         pygame.event.clear()
         app.net = None
         app.has_focus = True
-        app.settings.interface.auto_pause = True
+        app.settings.gameplay.auto_pause = True
         sm = app.state_manager
         sm.set_state("main_menu", mute = True)
         sm.push_state("game", mute = True)

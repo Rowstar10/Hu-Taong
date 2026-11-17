@@ -30,7 +30,7 @@ class GameState(State):
             net.game, net.over, net.rematch_asked = None, None, False      # in the lobby, still connected
         else:
             self.app.leave_online()
-        self.app.settings.gameplay.chaos_restore()
+        self.app.settings.match.chaos_restore()
         super().exit(**kwargs)
 
     def back_to_lobby(self):

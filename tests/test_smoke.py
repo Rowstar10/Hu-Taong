@@ -113,7 +113,7 @@ class LongMatch(unittest.TestCase):
     """Computer v computer for four minutes of game time, every power-up on, Chaotic."""
 
     def setUp(self):
-        self.g = g = app.settings.gameplay
+        self.g = g = app.settings.match
         g.reset_powerups()
         g.powerup_rate = 3
         g.winning_score_index = g.winning_scores.index("Endless Mode")

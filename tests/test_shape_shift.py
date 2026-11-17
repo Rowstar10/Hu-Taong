@@ -47,14 +47,14 @@ class Drifting(Match):
     def setUp(self):
         super().setUp()
         self.s = self.game.settings
-        self.was_mode = self.s.chaos_mode
-        self.s.chaos_mode = 0
+        self.was_mode = self.s.mode_chaos, self.s.chaos_timing
+        self.s.mode_chaos = False
         random.seed(16)                           # the same drift every run
         place(self.ball, 960, 540)
         self.ball.vx, self.ball.vy = 500.0, 300.0
 
     def tearDown(self):
-        self.s.chaos_mode = self.was_mode
+        self.s.mode_chaos, self.s.chaos_timing = self.was_mode
         super().tearDown()
 
     def drift(self, seconds):
@@ -107,14 +107,18 @@ class Drifting(Match):
         seen = self.drift(2.0)
         self.assertEqual({f[0] for f in seen}, {self.s.paddle_height}, "no more drifting")
 
-    def test_the_chaos_mode_plus_setting_still_drifts_speeds_too(self):
-        self.s.chaos_mode = 2
+    def test_chaos_constant_drift_is_the_same_drift(self):
+        """1.7: the Chaos mode's Constant drift is Shape Shift's drift, all match: sizes only, the
+        paddles together.  (1.6's Chaos Mode + drifted speeds too, each paddle on its own.)"""
+        self.s.mode_chaos, self.s.chaos_timing = True, 1
         self.game.reset_drift()
         seen = self.drift(8.0)
-        speeds = [f[3] for f in seen]
-        self.assertGreater(max(speeds) - min(speeds), 10)
-        self.assertTrue(any(f[0] != f[1] for f in seen), "each paddle on its own, as before")
-        self.assertFalse(self.pu.spawnable(BY_KEY["shape"]), "no Shape Shift on top of Chaos Mode +")
+        self.assertTrue(all(f[0] == f[1] for f in seen), "the paddles were different sizes")
+        self.assertGreater(max(f[0] for f in seen) - min(f[0] for f in seen), 10)
+        self.assertGreater(max(f[2] for f in seen) - min(f[2] for f in seen), 10)
+        self.assertEqual({f[3] for f in seen} | {f[4] for f in seen}, {self.s.paddle_speed})
+        self.assertEqual({f[5] for f in seen}, {self.s.ball_speed})
+        self.assertFalse(self.pu.spawnable(BY_KEY["shape"]), "no Shape Shift on top of Constant drift")
 
     def test_recorded_for_replays_and_online(self):
         """The friend's screen and replays draw the host's sizes from the rows."""
@@ -131,24 +135,24 @@ class Drifting(Match):
 
 class OldFiles(unittest.TestCase):
     def tearDown(self):
-        app.settings.gameplay.pu_shape = True
+        app.settings.match.pu_shape = True
 
     def load_gameplay(self, saved):
         data = save_data.collect(app)
         data["gameplay"] = saved
         save_data.save_path().parent.mkdir(parents = True, exist_ok = True)
         save_data.save_path().write_text(json.dumps(data))
-        app.settings.gameplay.pu_shape = True
+        app.settings.match.pu_shape = True
         save_data.load(app)
 
     def test_an_old_save_keeps_the_talisman_switched_off(self):
         self.load_gameplay({"pu_chaos": False})
-        self.assertFalse(app.settings.gameplay.pu_shape)
+        self.assertFalse(app.settings.match.pu_shape)
         self.load_gameplay({"pu_chaos": True})
-        self.assertTrue(app.settings.gameplay.pu_shape)
+        self.assertTrue(app.settings.match.pu_shape)
 
     def test_saved_under_its_new_name(self):
-        app.settings.gameplay.pu_shape = False
+        app.settings.match.pu_shape = False
         data = save_data.collect(app)
         self.assertIs(data["gameplay"]["pu_shape"], False)
         self.assertNotIn("pu_chaos", data["gameplay"])

@@ -39,10 +39,10 @@ class _Feed:
 
 def held_keys(app):
     """Either set of paddle keys, as the bits the host reads."""
-    keys, interface = app.keys_down, app.settings.interface
+    keys, controls = app.keys_down, app.settings.gameplay
     bits = 0
     for player in ("p1", "p2"):
-        k = interface.keys(player)
+        k = controls.keys(player)
         bits |= (netcode.UP if k["up"] in keys else 0) | (netcode.DOWN if k["down"] in keys else 0)
         bits |= (netcode.LEFT if k["left"] in keys else 0) | (netcode.RIGHT if k["right"] in keys else 0)
     return bits

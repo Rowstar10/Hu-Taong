@@ -162,7 +162,7 @@ class WinState(JukeboxControls, State):
         if self.handle_jukebox(event, key if event.type == pygame.MOUSEBUTTONDOWN else None):
             return
 
-        gameplay = self.app.settings.gameplay
+        gameplay = self.app.settings.match
         sound_manager = self.app.sound_manager
         
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:

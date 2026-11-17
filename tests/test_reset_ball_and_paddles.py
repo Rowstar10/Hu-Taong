@@ -11,7 +11,7 @@ app = harness.app()
 
 import pygame                                                   # noqa: E402
 
-g = app.settings.gameplay
+g = app.settings.match
 FIELDS = ("ball_speed", "ball_diameter", "paddle_speed", "paddle_height", "paddle_width")
 
 

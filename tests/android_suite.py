@@ -188,7 +188,7 @@ class Menus(unittest.TestCase):
 
 class Steering(unittest.TestCase):
     def start(self, vs_ai = True):
-        g = app.settings.gameplay
+        g = app.settings.match
         self.kept = (g.vs_ai, g.play_as_blue)
         g.vs_ai, g.play_as_blue = vs_ai, False
         app.state_manager.set_state("game", mute = True)
@@ -201,7 +201,7 @@ class Steering(unittest.TestCase):
     def tearDown(self):
         app.state_manager.set_state("main_menu", mute = True)
         frames(1)
-        g = app.settings.gameplay
+        g = app.settings.match
         g.vs_ai, g.play_as_blue = self.kept
 
     @staticmethod
@@ -210,8 +210,8 @@ class Steering(unittest.TestCase):
 
     def test_dragging_moves_your_paddle_as_far_as_the_finger(self):
         self.start()
-        app.settings.interface.touch_steer = 0
-        app.settings.interface.touch_sensitivity = 1                 # Normal: one to one
+        app.settings.gameplay.touch_steer = 0
+        app.settings.gameplay.touch_sensitivity = 1                 # Normal: one to one
         p1 = self.game.p1
         self.assertFalse(p1.ai_enabled)
         start = self.middle(p1)
@@ -226,7 +226,7 @@ class Steering(unittest.TestCase):
 
     def test_follow_heads_for_the_finger_no_faster_than_the_paddle(self):
         self.start()
-        app.settings.interface.touch_steer = 1
+        app.settings.gameplay.touch_steer = 1
         p1 = self.game.p1
         top = 0.0
         finger(pygame.FINGERDOWN, 200, 150)
@@ -235,13 +235,13 @@ class Steering(unittest.TestCase):
             top = max(top, abs(p1.vy))
         finger(pygame.FINGERUP, 200, 150)
         frames(1)
-        app.settings.interface.touch_steer = 0
+        app.settings.gameplay.touch_steer = 0
         self.assertAlmostEqual(self.middle(p1), max(p1.height / 2, 150), delta = 12)
         self.assertLessEqual(top, p1.speed * 1.01)
 
     def test_two_players_each_have_their_half(self):
         self.start(vs_ai = False)
-        app.settings.interface.touch_steer = 1
+        app.settings.gameplay.touch_steer = 1
         p1, p2 = self.game.p1, self.game.p2
         finger(pygame.FINGERDOWN, 300, 200, fid = 1)
         finger(pygame.FINGERDOWN, 1600, 900, fid = 2)
@@ -251,7 +251,7 @@ class Steering(unittest.TestCase):
         finger(pygame.FINGERUP, 300, 200, fid = 1)
         finger(pygame.FINGERUP, 1600, 900, fid = 2)
         frames(1)
-        app.settings.interface.touch_steer = 0
+        app.settings.gameplay.touch_steer = 0
 
     def test_the_pause_button_pauses(self):
         self.start()

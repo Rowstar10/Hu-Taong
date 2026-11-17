@@ -44,10 +44,10 @@ class Hu_Taong(GameBase):
         self.right_wall = Wall(self, BASE_W - 5, -10, BASE_W + 10, BASE_H + 10, color = theme.BLUE, is_goal = True)
         self.separator = Wall(self, BASE_W / 2, -10, BASE_W / 2, BASE_H + 10, is_separator = True)
 
-        settings = self.app.settings.gameplay
-        keys = self.app.settings.interface
+        settings = self.app.settings.match
+        keys = self.app.settings.gameplay
 
-        # Red (left) and Blue (right) use the keys set in Settings > Interface
+        # Red (left) and Blue (right) use the keys set in Settings > Gameplay
         p1_keys = keys.keys("p1")
         p2_keys = keys.keys("p2")
 
@@ -100,10 +100,8 @@ class Hu_Taong(GameBase):
 
         self.ball = Ball(self, diameter = settings.ball_diameter, x = (BASE_W - settings.ball_diameter) / 2, y = (BASE_H - settings.ball_diameter) / 2, speed = settings.ball_speed, color = "white")
 
-        # Chaos Mode +: each paddle and the ball drift through sizes and speeds on their own
-        # (Shape Shift: through sizes only, the two paddles together)
-        for obj in (self.p1, self.p2, self.ball):
-            obj.drift = {"size": self.drift_track(obj, "size"), "speed": self.drift_track(obj, "speed")}
+        # Chaos (Constant drift) and Shape Shift: the paddles' sizes drift together and the ball's on its own
+        self.reset_drift()
 
         # Chaos Switch
         self.switch_after_point = False
@@ -436,7 +434,7 @@ class Hu_Taong(GameBase):
         self.last_goal_clock = self.recorder.clock
         self.pause()
         nx, _ny = data["normal"]
-        settings = self.app.settings.gameplay
+        settings = self.app.settings.match
         sound_manager = self.app.sound_manager
         win_score = settings.winning_scores[settings.winning_score_index]
 
@@ -499,8 +497,8 @@ class Hu_Taong(GameBase):
         self.message_timer = 2
 
     def reset_round(self):
-        settings = self.app.settings.gameplay
-        if settings.chaos_mode == 1:
+        settings = self.app.settings.match
+        if settings.chaos_each_point:
             settings.chaos_roll()
             self.apply_gameplay_settings()
             for obj in self.objects:
@@ -520,7 +518,7 @@ class Hu_Taong(GameBase):
         self.message_text = ""
         self.message_timer = 0.0
 
-        self.start_countdown(self.app.settings.interface.serve_seconds)
+        self.start_countdown(self.app.settings.match.serve_seconds)
 
     def resume_countdown(self):
         """Back from a pause mid-point: 3-2-1 before play carries on, so nobody is caught out, at
@@ -698,30 +696,27 @@ class Hu_Taong(GameBase):
         if self.switch_warning <= 0:
             self.switch_warning = None
             self.next_switch = self.switch_gap()
-            if not self.app.settings.gameplay.switch_mid_rally:
+            if not self.app.settings.match.switch_mid_rally:
                 self.next_switch = random.uniform(4, 8)     # Soul Swap's: sooner, as it only lasts the point
             self.swap_positions()
 
-    # ---------------- Chaos Mode + and Shape Shift ----------------
+    # ---------------- Chaos (Constant drift) and Shape Shift ----------------
 
-    def drift_track(self, obj, key):
-        """[value, target, seconds until a new target], as a share of the setting's range."""
-        s = self.app.settings.gameplay
-        if obj.is_ball:
-            name = "ball_diameter" if key == "size" else "ball_speed"
-        else:
-            name = "paddle_height" if key == "size" else "paddle_speed"
+    def drift_track(self, obj):
+        """[size, target, seconds until a new target], as a share of the setting's range."""
+        s = self.app.settings.match
+        name = "ball_diameter" if obj.is_ball else "paddle_height"
         value = (getattr(s, name) - getattr(s, name + "_min")) / getattr(s, name + "_range")
         return [value, value, 0.0]
 
     def reset_drift(self):
-        """Back to the settings' own sizes and speeds (after a Shape Shift point)."""
+        """Back to the settings' own sizes (after a Shape Shift point)."""
         for obj in (self.p1, self.p2, self.ball):
-            obj.drift = {"size": self.drift_track(obj, "size"), "speed": self.drift_track(obj, "speed")}
+            obj.drift = {"size": self.drift_track(obj)}
 
     def update_drift(self, dt):
         powerups = getattr(self, "powerups", None)
-        if not (powerups.sizes_drifting() if powerups else self.app.settings.gameplay.chaos_mode == 2):
+        if not (powerups.sizes_drifting() if powerups else self.app.settings.match.chaos_drift):
             return
         ease = 1 - math.exp(-dt / 1.1)
         for obj in (self.p1, self.p2, self.ball):
@@ -743,25 +738,21 @@ class Hu_Taong(GameBase):
 
     def apply_gameplay_settings(self):
         super().apply_gameplay_settings()
-        s = self.app.settings.gameplay
+        s = self.app.settings.match
         powerups = getattr(self, "powerups", None)
-        # Chaos Mode + (Settings) drifts sizes and speeds; Shape Shift sizes only
-        sizes = powerups.sizes_drifting() if powerups else s.chaos_mode == 2
-        speeds = powerups.speeds_drifting() if powerups else s.chaos_mode == 2
-        linked = bool(powerups) and powerups.paddles_linked()     # Shape Shift: one size for both
+        # Chaos (Constant drift) and Shape Shift: both paddles drift to one size, the ball on its own.
+        # Speeds never drift (Chaos every point picks new ones between points, in reset_round).
+        sizes = powerups.sizes_drifting() if powerups else s.chaos_drift
 
         for obj in self.objects:
             if obj.is_paddle:
                 if sizes:
-                    t = (self.p1 if linked else obj).drift["size"][0]
+                    t = self.p1.drift["size"][0]
                     width = s.paddle_width_min + t * s.paddle_width_range
                     height = s.paddle_height_min + t * s.paddle_height_range
                 else:
                     width, height = s.paddle_width, s.paddle_height
-                if speeds:
-                    obj.speed = s.paddle_speed_min + obj.drift["speed"][0] * s.paddle_speed_range
-                else:
-                    obj.speed = s.paddle_speed
+                obj.speed = s.paddle_speed
 
                 # Giant Paddle, Shrink Curse and Swift Step act on top of the settings
                 powerups = getattr(self, "powerups", None)
@@ -791,15 +782,7 @@ class Hu_Taong(GameBase):
                     diameter = s.ball_diameter_min + obj.drift["size"][0] * s.ball_diameter_range
                 else:
                     diameter = s.ball_diameter
-                if speeds:
-                    speed = s.ball_speed_min + obj.drift["speed"][0] * s.ball_speed_range
-                    if obj.speed > 0:     # speed the ball up or down as the drift moves, keeping its direction
-                        k = speed / obj.speed
-                        obj.vx *= k
-                        obj.vy *= k
-                    obj.speed = speed
-                else:
-                    obj.speed = s.ball_speed
+                obj.speed = s.ball_speed
 
                 # A Snowball grows as it rolls (to 200 px at most)
                 powerups = getattr(self, "powerups", None)

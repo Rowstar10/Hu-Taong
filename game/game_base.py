@@ -14,7 +14,7 @@ class GameBase:
 
     def __init__(self, app, width=BASE_W, height=BASE_H):
         self.app = app
-        self.settings = self.app.settings.gameplay
+        self.settings = self.app.settings.match
         self.width = width
         self.height = height
 
@@ -35,7 +35,7 @@ class GameBase:
         self.running = True
         self.paused = False
 
-        self.start_countdown(self.app.settings.interface.serve_seconds)
+        self.start_countdown(self.app.settings.match.serve_seconds)
 
     def stop(self):
         self.running = False

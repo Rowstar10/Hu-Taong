@@ -19,7 +19,7 @@ class MatchSetupState(State):
     def handle_event(self, event):
         super().handle_event(event)
 
-        gameplay = self.app.settings.gameplay
+        gameplay = self.app.settings.match
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.pop_state()

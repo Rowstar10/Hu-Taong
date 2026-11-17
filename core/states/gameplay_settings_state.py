@@ -27,7 +27,7 @@ class GameplaySettingsState(State):
     def handle_event(self, event):
         super().handle_event(event)
         
-        audio = self.app.settings.gameplay
+        audio = self.app.settings.match
         
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.pop_state()
@@ -48,26 +48,21 @@ class GameplaySettingsState(State):
                 audio.ai_style = (audio.ai_style + 1) % len(audio.ai_styles)
 
             if key == "toggle_curveball":
-                audio.curveball = not audio.curveball
+                audio.mode_curveball = not audio.mode_curveball
             if key == "toggle_lantern_night":
-                audio.lantern_night = not audio.lantern_night
+                audio.mode_lantern_night = not audio.mode_lantern_night
             if key == "toggle_adaptive_ai":
                 audio.adaptive_ai = not audio.adaptive_ai
-            # The Middle Wall and Chaos Switch + can't both be on: turning one on turns the other off
             if key == "toggle_middle_wall":
                 audio.middle_wall = not audio.middle_wall
-                if audio.middle_wall and audio.switch_mid_rally:
-                    audio.chaos_switch -= 2          # keeps plain Chaos Switch if both were on
-                    self.app.renderer.show_toast("Chaos Switch + is off: it needs the Middle Wall down")
-            if key == "cycle_chaos_mode":
-                audio.chaos_mode = (audio.chaos_mode + 1) % 3
-                if audio.chaos_mode != 1:
+            if key == "cycle_chaos_mode":          # Off, every point, constant drift
+                step = ((audio.chaos_timing + 1) if audio.mode_chaos else 0) + 1
+                audio.mode_chaos, audio.chaos_timing = step % 3 > 0, max(0, step % 3 - 1)
+                if not audio.chaos_each_point:
                     audio.chaos_restore()
-            if key == "cycle_chaos_switch":
-                audio.chaos_switch = (audio.chaos_switch + 1) % 4
-                if audio.switch_mid_rally and audio.middle_wall:
-                    audio.middle_wall = False
-                    self.app.renderer.show_toast("Middle Wall is off: Chaos Switch + needs it down")
+            if key == "cycle_chaos_switch":        # Off, every point, mid-rally, both
+                step = ((audio.switch_timing + 1) if audio.mode_switch else 0) + 1
+                audio.mode_switch, audio.switch_timing = step % 4 > 0, max(0, step % 4 - 1)
 
             if key == "cycle_win_score_left":
                 audio.winning_score_index = (audio.winning_score_index - 1) % len(audio.winning_scores)
