@@ -546,6 +546,8 @@ class Renderer:
                 jobs.append(lambda tint=tint, level=level: art.glow(64, scaled(tint, .1 * level)))
         jobs.append(lambda: art.gilded("BANG!", self.brush(0.04), top=mix((255, 200, 80), white, .6),
                                        bottom=(255, 200, 80), glow=None))
+        for n in range(1, 6):                                 # the Firecracker's 5-to-1 over the ball
+            jobs.append(lambda n=n: self.cracker_digit(n))
         for mark in "三二一":
             jobs.append(lambda mark=mark: art.get(("countdown_mark", mark), self._faint_mark, mark))
         for text in ("3", "2", "1", "GO!"):
@@ -2109,6 +2111,28 @@ class Renderer:
         if random.random() < (0.9 if last else 0.45):
             self.app.fx.spark(tip[0], tip[1], 2 if last else 1, (255, 210, 120), speed = 160, life = .25)
 
+    CRACKER_DIGIT_GAP = 34      # px from the ball's edge to the middle of the Firecracker's number
+
+    def draw_cracker_count(self, screen, game, powerups, ox, oy):
+        """Firecracker: its seconds left, counting 5 to 1 over the ball (under it by the top wall),
+        red for the last two.  Drawn after night falls so it reads in the dark too; hidden, like the
+        fuse, while a Ghost Ball fades."""
+        ball = game.ball
+        fuse = powerups.cracker_fuse(ball) if hasattr(powerups, "cracker_fuse") else 0
+        if fuse <= 0 or powerups.ball_alpha(ball) < 1.0:
+            return
+        gap = self.CRACKER_DIGIT_GAP
+        top, bottom = ball.y0 + oy, ball.y1 + oy
+        y = top - gap if top > 2 * gap else bottom + gap
+        mark = self.cracker_digit(max(1, math.ceil(fuse - 1e-6)))
+        screen.blit(mark, mark.get_rect(center=(int((ball.x0 + ball.x1) / 2 + ox) - 6, int(y))))
+
+    def cracker_digit(self, n):
+        """The Firecracker's countdown number: cream with a dark edge, then bigger and red for 2 and 1."""
+        if n > 2:
+            return self.art.gilded(str(n), self.art.ui(46), top=(255, 250, 228), bottom=(242, 200, 126), glow=None)
+        return self.art.gilded(str(n), self.art.ui(56), top=(255, 170, 150), bottom=(226, 34, 30), glow=None)
+
     def draw_portals(self, screen, powerups, ox, oy):
         """Portal Pair: two swirling rings, linked, each with arrows showing the way a ball leaves it."""
         portals = getattr(powerups, "portals", [])
@@ -2362,6 +2386,7 @@ class Renderer:
                 self.draw_night(screen, game, night, ox, oy)
                 self.draw_portals(screen, powerups, ox, oy)     # portals and talismans glow in the dark
                 self.draw_pickups(screen, powerups, ox, oy)
+            self.draw_cracker_count(screen, game, powerups, ox, oy)
             self.draw_blasts(screen, powerups, ox, oy)
             self.draw_popups(screen, powerups)
 

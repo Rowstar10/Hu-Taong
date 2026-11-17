@@ -3,6 +3,9 @@
 It used to bang after 3 hits.  Now its fuse is lit when it's taken and burns for 5 seconds of play,
 shown burning down on the ball; then it bangs, away from whoever hit the ball last.  It still goes
 out without a bang if the point ends first.
+
+Playtesting 1.6 (2026-11-17): a number over the ball now counts the fuse down, 5 to 1, red for
+the last two, so it can be read mid-rally; online and in replays too.
 """
 import math
 import unittest
@@ -135,6 +138,94 @@ class Shown(Match):
         self.assertNotIn("hits", kind.about)
         self.assertIn("point ends first", kind.about)
 
+
+class CountedDown(Match):
+    """The number over the ball: the fuse's seconds, rounded up, red for the last two."""
+
+    def setUp(self):
+        super().setUp()
+        place(self.ball, 960, 540)
+        self.shown = []
+        renderer = app.renderer
+        self.real = renderer.cracker_digit
+        renderer.cracker_digit = lambda n: self.shown.append(n) or self.real(n)
+
+    def tearDown(self):
+        app.renderer.cracker_digit = self.real
+        super().tearDown()
+
+    def number_at(self, fuse, game = None):
+        game = game or self.game
+        self.shown.clear()
+        if fuse is not None:
+            self.pu.cracker = {"fuse": fuse, "taker": self.p1}
+        app.renderer.draw_world(app.virtual, game)
+        return self.shown[-1] if self.shown else None
+
+    def test_five_to_one(self):
+        self.assertEqual([self.number_at(f) for f in (5.0, 4.01, 4.0, 2.5, 2.0, 1.0, 0.3)],
+                         [5, 5, 4, 3, 2, 1, 1])
+
+    def test_no_number_without_a_firecracker(self):
+        self.pu.cracker = None
+        self.assertIsNone(self.number_at(None))
+
+    def test_red_and_bigger_for_the_last_two(self):
+        cream, red = self.real(3), self.real(2)
+        self.assertGreater(red.get_height(), cream.get_height())
+        def reddest(surf):
+            w, h = surf.get_size()
+            return max(surf.get_at((x, y))[0] - surf.get_at((x, y))[1]
+                       for x in range(0, w, 2) for y in range(0, h, 2) if surf.get_at((x, y))[3] > 200)
+        self.assertGreater(reddest(red), 120)
+        self.assertLess(reddest(cream), 120)
+
+    def test_hidden_while_a_ghost_ball_fades(self):
+        self.pu.ball_alpha = lambda ball = None: 0.4
+        self.assertIsNone(self.number_at(3.0))
+
+    def test_under_the_ball_by_the_top_wall(self):
+        """Over the ball, unless that would put it off the top of the screen."""
+        class Screen:
+            def blit(self, surf, rect, *a, **k):
+                self.at = rect
+        spots = {}
+        self.pu.cracker = {"fuse": 3.5, "taker": self.p1}
+        for y in (500, 30):
+            place(self.ball, 960, y)
+            screen = Screen()
+            app.renderer.draw_cracker_count(screen, self.game, self.pu, 0, 0)
+            spots[y] = screen.at.centery
+        self.assertLess(spots[500], 500 - self.ball.height / 2)
+        self.assertGreater(spots[30], 30 + self.ball.height / 2)
+
+    def test_shown_in_replays_and_online(self):
+        """The joining player and replays draw from the recorded rows, which carry the fuse."""
+        self.pu.collect({"kind": "cracker", "x": 900, "y": 500}, self.p1)
+        self.pu.update_cracker(1.5)
+        for _ in range(3):
+            self.game.recorder.capture(1 / 60)
+        clip = self.game.recorder.clip()
+        view = ReplayView(clip, app)
+        view.show(len(clip.frames) - 1)
+        self.assertEqual(self.number_at(None, view), 4)
+
+    def test_built_while_loading(self):
+        """Its digits are made ahead, so the first one shown mid-rally costs nothing."""
+        art = app.art
+        for key in [k for k in art.cache if k[0] == "gilded" and k[2] in "12345"]:
+            del art.cache[key]
+        for job in app.renderer.prewarm_jobs():
+            job()
+        built = []
+        real = art._gilded
+        art._gilded = lambda text, *a: built.append(text) or real(text, *a)
+        try:
+            for fuse in (5.0, 4.0, 3.0, 2.0, 1.0):
+                self.number_at(fuse)
+        finally:
+            art._gilded = real
+        self.assertEqual([t for t in built if t in "12345"], [])
 
 if __name__ == "__main__":
     unittest.main()
