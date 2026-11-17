@@ -23,7 +23,6 @@ BANTER_CONCEDED = ["Hmph. Lucky shot.", "Ooh, not bad~", "Again! Again!", "You'l
 
 class Hu_Taong(GameBase):
     SWITCH_WARNING = 2.0        # seconds of warning before a Chaos Switch + swap
-    QUICK_RESUME_STEP = 0.3     # offline, back from a pause: 3-2-1 at this many seconds a number
 
     def __init__(self, app, width=BASE_W, height=BASE_H):
         super().__init__(app, width, height)
@@ -523,13 +522,13 @@ class Hu_Taong(GameBase):
         self.start_countdown(self.app.settings.interface.serve_seconds)
 
     def resume_countdown(self):
-        """Back from a pause mid-point: 3-2-1 before play carries on, so nobody is caught out.
-        Quick offline; online at the usual pace, so both players see it coming.  Only in live
+        """Back from a pause mid-point: 3-2-1 before play carries on, so nobody is caught out, at
+        the serve countdown's pace, online and off (both players see it coming).  Only in live
         play: a serve countdown already under way just carries on, a goal message plays out, and
         online a goal held for word of the friend's save keeps waiting for it."""
         if not self.running or self.paused or self.countdown is not None or self.message_text:
             return
-        self.start_countdown(3, step = 1.0 if self.net else self.QUICK_RESUME_STEP)
+        self.start_countdown(3)
 
     def keep_ball_in(self):
         """Safety net: whatever shoves it, the ball never leaves the court.  Out past an end it is

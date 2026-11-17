@@ -77,8 +77,8 @@ class Hosting(unittest.TestCase):
         screen = self.frame()
         self.assertEqual(screen.NAME, "game", "carries on once they're back")
         self.assertIsNotNone(self.game.countdown)
-        self.assertEqual((self.game.countdown.shown_value, self.game.countdown.step), (3, 1.0),
-                         "3-2-1 at the usual pace, for both")
+        self.assertEqual(self.game.countdown.shown_value, 3)
+        self.assertGreater(self.game.countdown.remaining, 2.9, "3-2-1 at the usual pace, for both")
 
     def test_you_clicking_away_pauses_for_both_too(self):
         self.friend_says(focus = 1)
@@ -106,7 +106,7 @@ class Hosting(unittest.TestCase):
         self.assertEqual(self.frame().NAME, "pause", "back, but nobody pressed Resume")
         pause.resume()
         self.assertEqual(self.frame().NAME, "game")
-        self.assertEqual(self.game.countdown.step, 1.0)
+        self.assertEqual(self.game.countdown.remaining, 3.0)
 
     def test_the_friends_resume_waits_while_you_are_away(self):
         self.friend_says(focus = 1, ask = "pause")

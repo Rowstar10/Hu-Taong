@@ -8,7 +8,6 @@ from game.physics import Physics
 class Countdown:
     remaining: float
     shown_value: int
-    step: float = 1.0       # seconds each number stays up (a quick resume runs faster than a serve)
 
 class GameBase:
     MAX_STEP = 1 / 30   # a hitch slows the game for a moment instead of letting the ball jump
@@ -61,8 +60,8 @@ class GameBase:
 
     # ---------------- Countdown ----------------
 
-    def start_countdown(self, seconds, on_finish = None, step = 1.0):
-        self.countdown = Countdown(remaining = float(seconds), shown_value = int(seconds), step = step)
+    def start_countdown(self, seconds, on_finish = None):
+        self.countdown = Countdown(remaining = float(seconds), shown_value = int(seconds))
         self.countdown_on_finish = on_finish
         self.paused = True
         self.app.sound_manager.play("countdown_tick.wav") 
@@ -71,7 +70,7 @@ class GameBase:
         cd = self.countdown
         if cd is None:
             return
-        cd.remaining -= min(dt, self.MAX_STEP) / cd.step     # a slow frame mustn't swallow the countdown
+        cd.remaining -= min(dt, self.MAX_STEP)     # a slow frame mustn't swallow the countdown
 
         new_shown = int(cd.remaining + 0.999)
         if new_shown != cd.shown_value:
