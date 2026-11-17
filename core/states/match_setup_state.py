@@ -46,7 +46,7 @@ class MatchSetupState(MatchControls, State):
 
             self.handle_match_key(key)          # the modes, their timings and the court
             if key == "open_match_settings":
-                self.push_state("gameplay")
+                self.push_state("match")
 
             if key == "start_match":
                 self.start_match()

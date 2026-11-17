@@ -199,8 +199,11 @@ class App:
         my = pos[1] * self.sy
         return mx, my
 
-    def reset_gameplay_settings(self):
+    def reset_match_settings(self):
         self.settings.match.reset()
+
+    def reset_gameplay_settings(self):
+        self.settings.gameplay.reset()
 
     def reset_display_settings(self):
         self.settings.display.reset()
@@ -230,6 +233,7 @@ class App:
         self.settings.interface.reset()
 
     def reset_all_settings(self):
+        self.reset_match_settings()
         self.reset_gameplay_settings()
         self.reset_display_settings()
         self.reset_audio_settings()

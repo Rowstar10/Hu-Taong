@@ -74,14 +74,15 @@ class Screen(unittest.TestCase):
         self.assertIn("cycle_max_fps_left", keys)
         self.assertEqual(app.settings.display.max_fps_options[app.settings.display.max_fps], 60)
 
-    def test_interface_settings_have_touch_controls_not_keys(self):
-        go_to("settings", "interface")
+    def test_gameplay_settings_have_touch_controls_not_keys(self):
+        go_to("settings", "gameplay")            # (since 1.7 your controls are in Gameplay)
         keys = harness.buttons(app.state_manager.current(), app)
         self.assertIn("cycle_touch_steer_left", keys)
         self.assertIn("cycle_touch_sensitivity_right", keys)
         self.assertIn("toggle_vibration", keys)
         self.assertFalse([k for k in keys if k.startswith("key_")])
-        self.assertNotIn("toggle_hide_cursor", keys)
+        go_to("settings", "interface")
+        self.assertNotIn("toggle_hide_cursor", harness.buttons(app.state_manager.current(), app))
 
     def test_saves_go_to_the_apps_own_storage(self):
         with mock.patch.dict(os.environ, {"ANDROID_PRIVATE": "/data/user/0/hu.taong/files"}):

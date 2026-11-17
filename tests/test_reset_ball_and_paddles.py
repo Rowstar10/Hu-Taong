@@ -1,7 +1,7 @@
 """A Reset Ball & Paddles button, 1.6 (Rowan's playtest list, 2026-11-16).
 
 Under "Randomise Ball & Paddles": puts the ball's and paddles' sizes and speeds back to their
-defaults, and nothing else.
+defaults, and nothing else.  (Since 1.7 both are on Settings > Match > Ball & Paddles.)
 """
 import unittest
 
@@ -21,7 +21,7 @@ class ResetBallAndPaddles(unittest.TestCase):
         self.defaults = {name: getattr(g, name) for name in FIELDS}
         sm = app.state_manager
         sm.set_state("main_menu", mute = True)
-        sm.push_state("gameplay", mute = True)
+        sm.push_state("ball_paddles", mute = True)
         harness.settle(app)
         self.screen = sm.current()
 

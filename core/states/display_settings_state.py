@@ -86,6 +86,13 @@ class DisplaySettingsState(State):
 
             if key == "toggle_rotate_bg":
                 settings.rotate_backgrounds = not settings.rotate_backgrounds
+            if key == "toggle_screen_shake":
+                settings.screen_shake = not settings.screen_shake
+            if key == "toggle_ball_trail":
+                settings.ball_trail = not settings.ball_trail
+            for suffix, step in (("_left", -1), ("_right", 1)):
+                if key == f"cycle_effects{suffix}":
+                    settings.effects = (settings.effects + step) % len(settings.effects_options)
 
             for name, options in (("rotate_every", settings.rotate_options), ("parallax", settings.parallax_options)):
                 for suffix, step in (("_left", -1), ("_right", 1)):

@@ -67,7 +67,7 @@ class Picker(unittest.TestCase):
     def test_match_settings_opens_the_rules(self):
         self.click("open_match_settings")
         harness.settle(app)
-        self.assertEqual(app.state_manager.current().NAME, "gameplay")
+        self.assertEqual(app.state_manager.current().NAME, "match")
 
     def test_everything_fits_and_nothing_overlaps(self):
         boxes = self.screen.ui_hitboxes

@@ -25,12 +25,14 @@ class SettingsState(State):
             mouse_pos = self.app.window_to_base(event.pos)
             key = self.hit_test(mouse_pos)
             
-            if key == "gameplay":
+            if key == "match":
                 net = self.app.net
                 if net and net.role == "guest":   # online, the host's game sets the rules
-                    self.app.renderer.show_toast("Your friend is hosting, so their Gameplay settings are used", important = True)
+                    self.app.renderer.show_toast("Your friend is hosting, so their Match settings are used", important = True)
                 else:
-                    self.push_state("gameplay")
+                    self.push_state("match")
+            if key == "gameplay":
+                self.push_state("gameplay")
             if key == "display":
                 self.push_state("display")
             if key == "audio":

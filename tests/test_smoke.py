@@ -44,7 +44,8 @@ def click(key):
 
 
 class Screens(unittest.TestCase):
-    MENUS = ("main_menu", "settings", "display", "audio", "interface", "gameplay", "powerups", "stats",
+    MENUS = ("main_menu", "settings", "display", "audio", "interface", "gameplay", "match", "ball_paddles",
+             "powerups", "stats",
              "replays", "background_selection", "match_setup", "online")
 
     def setUp(self):

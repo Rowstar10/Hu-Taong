@@ -319,7 +319,7 @@ class OnlineState(State):
             elif key == "toggle_public":
                 self.toggle_public()
             elif key == "online_settings":
-                self.push_state("gameplay")
+                self.push_state("match")
             elif key in ("cycle_court_left", "cycle_court_right"):
                 g = self.app.settings.match
                 g.court = (g.court + (1 if key.endswith("right") else -1)) % len(g.court_options)

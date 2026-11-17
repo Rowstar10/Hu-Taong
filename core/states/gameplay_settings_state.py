@@ -1,157 +1,61 @@
-import pygame, random
+import pygame
 
 from core.states.base_state import State
-from core.states.game_state import GameState
 
 class GameplaySettingsState(State):
+    """Settings > Gameplay: your own controls.  The keys, Auto-Pause, and on a phone the touch
+    steering and vibration."""
     NAME = "gameplay"
     is_menu = True
 
+    TOGGLES = ("auto_pause", "vibration")
+    CYCLES = {"touch_steer": "touch_steer_options", "touch_sensitivity": "touch_sensitivity_options"}  # (a phone's)
+
     def __init__(self, app):
         super().__init__(app)
-        self.dragging_ball_speed = False
-        self.dragging_ball_diameter = False
-        self.dragging_paddle_speed = False
-        self.dragging_paddle_size = False
-        self.dragging_pace = False
-
-    @staticmethod
-    def pace_from(percent, settings):
-        """Game pace for a slider position, in steps of 0.05 so it reads cleanly."""
-        return round((settings.pace_min + percent * settings.pace_range) * 20) / 20
+        self.listening = None        # the key binding waiting for a new key, e.g. "p1_up"
 
     def draw(self, screen):
         super().draw(screen)
         self.app.renderer.draw_gameplay_settings_menu(self, screen)
-        
+
     def handle_event(self, event):
+        controls = self.app.settings.gameplay
+
+        # While a binding is waiting, the next key press is the new key (Esc cancels)
+        if self.listening and event.type == pygame.KEYDOWN:
+            if event.key != pygame.K_ESCAPE:
+                controls.bind(self.listening, event.key)
+                self.app.sound_manager.play("click.wav")
+            self.listening = None
+            return
+
         super().handle_event(event)
-        
-        audio = self.app.settings.match
-        
+
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.pop_state()
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            mouse_pos = self.app.window_to_base(event.pos)
-            mx, my = mouse_pos
-            key = self.hit_test(mouse_pos)
-            
-            if key == "cycle_ai_left":
-                audio.ai_difficulty = (audio.ai_difficulty - 1) % len(audio.ai_difficulties)
-            if key == "cycle_ai_right":
-                audio.ai_difficulty = (audio.ai_difficulty + 1) % len(audio.ai_difficulties)
-                
-            if key == "cycle_ai_style_left":
-                audio.ai_style = (audio.ai_style - 1) % len(audio.ai_styles)
-            if key == "cycle_ai_style_right":
-                audio.ai_style = (audio.ai_style + 1) % len(audio.ai_styles)
+            key = self.hit_test(self.app.window_to_base(event.pos))
+            listening, self.listening = self.listening, None
 
-            if key == "toggle_curveball":
-                audio.mode_curveball = not audio.mode_curveball
-            if key == "toggle_lantern_night":
-                audio.mode_lantern_night = not audio.mode_lantern_night
-            if key == "toggle_adaptive_ai":
-                audio.adaptive_ai = not audio.adaptive_ai
-            if key == "toggle_middle_wall":
-                audio.middle_wall = not audio.middle_wall
-            if key == "cycle_chaos_mode":          # Off, every point, constant drift
-                step = ((audio.chaos_timing + 1) if audio.mode_chaos else 0) + 1
-                audio.mode_chaos, audio.chaos_timing = step % 3 > 0, max(0, step % 3 - 1)
-                if not audio.chaos_each_point:
-                    audio.chaos_restore()
-            if key == "cycle_chaos_switch":        # Off, every point, mid-rally, both
-                step = ((audio.switch_timing + 1) if audio.mode_switch else 0) + 1
-                audio.mode_switch, audio.switch_timing = step % 4 > 0, max(0, step % 4 - 1)
+            if key and key.startswith("toggle_") and key[7:] in self.TOGGLES:
+                name = key[7:]
+                setattr(controls, name, not getattr(controls, name))
 
-            if key == "cycle_win_score_left":
-                audio.winning_score_index = (audio.winning_score_index - 1) % len(audio.winning_scores)
-            if key == "cycle_win_score_right":
-                audio.winning_score_index = (audio.winning_score_index + 1) % len(audio.winning_scores)
-            if key == "toggle_win_by_two":
-                audio.win_by_two = not audio.win_by_two
-            
-            if key == "ball_speed_slider":
-                self.dragging_ball_speed = True
-                percent = self.update_slider_from_mouse("ball_speed_slider", event)
-                audio.ball_speed = audio.ball_speed_min + percent * audio.ball_speed_range
-            if key == "paddle_speed_slider":
-                self.dragging_paddle_speed = True
-                percent = self.update_slider_from_mouse("paddle_speed_slider", event)
-                audio.paddle_speed = audio.paddle_speed_min + percent * audio.paddle_speed_range
-            if key == "ball_diameter_slider":
-                self.dragging_ball_diameter = True
-                percent = self.update_slider_from_mouse("ball_diameter_slider", event)
-                audio.ball_diameter = audio.ball_diameter_min + percent * audio.ball_diameter_range
-            if key == "pace_slider":
-                self.dragging_pace = True
-                percent = self.update_slider_from_mouse("pace_slider", event)
-                audio.pace = self.pace_from(percent, audio)
-            if key == "paddle_size_slider":
-                self.dragging_paddle_size = True
-                percent = self.update_slider_from_mouse("paddle_size_slider", event)
-                audio.paddle_height = audio.paddle_height_min + percent * audio.paddle_height_range
-                audio.paddle_width = audio.paddle_width_min + percent * audio.paddle_width_range
+            for name, options in self.CYCLES.items():
+                count = len(getattr(controls, options))
+                if key == f"cycle_{name}_left":
+                    setattr(controls, name, (getattr(controls, name) - 1) % count)
+                if key == f"cycle_{name}_right":
+                    setattr(controls, name, (getattr(controls, name) + 1) % count)
 
-            if key == "open_powerups":
-                self.push_state("powerups")
-
-            if key == "randomise_all":
-                audio.ball_speed = audio.ball_speed_min + random.random() * audio.ball_speed_range
-                audio.paddle_speed = audio.paddle_speed_min + random.random() * audio.paddle_speed_range
-                audio.ball_diameter = audio.ball_diameter_min + random.random() * audio.ball_diameter_range
-                audio.paddle_height = audio.paddle_height_min + random.random() * audio.paddle_height_range
-                audio.paddle_width = audio.paddle_width_min + random.random() * audio.paddle_width_range
-
-            if key == "reset_ball_and_paddles":
-                audio.reset_ball_and_paddles()
+            if key and key.startswith("key_"):
+                field = key[4:]
+                self.listening = None if listening == field else field
 
             if key == "reset_defaults":
                 self.confirm_reset("Reset gameplay settings?", self.app.reset_gameplay_settings)
 
-            if key == "reset_ball_speed":
-                audio.ball_speed = audio.ball_speed_min + 0.5 * audio.ball_speed_range
-            if key == "reset_paddle_speed":
-                audio.paddle_speed = audio.paddle_speed_min + 0.5 * audio.paddle_speed_range
-            if key == "reset_ball_diameter":
-                audio.ball_diameter = audio.ball_diameter_min + 0.5 * audio.ball_diameter_range
-            if key == "reset_pace":
-                audio.pace = 1.0
-            if key == "reset_paddle_size":
-                audio.paddle_height = audio.paddle_height_min + 0.5 * audio.paddle_height_range
-                audio.paddle_width = audio.paddle_width_min + 0.5 * audio.paddle_width_range
-            
             if key == "back":
                 self.pop_state()
-
-        if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.dragging_ball_speed:
-            self.dragging_ball_speed = False
-        if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.dragging_ball_diameter:
-            self.dragging_ball_diameter = False
-        if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.dragging_paddle_speed:
-            self.dragging_paddle_speed = False
-        if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.dragging_paddle_size:
-            self.dragging_paddle_size = False
-        if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.dragging_pace:
-            self.dragging_pace = False
-
-        if event.type == pygame.MOUSEMOTION and self.dragging_ball_speed:
-            percent = self.update_slider_from_mouse("ball_speed_slider", event)
-            audio.ball_speed = audio.ball_speed_min + percent * audio.ball_speed_range
-        if event.type == pygame.MOUSEMOTION and self.dragging_paddle_speed:
-            percent = self.update_slider_from_mouse("paddle_speed_slider", event)
-            audio.paddle_speed = audio.paddle_speed_min + percent * audio.paddle_speed_range
-        if event.type == pygame.MOUSEMOTION and self.dragging_ball_diameter:
-            percent = self.update_slider_from_mouse("ball_diameter_slider", event)
-            audio.ball_diameter = audio.ball_diameter_min + percent * audio.ball_diameter_range            
-        if event.type == pygame.MOUSEMOTION and self.dragging_pace:
-            percent = self.update_slider_from_mouse("pace_slider", event)
-            audio.pace = self.pace_from(percent, audio)
-        if event.type == pygame.MOUSEMOTION and self.dragging_paddle_size:
-            percent = self.update_slider_from_mouse("paddle_size_slider", event)
-            audio.paddle_height = audio.paddle_height_min + percent * audio.paddle_height_range
-            audio.paddle_width = audio.paddle_width_min + percent * audio.paddle_width_range
-            
-        game_state = self.app.state_manager.get_state(GameState)
-        if game_state:
-            game_state.game.apply_gameplay_settings()
