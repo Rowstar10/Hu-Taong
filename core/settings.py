@@ -1,3 +1,4 @@
+import copy
 import random
 from pathlib import Path
 
@@ -129,12 +130,11 @@ class MatchSettings:
         self.countdown = 0           # the serve countdown: 3 s
 
         # Game modes (Match Setup), any of them together.  Each mode remembers its timing while off.
-        # Chaos, every point: new random sizes and speeds for the ball and paddles each point (the
-        # player's own values are kept in _chaos_backup and put back when the match ends).
+        # Chaos, every point: new random sizes and speeds for the ball and paddles each point (rolled
+        # into the match's own copy of the rules: see copy).
         # Chaos, constant drift: Shape Shift's drift for the whole match, sizes only.
         self.mode_chaos = False
         self.chaos_timing = 0        # 0 every point, 1 constant drift
-        self._chaos_backup = None
         # Switch: each player takes over the other's paddle and goal, keeping their own keys and score
         self.mode_switch = False
         self.switch_timing = 0       # 0 after every point, 1 mid-rally at random moments (after a warning), 2 both
@@ -201,29 +201,54 @@ class MatchSettings:
         for kind in POWERUP_KINDS:
             setattr(self, "pu_" + kind.key, True)
 
-    CHAOS_KEYS = ("ball_speed", "ball_diameter", "paddle_height", "paddle_width", "paddle_speed")
+    # What a host sends its friend, to see (read only) the rules its next serve will be played by
+    RULES = ("paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "ball_speed", "pace",
+             "winning_score_index", "win_by_two", "middle_wall", "ai_difficulty", "ai_style", "adaptive_ai",
+             "court", "countdown", "powerups", "powerup_rate", "mode_chaos", "chaos_timing", "mode_switch",
+             "switch_timing", "mode_curveball", "mode_lantern_night", "mode_twin_ball", "mode_talisman_rush")
 
-    def stored(self, name):
-        """The player's own value for a setting, even while chaos mode has it borrowed."""
-        if self._chaos_backup is not None and name in self._chaos_backup:
-            return self._chaos_backup[name]
-        return getattr(self, name)
+    def copy(self):
+        """The rules a match plays by: a copy, so what you change mid-match (from Pause) only comes
+        in when the next serve takes a fresh one, and Chaos's every-point sizes and speeds are
+        rolled into it, never into your own settings."""
+        return copy.copy(self)
+
+    def rules(self):
+        """These rules as plain values (a host sends them to its friend)."""
+        out = {name: getattr(self, name) for name in self.RULES}
+        out["off"] = [kind.key for kind in POWERUP_KINDS if not getattr(self, "pu_" + kind.key)]
+        return out
+
+    def take_rules(self, rules):
+        """Set these rules from a host's, ignoring anything unknown or mistyped."""
+        if not isinstance(rules, dict):
+            return
+        choices = {"winning_score_index": self.winning_scores, "ai_difficulty": self.ai_difficulties,
+                   "ai_style": self.ai_styles, "court": self.court_options, "countdown": self.countdown_options,
+                   "powerup_rate": self.powerup_rate_options, "chaos_timing": self.CHAOS_TIMINGS,
+                   "switch_timing": self.SWITCH_TIMINGS}
+        for name in self.RULES:
+            value, current = rules.get(name), getattr(self, name)
+            if isinstance(current, bool):
+                if isinstance(value, bool):
+                    setattr(self, name, value)
+            elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                if name in choices:                    # a choice: a whole number, one of the options
+                    value = max(0, min(len(choices[name]) - 1, int(value)))
+                setattr(self, name, value)
+        off = rules.get("off")
+        if isinstance(off, list):
+            for kind in POWERUP_KINDS:
+                setattr(self, "pu_" + kind.key, kind.key not in off)
 
     def chaos_roll(self):
-        if self._chaos_backup is None:
-            self._chaos_backup = {key: getattr(self, key) for key in self.CHAOS_KEYS}
+        """Chaos, every point: new random sizes and speeds (on the match's copy: see copy)."""
         self.ball_speed = self.ball_speed_min + random.random() * self.ball_speed_range
         self.ball_diameter = self.ball_diameter_min + random.random() * self.ball_diameter_range
         self.paddle_speed = self.paddle_speed_min + random.random() * self.paddle_speed_range
         t = random.random()
         self.paddle_height = self.paddle_height_min + t * self.paddle_height_range
         self.paddle_width = self.paddle_width_min + t * self.paddle_width_range
-
-    def chaos_restore(self):
-        if self._chaos_backup is not None:
-            for key, value in self._chaos_backup.items():
-                setattr(self, key, value)
-            self._chaos_backup = None
 
     def ai_skill(self, own_score, opponent_score):
         """AI skill right now, from 0 (Baby) to 4 (Insane).  With adaptive AI it eases

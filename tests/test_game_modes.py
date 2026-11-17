@@ -33,10 +33,10 @@ class ModeMatch(unittest.TestCase):
         self.game.countdown, self.game.paused = None, False
         self.pu = self.game.powerups
         self.pu.wait = 999.0
+        self.rules = self.game.settings          # the match's own copy of the rules
 
     def tearDown(self):
         self.game.stop()
-        m.chaos_restore()
         m.reset()
 
     def score_point(self):
@@ -101,17 +101,17 @@ class TalismanRush(ModeMatch):
 
     def test_three_times_as_often(self):
         for rate, (lo, hi) in enumerate(PowerUps.WAITS):
-            m.powerup_rate = rate
+            self.rules.powerup_rate = rate
             waits = [self.pu.next_wait() for _ in range(200)]
             self.assertLessEqual(max(waits), hi / m.RUSH + 1e-9)
             self.assertGreaterEqual(min(waits), lo / m.RUSH - 1e-9)
 
     def test_up_to_three_at_once(self):
-        m.powerup_rate = 0
+        self.rules.powerup_rate = 0
         self.assertEqual(self.pu.most(), 3)
 
     def test_without_it_power_ups_off_means_none(self):
-        m.mode_talisman_rush = False
+        self.rules.mode_talisman_rush = False
         self.assertEqual(self.pu.kinds(), [])
 
 
@@ -135,16 +135,21 @@ class ChaosEveryPoint(ModeMatch):
                 self.assertEqual(self.sizes_and_speeds(), now, "changed mid-rally")
         self.assertGreater(len(seen), 1, "the same every point")
 
-    def test_your_own_settings_come_back_after_the_match(self):
-        before = m.stored("ball_speed")
-        self.score_point()
-        m.chaos_restore()
-        self.assertEqual(m.ball_speed, before)
+    def test_your_own_settings_are_never_touched(self):
+        """1.7: the sizes and speeds are rolled into the match's own copy of the rules (1.6 rolled
+        them into yours, and put yours back when the match ended)."""
+        mine = {k: getattr(m, k) for k in ("ball_speed", "ball_diameter", "paddle_speed", "paddle_height")}
+        rolled = set()
+        for _ in range(3):
+            self.score_point()
+            rolled.add(self.game.settings.ball_speed)
+            self.assertEqual({k: getattr(m, k) for k in mine}, mine)
+        self.assertNotEqual(rolled, {mine["ball_speed"]})
 
 
 class WholeMatchTalismans(ModeMatch):
     def test_curveball_and_lantern_night_modes(self):
-        m.mode_curveball = m.mode_lantern_night = True
+        self.rules.mode_curveball = self.rules.mode_lantern_night = True
         self.assertTrue(self.pu.curving())
         self.assertEqual(self.pu.lantern_level(), 1.0)
         self.assertFalse(self.pu.spawnable(BY_KEY["curve"]))

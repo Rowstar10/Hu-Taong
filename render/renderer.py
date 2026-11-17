@@ -739,10 +739,11 @@ class Renderer:
         "talisman_rush": "Talisman Rush\nTalismans turn up three times as often, up to three at once.\n"
                          "• Even with Power-Ups off: the ones switched on in Power-Ups are used"}
 
-    def modes_section(self, ui, s, font):
+    def modes_section(self, ui, s, font, m=None):
         """The game modes, any of them together: an on/off for each, with Chaos's and Switch's
-        timing beside them (greyed while the mode is off; picking one turns it on)."""
-        m = self.app.settings.match
+        timing beside them (greyed while the mode is off; picking one turns it on).  `m`: the rules
+        shown, if not your own (the host's, online)."""
+        m = m or self.app.settings.match
         gap = int(BASE_W * 0.012 * s)
 
         def mode(key):
@@ -1170,9 +1171,12 @@ class Renderer:
     # ── Gameplay settings ──────────────────────────────────────────────────────
 
     def draw_match_settings_menu(self, state, screen):
-        """Settings > Match: the rules of a match, the same for both players (online, the host's)."""
+        """Settings > Match: the rules of a match, the same for both players (online, the host's).
+        Read only, it shows the host's rules (`state.shown`) to the friend who joined."""
         ui = self.ui
-        g = self.app.settings.match
+        g = state.shown or self.app.settings.match
+        fixed = state.read_only
+        greyed = lambda colours: (lambda: (theme.DARK_GRAY, theme.DARK_GRAY) if fixed else colours)
 
         def build(s):
             f, sm, ty = ui.fnt(0.032, s), ui.fnt(0.028, s), ui.fnt(0.023, s)
@@ -1220,7 +1224,10 @@ class Renderer:
                                      Stack([self.toggle(sm, "toggle_powerups", "Power-Ups", lambda: g.powerups),
                                             Cycle("cycle_powerup_rate", lambda: rates[g.powerup_rate], sm, rates, tip=rate_tip)],
                                            vertical=False, gap=int(BASE_W * 0.012 * s)),
-                                     Button("open_powerups", "Choose Talismans", sm, (theme.ORANGE, theme.ORANGE_HOVER),
+                                     Text(lambda: f"{sum(getattr(g, 'pu_' + k.key) for k in POWERUP_KINDS)} of "
+                                                  f"{len(POWERUP_KINDS)} talismans switched on", ty, theme.PARCHMENT,
+                                          samples=[f"{len(POWERUP_KINDS)} of {len(POWERUP_KINDS)} talismans switched on"]),
+                                     Button("open_powerups", "Choose Talismans", sm, greyed((theme.ORANGE, theme.ORANGE_HOVER)),
                                             tip=TIPS["open_powerups"]))
 
             def sizes():
@@ -1230,16 +1237,19 @@ class Renderer:
             ball = self.section(ui, s, "Ball & Paddles",
                                 Text(sizes, ty, theme.PARCHMENT,
                                      samples=["Ball 100 px, speed 800   -   Paddles 300 x 60, speed 2000   -   Pace 1.50x"]),
-                                Button("open_ball_paddles", "Ball & Paddles", sm, (theme.GREEN, theme.GREEN_HOVER),
+                                Button("open_ball_paddles", "Ball & Paddles", sm, greyed((theme.GREEN, theme.GREEN_HOVER)),
                                        tip=TIPS["open_ball_paddles"]))
 
             wide = int(BASE_W * 0.05 * s)
-            return Stack([Grid([[rules, ai, court]], gap_x=wide),
-                          self.modes_section(ui, s, sm),
-                          Grid([[talismans, ball]], gap_x=wide)],
-                         gap=self.vgap(ui, s, 1.2))
+            body = [Grid([[rules, ai, court]], gap_x=wide),
+                    self.modes_section(ui, s, sm, g),
+                    Grid([[talismans, ball]], gap_x=wide)]
+            if state.note:      # read only, or changing the match being played: say so first
+                body.insert(0, Text(state.note, sm, theme.FLAME))
+            return Stack(body, gap=self.vgap(ui, s, 1.2))
 
-        ui.screen_menu(state, screen, build, title="对局 Match", mark="战", reset="Reset to Default")
+        ui.screen_menu(state, screen, build, title="对局 Match", mark="战",
+                       reset=None if fixed else "Reset to Default")
 
     def draw_ball_paddles_menu(self, state, screen):
         """Settings > Match > Ball & Paddles: their sizes and speeds, and the game's pace."""

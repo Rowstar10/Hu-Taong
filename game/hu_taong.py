@@ -44,7 +44,7 @@ class Hu_Taong(GameBase):
         self.right_wall = Wall(self, BASE_W - 5, -10, BASE_W + 10, BASE_H + 10, color = theme.BLUE, is_goal = True)
         self.separator = Wall(self, BASE_W / 2, -10, BASE_W / 2, BASE_H + 10, is_separator = True)
 
-        settings = self.app.settings.match
+        settings = self.settings
         keys = self.app.settings.gameplay
 
         # Red (left) and Blue (right) use the keys set in Settings > Gameplay
@@ -436,7 +436,7 @@ class Hu_Taong(GameBase):
         self.last_goal_clock = self.recorder.clock
         self.pause()
         nx, _ny = data["normal"]
-        settings = self.app.settings.match
+        settings = self.settings
         sound_manager = self.app.sound_manager
         win_score = settings.winning_scores[settings.winning_score_index]
 
@@ -499,7 +499,9 @@ class Hu_Taong(GameBase):
         self.message_timer = 2
 
     def reset_round(self):
-        settings = self.app.settings.match
+        # A new serve plays by the rules as they stand now: anything changed since (from Pause)
+        # comes in here, never mid-rally
+        settings = self.settings = self.app.settings.match.copy()
         if settings.chaos_each_point:
             settings.chaos_roll()
             self.apply_gameplay_settings()
@@ -522,7 +524,7 @@ class Hu_Taong(GameBase):
         self.message_text = ""
         self.message_timer = 0.0
 
-        self.start_countdown(self.app.settings.match.serve_seconds)
+        self.start_countdown(self.settings.serve_seconds)
 
     def resume_countdown(self):
         """Back from a pause mid-point: 3-2-1 before play carries on, so nobody is caught out, at
@@ -666,7 +668,7 @@ class Hu_Taong(GameBase):
 
     def drift_track(self, obj):
         """[size, target, seconds until a new target], as a share of the setting's range."""
-        s = self.app.settings.match
+        s = self.settings
         name = "ball_diameter" if obj.is_ball else "paddle_height"
         value = (getattr(s, name) - getattr(s, name + "_min")) / getattr(s, name + "_range")
         return [value, value, 0.0]
@@ -678,7 +680,7 @@ class Hu_Taong(GameBase):
 
     def update_drift(self, dt):
         powerups = getattr(self, "powerups", None)
-        if not (powerups.sizes_drifting() if powerups else self.app.settings.match.chaos_drift):
+        if not (powerups.sizes_drifting() if powerups else self.settings.chaos_drift):
             return
         ease = 1 - math.exp(-dt / 1.1)
         for obj in (self.p1, self.p2, self.ball):
@@ -700,7 +702,7 @@ class Hu_Taong(GameBase):
 
     def apply_gameplay_settings(self):
         super().apply_gameplay_settings()
-        s = self.app.settings.match
+        s = self.settings
         powerups = getattr(self, "powerups", None)
         # Chaos (Constant drift) and Shape Shift: both paddles drift to one size, the ball on its own.
         # Speeds never drift (Chaos every point picks new ones between points, in reset_round).

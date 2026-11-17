@@ -14,6 +14,8 @@ class PauseState(JukeboxControls, State):
             "reset": "Reset\nServe again from the middle.\n• Scores and everything else stay as they are",
             "reset_scores": "Reset Scores\nRestart this match from 0-0.",
             "settings": "Settings\nChange settings without leaving the match.",
+            "match_settings": "Match Settings\nChange the rules of this match: modes, points to win, talismans and the rest.\n"
+                              "• Changes come in at the next serve",
             "main_menu": "Main Menu\nLeave this match.",
             "lobby": "Lobby\nBack to the lobby with your friend, to change the court or sides.\n"
                      "• They stay connected; the match so far ends",
@@ -59,6 +61,7 @@ class PauseState(JukeboxControls, State):
                    ("reset", "Reset", theme.BLUE, theme.BLUE_HOVER),
                    ("reset_scores", "Reset Scores", theme.BLUE, theme.BLUE_HOVER),
                    ("watch_replay", "Replay", theme.ORANGE, theme.ORANGE_HOVER),
+                   ("match_settings", "Match Settings", theme.ORANGE, theme.ORANGE_HOVER),
                    ("settings", "Settings", theme.ORANGE, theme.ORANGE_HOVER),
                    ("main_menu", "Main Menu", theme.RED, theme.RED_HOVER)]
 
@@ -76,6 +79,7 @@ class PauseState(JukeboxControls, State):
                        ("reset", "Reset", theme.BLUE, theme.BLUE_HOVER),
                        ("reset_scores", "Reset Scores", theme.BLUE, theme.BLUE_HOVER),
                        ("watch_replay", "Replay", theme.ORANGE, theme.ORANGE_HOVER),
+                       ("match_settings", "Match Settings", theme.ORANGE, theme.ORANGE_HOVER),
                        ("settings", "Settings", theme.ORANGE, theme.ORANGE_HOVER),
                        ("lobby", "Lobby", theme.WHITE, theme.WHITE_HOVER),
                        ("main_menu", "Leave Match", theme.RED, theme.RED_HOVER)]
@@ -160,6 +164,8 @@ class PauseState(JukeboxControls, State):
 
             if key == "settings":
                 self.push_state("settings")
+            if key == "match_settings":
+                self.push_state("match")
 
             if key == "lobby" and self.game_state:
                 self.push_state("confirm_choice", action = self.game_state.back_to_lobby,

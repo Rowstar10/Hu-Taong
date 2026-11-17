@@ -76,8 +76,7 @@ def _old_modes(m):
 
 
 def _section(s, keys):
-    return {key: s.match.stored(key) if s.group_of(key) is s.match else getattr(s.group_of(key), key)
-            for key in keys}
+    return {key: getattr(s.group_of(key), key) for key in keys}
 
 
 def collect(app):

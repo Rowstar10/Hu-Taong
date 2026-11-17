@@ -1,7 +1,6 @@
 import pygame, random
 
 from core.states.base_state import State
-from core.states.game_state import GameState
 
 class BallPaddlesState(State):
     """Settings > Match > Ball & Paddles: the ball's and paddles' sizes and speeds, and the pace."""
@@ -89,6 +88,3 @@ class BallPaddlesState(State):
         if event.type == pygame.MOUSEMOTION and self.dragging:
             self.set_from_slider(self.dragging, event)
 
-        game_state = self.app.state_manager.get_state(GameState)
-        if game_state:
-            game_state.game.apply_gameplay_settings()

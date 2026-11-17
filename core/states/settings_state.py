@@ -27,8 +27,9 @@ class SettingsState(State):
             
             if key == "match":
                 net = self.app.net
-                if net and net.role == "guest":   # online, the host's game sets the rules
-                    self.app.renderer.show_toast("Your friend is hosting, so their Match settings are used", important = True)
+                if net and net.role == "guest":   # online, the host's game sets the rules: see them, read only
+                    from core.states.guest_state import show_host_rules
+                    show_host_rules(self)
                 else:
                     self.push_state("match")
             if key == "gameplay":

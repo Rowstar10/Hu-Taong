@@ -775,6 +775,15 @@ class GuestMatchState(State):
                 net.request("pause")
 
 
+def show_host_rules(state):
+    """The friend who joined sees the host's Match settings, read only (once they've arrived)."""
+    net = state.app.net
+    if net is not None and getattr(net, "rules", None):
+        state.push_state("match", read_only = True)
+    else:
+        state.app.renderer.show_toast("Your friend's rules haven't reached you yet")
+
+
 class GuestPauseState(JukeboxControls, State):
     """The match is paused (by either player): resume it for both, or leave."""
     NAME = "guest_pause"
@@ -824,6 +833,7 @@ class GuestPauseState(JukeboxControls, State):
         buttons = [("resume", "Resume", theme.GREEN, theme.GREEN_HOVER),
                    ("restart", "Restart?", theme.BLUE, theme.BLUE_HOVER),
                    ("watch_replay", "Replay", theme.ORANGE, theme.ORANGE_HOVER),
+                   ("match_settings", "Match Settings", theme.ORANGE, theme.ORANGE_HOVER),
                    ("settings", "Settings", theme.ORANGE, theme.ORANGE_HOVER),
                    ("leave", "Leave Match", theme.RED, theme.RED_HOVER)]
         net = self.app.net
@@ -836,8 +846,10 @@ class GuestPauseState(JukeboxControls, State):
                                        tips = {"resume": "Resume\nCarry on the match, for both of you.\n~ Esc",
                                                "restart": "Restart\nAsk your friend to start this match again from 0-0.",
                                                "watch_replay": "Replay\nWatch the match so far, and save all or part of it.",
-                                               "settings": "Settings\nDisplay, sound and interface. The match waits.\n"
-                                                           "• The host's Gameplay settings are used online",
+                                               "match_settings": "Match Settings\nSee the rules your friend's game is set to.\n"
+                                                                 "• Only the host can change them",
+                                               "settings": "Settings\nYour controls, display, sound and interface. The match waits.\n"
+                                                           "• The match's rules are the host's: see Match Settings",
                                                "leave": "Leave Match\nStop playing and go back to the menu."})
         self.draw_jukebox_extras(screen)
 
@@ -866,6 +878,8 @@ class GuestPauseState(JukeboxControls, State):
                     self.push_state("replay", clip = clip, mode = "viewer", mute = True)
             if key == "settings":
                 self.push_state("settings")
+            if key == "match_settings":
+                show_host_rules(self)
             if key == "leave":
                 action = lambda: self.set_state("main_menu", mute = True)
                 self.push_state("confirm_choice", action = action, header = "Leave the match?", mute = True)
