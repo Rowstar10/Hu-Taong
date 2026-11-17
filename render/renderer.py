@@ -49,6 +49,7 @@ TIPS = {
     "open_powerups": "Power-Ups\nSee what each power-up does, and choose which can appear.",
     "toggle_powerups": "Power-Ups\nTalismans appear on the court during a match.\n• Touch one with your paddle, or a ball you hit last\n~ Hold Tab in a match to see every power-up in play",
     "toggle_lantern_night": "Lantern Night\nThe court is always dark, lit only by lanterns round the paddles and the ball's glow.\n~ Off by default",
+    "open_match_settings": "Match Settings\nPoints to win, talismans, the ball and paddles, the AI and the rest of the rules.",
     "toggle_curveball": "Curveball\nEvery hit bends the way the paddle was moving as it hit.\n"
                         "• Sweep up or down as you hit to curve the ball; a still paddle hits it straight\n"
                         "• The spin fades as it flies\n~ Off by default",
@@ -712,6 +713,50 @@ class Renderer:
 
     # ── Match setup ────────────────────────────────────────────────────────────
 
+    MODE_TIPS = {
+        "chaos": "Chaos\nShakes up the ball's and paddles' sizes and speeds.\n"
+                 "• Every point: new random sizes and speeds each point, fixed through the rally\n"
+                 "• Constant drift: sizes keep drifting all match, both paddles together and the ball on its own; speeds stay put\n"
+                 "~ The Shape Shift talisman doesn't turn up with Constant drift",
+        "switch": "Switch\nThe players take over each other's paddle, and the goal it defends.\n"
+                  "• Your keys and your score stay yours; the paddles stay where they are\n"
+                  "• Every point: after each point\n"
+                  "• Mid-rally: at random moments, after a 2-second warning\n"
+                  "• Both: after each point and mid-rally\n"
+                  "~ The Soul Swap talisman doesn't turn up mid-rally",
+        "curveball": "Curveball\nEvery hit bends the way the paddle was moving, all match.\n"
+                     "~ The Curveball talisman doesn't turn up",
+        "lantern_night": "Lantern Night\nThe court is always dark, lit only by lanterns round the paddles and the ball's glow.\n"
+                         "~ The Lantern Night talisman doesn't turn up",
+        "twin_ball": "Twin Ball\nEvery point is played with two balls, Red's and Blue's.\n"
+                     "• Red scores only with the red ball, in Blue's goal; Blue only with the blue one, in Red's\n"
+                     "• A ball that reaches its own colour's goal just bounces off\n"
+                     "~ The Twin Balls talisman doesn't turn up",
+        "talisman_rush": "Talisman Rush\nTalismans turn up three times as often, up to three at once.\n"
+                         "• Even with Power-Ups off: the ones switched on in Power-Ups are used"}
+
+    def modes_section(self, ui, s, font):
+        """The game modes, any of them together: an on/off for each, with Chaos's and Switch's
+        timing beside them (greyed while the mode is off; picking one turns it on)."""
+        m = self.app.settings.match
+        gap = int(BASE_W * 0.012 * s)
+
+        def mode(key):
+            return self.toggle(font, f"toggle_mode_{key}", m.MODE_NAMES[key], lambda: getattr(m, "mode_" + key),
+                               tip=self.MODE_TIPS[key])
+
+        def timed(key, timings):
+            on = lambda: getattr(m, "mode_" + key)
+            timing = Cycle(f"cycle_{key}_timing", lambda: timings[getattr(m, key + "_timing")], font, list(timings),
+                           lambda: theme.PARCHMENT if on() else theme.GRAY, tip=self.MODE_TIPS[key])
+            return Stack([mode(key), timing], vertical=False, gap=gap)
+
+        rows = Grid([[timed("chaos", m.CHAOS_TIMINGS), timed("switch", m.SWITCH_TIMINGS)],
+                     [Stack([mode("curveball"), mode("lantern_night")], vertical=False, gap=gap),
+                      Stack([mode("twin_ball"), mode("talisman_rush")], vertical=False, gap=gap)]],
+                    gap_x=int(BASE_W * 0.03 * s), gap_y=self.vgap(ui, s, 0.6))
+        return self.section(ui, s, "Modes", rows)
+
     def draw_match_setup_menu(self, state, screen):
         ui = self.ui
         g = self.app.settings.match
@@ -766,7 +811,11 @@ class Renderer:
                                  Text(lambda: self.court_about(g.court), sm, theme.PARCHMENT,
                                       samples=[self.court_about(i) for i in range(len(names))]))
             left = Stack([opponent, paddle, caption], gap=self.vgap(ui, s, 2))
-            return Stack([Grid([[left, court]], gap_x=int(BASE_W * 0.06 * s)), start], gap=self.vgap(ui, s, 2))
+            more = Button("open_match_settings", "Match Settings", f, (theme.BLUE, theme.BLUE_HOVER),
+                          tip=TIPS["open_match_settings"])
+            buttons = Stack([more, start], vertical=False, gap=int(BASE_W * 0.03 * s))
+            return Stack([Grid([[left, court]], gap_x=int(BASE_W * 0.06 * s)),
+                          self.modes_section(ui, s, sm), buttons], gap=self.vgap(ui, s, 1.4))
 
         ui.screen_menu(state, screen, build, title="对局 Match Setup", mark="战")
 

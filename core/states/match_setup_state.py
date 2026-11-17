@@ -2,8 +2,9 @@ import pygame
 
 from core import save_data
 from core.states.base_state import State
+from core.states.match_controls import MatchControls
 
-class MatchSetupState(State):
+class MatchSetupState(MatchControls, State):
     NAME = "match_setup"
     is_menu = True
 
@@ -43,11 +44,9 @@ class MatchSetupState(State):
                 if key == "side_blue":
                     gameplay.play_as_blue = True
 
-            count = len(gameplay.court_options)
-            if key == "cycle_court_left":
-                gameplay.court = (gameplay.court - 1) % count
-            if key == "cycle_court_right":
-                gameplay.court = (gameplay.court + 1) % count
+            self.handle_match_key(key)          # the modes, their timings and the court
+            if key == "open_match_settings":
+                self.push_state("gameplay")
 
             if key == "start_match":
                 self.start_match()
