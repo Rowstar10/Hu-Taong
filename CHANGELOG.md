@@ -42,6 +42,7 @@ Power-up fixes and changes, from a review of every power-up, then a round of cha
 - Resuming a match from a pause counts 3-2-1 first, so nobody is caught out: a quick one on your own, at the usual pace online, on both screens.
 - Online, clicking away from the game pauses it for both players, and it only carries on while both of you are in the game. Turn Auto-Pause off if you'd rather your clicking away didn't pause it.
 - Court Dim is a slider, like the Dim Overlay's, instead of four steps. Your old setting keeps its darkness.
+- Smoother play: far fewer stutters mid-match. Pictures a match needs are got ready while the game loads and between points instead of the first time they're shown, the next background is got ready before it fades in, the end of a background fade and the start of a change of screen no longer catch, and the first pause no longer freezes for a moment. Nothing looks any different.
 - Online play needs both players on 1.6: it won't connect to 1.5 or earlier, and their rooms show "Other version".
 - 1.6 was updated after its first playtest. To get the update, uninstall 1.6 and install it again, both of you: a 1.6 installed before the update won't play online with one installed after.
 
