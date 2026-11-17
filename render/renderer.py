@@ -568,6 +568,7 @@ class Renderer:
         for finish in ("red", "blue"):
             for level in range(1, 5):
                 jobs.append(lambda finish=finish, level=level: art.paddle_flash(w, h, finish, level))
+        jobs.append(self.warm_pause_screen)
 
         # Every size and colour of butterfly the game sends out, at every angle: goal bursts (64),
         # hits (48, 40), talismans taken (44), the Firecracker's bang (80), the swarm (88) and the
@@ -616,6 +617,26 @@ class Renderer:
 
         jobs.reverse()          # taken from the end, so the goal-burst butterflies come first
         return jobs
+
+    def warm_pause_screen(self):
+        """Draw the pause screen once, off-screen, over a stand-in match (its Red and Blue AI
+        switches and all, so it's laid out as in a real one), so opening it the first time
+        doesn't build its panel, buttons and lettering then.  Nothing is shown, and no tooltip
+        is offered: the pointer is kept off it while it draws."""
+        from types import SimpleNamespace
+        from core.state_manager import StateManager
+        app = self.app
+        state = StateManager.create("pause", app)
+        match = SimpleNamespace(net = None, p1 = SimpleNamespace(ai_enabled = False),
+                                p2 = SimpleNamespace(ai_enabled = True))
+        state.game_state = SimpleNamespace(game = match)
+        offered = self.tips.offered
+        app.pointer = lambda: (-10000, -10000)
+        try:
+            state.draw(pygame.Surface((BASE_W, BASE_H)))
+        finally:
+            del app.pointer                     # back to App.pointer
+            self.tips.offered = offered
 
     def draw_loading_screen(self, screen, progress):
         screen.fill(theme.INK)

@@ -27,6 +27,7 @@ class Backgrounds:
 
         self.pictures = OrderedDict()   # name -> Future of the full-size picture
         self.dimmed = OrderedDict()     # name -> (dim, picture with the dim setting baked in)
+        self.dim_jobs = OrderedDict()   # (name, dim) -> Future of a dimmed picture, baked on the worker
         self.shade = None
 
         # Thumbnails for the picker are made in the background straight away
@@ -45,17 +46,41 @@ class Backgrounds:
         full.blit(self.vignette, (0, 0))
         return full
 
+    def _dim(self, picture, dim):
+        """The picture with `dim` baked in, exactly as get() bakes it (its own shade: this runs on
+        the worker, while get()'s may be in use on the main thread)."""
+        surf = picture.result().copy()
+        shade = pygame.Surface(self.size, pygame.SRCALPHA)
+        shade.fill((0, 0, 0, int(255 * dim)))
+        surf.blit(shade, (0, 0))
+        return surf
+
     # ---------- Asking for pictures (main thread) ----------
 
-    def request(self, name):
-        """Start loading a picture without waiting for it."""
+    def request(self, name, dim = None):
+        """Start loading a picture without waiting for it, and, given the dim it will be shown at,
+        baking that in too, so showing it later costs the main thread nothing."""
         if name not in self.pictures:
             self.pictures[name] = self.worker.submit(self._picture, name)
             self.trim()
+        if dim and (name, dim) not in self.dim_jobs and not self.baked(name, dim):
+            self.dim_jobs[(name, dim)] = self.worker.submit(self._dim, self.pictures[name], dim)
+            while len(self.dim_jobs) > self.KEEP:
+                self.dim_jobs.popitem(last = False)[1].cancel()
 
-    def ready(self, name):
+    def baked(self, name, dim):
+        cached = self.dimmed.get(name)
+        return cached is not None and cached[0] == dim
+
+    def ready(self, name, dim = None):
+        """Is the picture loaded (and, given a dim, baked at it)?"""
         future = self.pictures.get(name)
-        return future is not None and future.done()
+        if future is None or not future.done():
+            return False
+        if not dim or self.baked(name, dim):
+            return True
+        job = self.dim_jobs.get((name, dim))
+        return job is not None and job.done()
 
     def picture(self, name):
         """The full-size picture.  If the worker hasn't got to it yet it is made right now."""
@@ -72,18 +97,29 @@ class Backgrounds:
         """The picture with the Dim Background setting baked in, so it costs nothing per frame."""
         cached = self.dimmed.get(name)
         if cached is None or cached[0] != dim:
-            surf = self.picture(name)
-            if dim > 0:
-                surf = surf.copy()
-                if self.shade is None:
-                    self.shade = pygame.Surface(self.size, pygame.SRCALPHA)
-                self.shade.fill((0, 0, 0, int(255 * dim)))
-                surf.blit(self.shade, (0, 0))
+            job = self.dim_jobs.pop((name, dim), None)
+            if job is not None and job.done() and not job.cancelled() and job.exception() is None:
+                surf = job.result()                        # baked on the worker already
+            else:
+                if job is not None:
+                    job.cancel()
+                surf = self.picture(name)
+                if dim > 0:
+                    surf = self._shade_main(surf, dim)
             cached = self.dimmed[name] = (dim, surf)
         self.dimmed.move_to_end(name)
         while len(self.dimmed) > self.KEEP:
             self.dimmed.popitem(last = False)
         return cached[1]
+
+    def _shade_main(self, surf, dim):
+        """Bake `dim` in on the main thread (when the worker hasn't), exactly as _dim does."""
+        surf = surf.copy()
+        if self.shade is None:
+            self.shade = pygame.Surface(self.size, pygame.SRCALPHA)
+        self.shade.fill((0, 0, 0, int(255 * dim)))
+        surf.blit(self.shade, (0, 0))
+        return surf
 
     def thumb(self, name):
         future = self.thumbs.get(name)

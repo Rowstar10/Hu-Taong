@@ -95,6 +95,29 @@ class WarmedAhead(unittest.TestCase):
         self.assertLessEqual(used, sizes, f"burst sizes not warmed: {used - sizes}")
 
 
+class FirstPause(unittest.TestCase):
+    """The first pause of a session built its panel and lettering, and loaded the ambience."""
+
+    def test_the_ambience_is_loaded_at_start(self):
+        import pygame
+        from core.sound_manager import AMBIENCE, SOUND_CACHE
+        if not pygame.mixer.get_init():
+            self.skipTest("no sound here")
+        for name, _ in AMBIENCE:
+            self.assertIn(name, SOUND_CACHE)
+
+    def test_the_pause_screen_is_warmed_without_showing_anything(self):
+        offered = renderer.tips.offered
+        renderer.warm_pause_screen()
+        self.assertNotIn("pointer", app.__dict__, "the real pointer is back")
+        self.assertEqual(renderer.tips.offered, offered, "no tooltip offered")
+        self.assertIn(("watermark", "停", 400, 26), art.cache)
+        self.assertTrue(any(isinstance(k, tuple) and k[0] == "panel" for k in art.cache))
+
+    def test_it_is_in_the_menu_warm_up(self):
+        self.assertIn(renderer.warm_pause_screen, renderer.idle_jobs())
+
+
 class WarmsOnlyWhileTheBallRests(unittest.TestCase):
     def setUp(self):
         app.idle_jobs = [lambda: None] * 5000

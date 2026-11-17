@@ -110,6 +110,8 @@ class App:
         self.restart_bg_timer()
         
         self.bg_next = None
+        self.bg_upcoming = None           # the background the next fade will bring, chosen ahead...
+        self.bg_upcoming_asked = False    # ...and handed to the worker to get ready at a quiet moment
         self.bg_transition_active = False
         self.bg_transition_time = 0
         self.bg_transition_duration = 5
@@ -356,17 +358,33 @@ class App:
 
     def start_bg_transition(self):
         display = self.settings.display
-        new_bg = random.choice(display.backgrounds)
+        # the one chosen (at random) and got ready ahead, if there is one
+        new_bg = self.bg_upcoming if self.bg_upcoming in display.backgrounds else random.choice(display.backgrounds)
+        self.bg_upcoming, self.bg_upcoming_asked = None, False
 
         if self.bg_current == new_bg or self.bg_next:
             return
 
-        # The fade starts once the worker thread has the picture ready
+        # The fade starts once the worker thread has the picture ready, dim and all
         self.bg_next = new_bg
-        self.backgrounds.request(new_bg)
+        self.backgrounds.request(new_bg, self.background_dim())
         display.background = display.backgrounds.index(new_bg)
         self.bg_transition_active = False
         self.bg_transition_time = 0
+
+    def prepare_next_background(self, dim):
+        """Choose the next background well before its fade, and have the worker load it and bake
+        the dim in while nothing is moving (the menus, a serve countdown, a goal).  Loading it the
+        moment the fade was due, mid-rally, stuttered play; so did baking the dim on this thread."""
+        display = self.settings.display
+        if not display.rotate_backgrounds or self.bg_next:
+            return
+        if self.bg_upcoming not in display.backgrounds:
+            self.bg_upcoming, self.bg_upcoming_asked = random.choice(display.backgrounds), False
+        if not self.bg_upcoming_asked and (not self.in_match() or self.ball_resting()):
+            self.bg_upcoming_asked = True
+            if self.bg_upcoming != self.bg_current:
+                self.backgrounds.request(self.bg_upcoming, dim)
 
     def show_background(self, name):
         """Switch straight to a background, dropping any fade in progress."""
@@ -399,9 +417,13 @@ class App:
         pos = (self.bg_offset[0] - BG_OVERSCAN[0], self.bg_offset[1] - BG_OVERSCAN[1])
         dim = self.background_dim()
         self.virtual.blit(self.backgrounds.get(self.bg_current, dim), pos)
+        self.prepare_next_background(dim)
 
-        if self.bg_next and not self.bg_transition_active and self.backgrounds.ready(self.bg_next):
-            self.bg_transition_active = True
+        if self.bg_next and not self.bg_transition_active:
+            if self.backgrounds.ready(self.bg_next, dim):
+                self.bg_transition_active = True
+            else:
+                self.backgrounds.request(self.bg_next, dim)     # (the dim changed while it loaded)
 
         if self.bg_transition_active:
             self.bg_transition_time += self.dt

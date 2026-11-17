@@ -88,11 +88,14 @@ class SoundManager:
     # ---------------- Sound effects ----------------
 
     def preload_sounds(self):
-        """Load every effect up front so the first paddle hit doesn't stall on disk."""
+        """Load every effect up front so the first paddle hit doesn't stall on disk (and the
+        ambience too: loading it as a match is paused took about 90 ms)."""
         if not pygame.mixer.get_init():
             return
         for path in SOUND_DIR.glob("*.wav"):
             SOUND_CACHE[path.name] = pygame.mixer.Sound(str(path))
+        for name, _ in AMBIENCE:
+            self.sound(name, SOUND_DIR / "Ambience")
 
     def sound(self, name, folder = SOUND_DIR):
         snd = SOUND_CACHE.get(name)
