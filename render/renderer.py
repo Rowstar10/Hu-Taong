@@ -2755,8 +2755,8 @@ class Renderer:
         dx, dy = stuck["side"] * math.cos(angle), math.sin(angle)
         tail = (cx + dx * (r + 10), cy + dy * (r + 10))
         tip = (cx + dx * (r + 70), cy + dy * (r + 70))
-        pulse = 0.6 + 0.4 * math.sin(self.app.fx.time * 10)
-        colour = (int(214 + 41 * pulse), int(236 + 19 * pulse), 120)
+        pulse = 1.0 if "aim" in stuck else 0.6 + 0.4 * math.sin(self.app.fx.time * 10)   # (steady: locked)
+        colour = (int(214 + 41 * pulse), int(236 + 19 * pulse), 120 + 100 * ("aim" in stuck))
         pygame.draw.line(screen, (60, 70, 20), tail, tip, 7)
         pygame.draw.line(screen, colour, tail, tip, 4)
         for turn in (2.6, -2.6):

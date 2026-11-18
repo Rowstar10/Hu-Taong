@@ -4,6 +4,7 @@
 - Swift Step: the paddle moves 1.5x as fast, but its drives hit no harder than a normal paddle's
   (a faster paddle hit much harder, which was most of its edge: the taker won 74% at Hard).
 - Spirit Fire: blazing shots go at most 10% past the usual top speed (they reached about 4,450 px/s).
+  (1.8's balance review: no further than the top speed itself; see test_balance_review.)
 - Ghost Ball: always in sight in the last 300 px before the paddle it's heading for.
 - Blink Ball: no hops within 350 px of the paddle it's heading for.
 - Twin Balls: never split slower than half a serve.
@@ -67,11 +68,10 @@ class Hits(Match):
         self.game.apply_gameplay_settings()
         self.assertAlmostEqual(self.p2.speed, base * PowerUps.SWIFT)
 
-    def test_fire_capped_just_past_the_top_speed(self):
+    def test_fire_capped_at_the_top_speed(self):
         cap = MAX_BALL_SPEEDUP * self.ball.speed * math.sqrt(2)
         fast = self.hit(self.p2, 1.0, 3200.0, ("fire",))         # a smash into a fast ball
         self.assertLessEqual(fast, cap * PowerUps.FIRE_TOP + 1)
-        self.assertGreater(fast, cap)                                # still past the usual top speed
 
     def test_fire_still_speeds_up_an_ordinary_shot(self):
         plain = self.hit(self.p2, 0.0, 900.0)

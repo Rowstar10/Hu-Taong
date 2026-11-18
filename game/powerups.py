@@ -44,14 +44,14 @@ KINDS = (
          "• It doesn't make your hits any harder\n"
          "• Lasts 10 s of play: what's left carries on into the next point"),
     Kind("fire", "Spirit Fire", "火", "Boon", 10,
-         "For 10 seconds of play every hit you make is a blazing shot, 40% faster.",
+         "For 10 seconds of play every hit you make is a blazing shot, 20% faster.",
          "Every hit you make leaves as a blazing shot.\n"
-         "• 40% faster, even a little past the usual top speed\n"
+         "• 20% faster, up to the usual top speed\n"
          "• Blazing shots chip stones: tombstones break in 2 hits, ferry gates in 3, walls in 4\n"
          "• Lasts 10 s of play: what's left carries on into the next point"),
     Kind("shrink", "Shrink Curse", "缩", "Curse", 10,
-         "Your opponent's paddle shrinks by a third for 10 seconds of play.",
-         "Your opponent's paddle shrinks by a third.\n"
+         "Your opponent's paddle shrinks by a fifth for 10 seconds of play.",
+         "Your opponent's paddle shrinks by a fifth.\n"
          "• Lasts 10 s of play: what's left carries on into the next point"),
     Kind("ghost", "Ghost Ball", "鬼", "Wild", 10,
          "For 10 seconds the ball keeps vanishing and reappearing, at random.",
@@ -63,9 +63,9 @@ KINDS = (
     Kind("sticky", "Sticky Goo", "粘", "Wild", 10,
          "Both paddles are coated in goo: catch the ball, then sling it where you like.",
          "Both paddles are coated in sticky goo: the ball sticks for a moment, then you sling it.\n"
-         "• The way your paddle is moving as it peels off aims it (up slings it up)\n"
+         "• The way your paddle is moving aims it (up slings it up), until the aim locks half a second before it goes\n"
          "• It comes off a little slower than it came in, and a quick flick of the paddle throws it faster\n"
-         "• An arrow on the ball shows where it will go\n"
+         "• An arrow on the ball shows where it will go, and holds steady once the aim is locked\n"
          "• Lasts 10 s"),
     Kind("wall", "Open Court", "破", "Wild", 0,
          "The Middle Wall comes down until the point ends; both paddles can roam.",
@@ -176,15 +176,16 @@ class PowerUps:
     LIFETIME = 20.0      # seconds of play a talisman waits on the court (it stays through points: 1.8)
     WAITS = ((14, 22), (8, 14), (4, 8), (1.5, 3))   # seconds between talismans: Rare, Normal, Frequent, Chaotic
 
-    GIANT, SHRINK = 1.5, 0.65               # paddle height
+    GIANT, SHRINK = 1.5, 0.8                # paddle height (Shrink Curse took a third off until 1.8)
     SWIFT = 1.5                             # paddle speed (Swift Step's hits are no harder: see Paddle.on_contact)
-    FIRE = 1.4                              # a Spirit Fire shot's speed...
-    FIRE_TOP = 1.1                          # ...up to this much past the usual top speed (it reached 1.4 times)
+    FIRE = 1.2                              # a Spirit Fire shot's speed (1.4 until 1.8)...
+    FIRE_TOP = 1.0                          # ...up to this times the usual top speed (1.1 until 1.8; once 1.4)
     TELEPORT_WARNING = 0.12                 # seconds before the ball would be in
     TELEPORTS_HELD = 1                      # Safety Teleport charges a player can hold
     STICK_TIME = (0.6, 1.0)                 # seconds a gooey paddle holds the ball before slinging it
     STICK_SPEED = 0.75                      # the share of its speed it keeps (0.85 until 1.8)...
     SLING_WHIP = 0.5                        # ...plus this share of the paddle's speed as it flicks
+    AIM_LOCK = 0.5                          # seconds before it's slung that its aim locks (1.8: no last-moment fakes)
     BLINK_EVERY = (0.1, 0.5)                # seconds between Blink Ball hops
     BLINK_REACH = (45, 120)                 # how far a hop goes, in px
     BLINK_CLEAR = 350                       # px: no hops this close to the paddle the ball is heading for
@@ -765,15 +766,16 @@ class PowerUps:
         main = ball is self.game.ball          # Twin Balls' blue ball carries no goo, snow or firecracker
         self.portal_trips = 0                  # a ball looping through the portals has been played
 
-        # Spirit Fire: every hit while it lasts is a blazing shot, 40% faster, but never more than a
-        # little past the usual top speed (it reached 1.4 times it, faster than anyone can follow)
+        # Spirit Fire: every hit while it lasts is a blazing shot, 20% faster, but never past the
+        # usual top speed (nor slower than the hit would have been without it)
         ball.blazing = False
         if self.has(paddle, "fire"):
+            plain = math.hypot(ball.vx, ball.vy)
             ball.vx *= self.FIRE
             ball.vy *= self.FIRE
             serve = getattr(ball, "speed", 0)
             if serve:
-                top = self.FIRE_TOP * MAX_BALL_SPEEDUP * serve * math.sqrt(2)
+                top = max(self.FIRE_TOP * MAX_BALL_SPEEDUP * serve * math.sqrt(2), plain)
                 speed = math.hypot(ball.vx, ball.vy)
                 if speed > top:
                     ball.vx, ball.vy = ball.vx * top / speed, ball.vy * top / speed
@@ -1235,13 +1237,17 @@ class PowerUps:
         cy = (ball.y0 + ball.y1) / 2 - (paddle.y0 + paddle.y1) / 2
         ball.stuck = {"paddle": paddle, "dy": cy, "side": side, "left": hold, "total": hold,
                       "vx": ball.vx * k, "vy": ball.vy * k}
+        self.lock_aim(ball.stuck)
         self.game.app.sound_manager.play("countdown_tick.wav", multiplier = 0.5)
         self.game.on_stick(paddle)
 
     @staticmethod
     def sling_angle(paddle, stuck=None):
         """Sticky Goo: the angle a stuck ball is slung at.  The paddle's movement aims it (moving up
-        slings it up, as far as the steepest return angle); held still, it goes as it was returned."""
+        slings it up, as far as the steepest return angle); held still, it goes as it was returned.
+        Once the aim has locked (AIM_LOCK before it goes), that's where it goes."""
+        if stuck and "aim" in stuck:
+            return stuck["aim"]
         move = getattr(paddle, "vy", 0.0) / max(1.0, getattr(paddle, "speed", 1500))
         if abs(move) > 0.1 or not stuck or "vx" not in stuck:
             return clamp(move, -1.0, 1.0) * MAX_BOUNCE_ANGLE
@@ -1262,6 +1268,12 @@ class PowerUps:
             vx = side * (max(0.0, chasing) + 150)
         return vx, vy
 
+    def lock_aim(self, stuck):
+        """Sticky Goo: from AIM_LOCK before it's slung, the aim holds where it is, so a last-moment
+        fake no longer changes where it goes (1.8)."""
+        if "aim" not in stuck and stuck["left"] <= self.AIM_LOCK:
+            stuck["aim"] = self.sling_angle(stuck["paddle"], stuck)
+
     def update_sticky(self, dt):
         ball = self.game.ball
         if ball.unstick > 0:
@@ -1280,6 +1292,7 @@ class PowerUps:
         if not self.game.wall_up:
             if ((ball.x0 + ball.x1) / 2 > BASE_W / 2) == stuck["paddle"].is_left:
                 stuck["left"] = 0
+        self.lock_aim(stuck)
         if stuck["left"] > 0:
             return
         # Peeled off: slung away where the paddle aims it

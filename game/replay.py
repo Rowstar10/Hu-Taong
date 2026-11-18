@@ -29,6 +29,7 @@ MAGIC = b"HUTAONG-REPLAY 1\n"
 KIND_KEYS = [kind.key for kind in KINDS]
 ROWS = 3        # the rows' layout: 2 from 1.7 (each portal's size), 3 from 1.8 (each portal's flash, and
                 # the blue ball's visibility); none said in a header means 1
+NO_AIM = 9.0                        # (Sticky Goo's aim, in a row, when it hasn't locked: 1.8)
 RENAMED = {"chaos": "shape"}        # power-ups since renamed: Chaos Mode + is Shape Shift (1.6)
 STYLES = ["tomb", "pillar"]
 GREAT = 14.0                 # a point's best moment worth an instant replay scores at least this
@@ -267,6 +268,8 @@ class Recorder:
         values.append(len(ploughs))
         for plough in ploughs:
             values += plough
+        # then (1.8) where Sticky Goo's aim has locked, if it has
+        values.append(stuck["aim"] if stuck and "aim" in stuck else NO_AIM)
         return array("f", values).tobytes()
 
     def track_pass(self):
@@ -746,6 +749,9 @@ class ReplayView:
                 if pos + 3 <= len(a):
                     pu.ploughs.append([a[pos], a[pos + 1], a[pos + 2]])
                 pos += 3
+        if pos < len(a) and ball.stuck and a[pos] < NO_AIM:
+            ball.stuck["aim"] = a[pos]
+        pos += 1
         self.objects = [*self.stones, self.p1, self.p2, ball, *self.extra_balls]
 
 

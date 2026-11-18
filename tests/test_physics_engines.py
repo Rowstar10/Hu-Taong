@@ -195,7 +195,7 @@ class Classic(unittest.TestCase):
         self.assertLessEqual(math.hypot(game.ball.vx, game.ball.vy), speed, "and it wasn't knocked again")
 
     def test_spirit_fire_doesnt_stack(self):
-        """A fired hit is 40% faster, as ever; the next hit is back to the rally's speed."""
+        """A fired hit is faster (20% since 1.8's review); the next hit is back to the rally's speed."""
         self.p1.effects["fire"] = 30.0
         speeds = self.rally(3)
         start = engines.serve_speed(SERVE)

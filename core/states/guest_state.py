@@ -775,8 +775,9 @@ class GuestMatchState(State):
             vx = forward * total * 0.3
             vy = math.copysign(total * math.sqrt(1 - 0.09), vy or -1)
         if fire:                                               # Spirit Fire: every hit a blazing shot...
+            plain = math.hypot(vx, vy)
             vx, vy = vx * PowerUps.FIRE, vy * PowerUps.FIRE
-            limit = PowerUps.FIRE_TOP * cap                    # ...a little past the top speed at most
+            limit = max(PowerUps.FIRE_TOP * cap, plain)        # ...up to the top speed (never slower for it)
             total = math.hypot(vx, vy)
             if serve and total > limit:
                 vx, vy = vx * limit / total, vy * limit / total
