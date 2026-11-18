@@ -24,7 +24,7 @@ class Gone(unittest.TestCase):
     def test_no_longer_a_talisman(self):
         for key in GONE:
             self.assertNotIn(key, BY_KEY)
-        self.assertEqual(len(KINDS), 20)
+        self.assertEqual(len(KINDS), 21)                         # (1.8 added the Black Hole)
 
     def test_no_switch_for_them(self):
         g = app.settings.match

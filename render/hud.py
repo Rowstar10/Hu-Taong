@@ -17,7 +17,7 @@ SHORT = {"teleport": "Saves one goal", "giant": "Taller paddle", "swift": "Faste
          "shape": "Sizes drifting", "curve": "Hits bend the way the paddle moved",
          "double": "This point is worth 2", "wind": "Wind bending the ball",
          "cracker": "Bangs when its fuse burns down", "lantern": "Night: lanterns only",
-         "portal": "Two linked portals"}
+         "portal": "Two linked portals", "hole": "A black hole pulls the ball"}
 
 
 def seconds_text(left):
@@ -74,7 +74,7 @@ class Hud:
             self.draw_effects(screen, powerups.effect_list(p2), right, top)
             court = [(key, seconds, 0) for key, seconds, _ in powerups.court_list()
                      if key in ("wall", "blink", "snowball", "ghost", "twin", "swap", "shape", "curve",
-                                "double", "wind", "cracker", "lantern", "portal")]
+                                "double", "wind", "cracker", "lantern", "portal", "hole")]
             if court:                            # things that are on everyone sit in the middle
                 self.draw_effects(screen, court, BASE_W // 2, 150)
 

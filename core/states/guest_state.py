@@ -466,6 +466,11 @@ class GuestMatchState(State):
         curve = getattr(view.ball, "curve", 0.0)            # Curveball's spin, fading as it flies
         wind = getattr(view.powerups, "wind", 0.0)           # and Wind Gust's push
         portals = getattr(view.powerups, "portals", [])
+        # black holes pull it (1.8), but not one that has just flung a ball out (the host's game
+        # doesn't pull a ball for a moment after flinging it)
+        holes = [hole for hole in getattr(view.powerups, "holes", [])
+                 if hole.get("power", 0) > 0 and hole.get("dying") is None and hole.get("flash", 0) <= 0]
+        serve = getattr(self, "serve_speed", 0)
         cool, inside, coming = 0.0, 0.0, None
         for _ in range(steps):
             if inside > 0:                                 # inside a portal for a moment (1.8)
@@ -477,6 +482,15 @@ class GuestMatchState(State):
             if curve or wind:
                 vy = max(-2600.0, min(2600.0, vy + (curve + wind) * h))
                 curve *= math.exp(-1.3 * h)
+            if holes:
+                pace = PowerUps.pace_of(vx, vy, serve)
+                ax = ay = 0.0
+                for hole in holes:
+                    if PowerUps.falls_in(hole, cx, cy, vx, vy, h, r):
+                        return hole["x"], hole["y"], 0.0, 0.0     # in: where it comes out is the host's call
+                    px, py = PowerUps.hole_pull(hole, cx, cy, pace)
+                    ax, ay = ax + px, ay + py
+                vx, vy = PowerUps.bend(vx, vy, ax, ay, h)
             cool = max(0.0, cool - h)
             if portals and cool <= 0:
                 for i, door in enumerate(portals):

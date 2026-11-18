@@ -30,6 +30,7 @@ KIND_KEYS = [kind.key for kind in KINDS]
 ROWS = 3        # the rows' layout: 2 from 1.7 (each portal's size), 3 from 1.8 (each portal's flash, and
                 # the blue ball's visibility); none said in a header means 1
 NO_AIM = 9.0                        # (Sticky Goo's aim, in a row, when it hasn't locked: 1.8)
+HOLE_FIELDS = 11                    # a black hole's numbers in a row (1.8)
 RENAMED = {"chaos": "shape"}        # power-ups since renamed: Chaos Mode + is Shape Shift (1.6)
 STYLES = ["tomb", "pillar"]
 GREAT = 14.0                 # a point's best moment worth an instant replay scores at least this
@@ -270,6 +271,15 @@ class Recorder:
             values += plough
         # then (1.8) where Sticky Goo's aim has locked, if it has
         values.append(stuck["aim"] if stuck and "aim" in stuck else NO_AIM)
+        # then (1.8) the black holes
+        holes = getattr(pu, "holes", [])
+        values.append(len(holes))
+        for hole in holes:
+            way, arrows = hole.get("way"), list(hole.get("arrows", ()))[:2]
+            arrows += [NO_AIM] * (2 - len(arrows))
+            values += [hole["x"], hole["y"], hole["kind"], hole.get("power", 1.0), hole.get("age", 0.0),
+                       hole.get("flash", 0.0), hole["dying"] if hole.get("dying") is not None else -1.0,
+                       hole.get("spin", 1), way if way is not None else NO_AIM, *arrows]
         return array("f", values).tobytes()
 
     def track_pass(self):
@@ -526,6 +536,7 @@ class ViewPowerUps:
         self.blasts = []
         self.ploughs = []
         self.closing = []
+        self.holes = []
 
     def effect_list(self, paddle):
         return self.fx[0 if paddle.is_left else 1]
@@ -752,6 +763,18 @@ class ReplayView:
         if pos < len(a) and ball.stuck and a[pos] < NO_AIM:
             ball.stuck["aim"] = a[pos]
         pos += 1
+        pu.holes = []
+        if pos < len(a):
+            n_holes = int(a[pos])
+            pos += 1
+            for _ in range(n_holes):
+                if pos + HOLE_FIELDS <= len(a):
+                    v = a[pos:pos + HOLE_FIELDS]
+                    pu.holes.append({"x": v[0], "y": v[1], "kind": int(v[2]), "power": v[3], "age": v[4],
+                                     "flash": v[5], "dying": None if v[6] < 0 else v[6],
+                                     "spin": 1 if v[7] >= 0 else -1, "way": None if v[8] >= NO_AIM else v[8],
+                                     "arrows": [angle for angle in v[9:11] if angle < NO_AIM]})
+                pos += HOLE_FIELDS
         self.objects = [*self.stones, self.p1, self.p2, ball, *self.extra_balls]
 
 

@@ -1216,6 +1216,19 @@ class Art:
         pygame.draw.arc(surf, pale, (*P(-.5, -.75), 1.0 * u, .6 * u), 0.3, 2.84, max(2, line // 2))
         self._arrow(surf, pale, P, (.5, -.38), (.35, -.62), max(2, line // 2))
 
+    def _icon_hole(self, surf, P, u, pale, line):
+        # a black heart in a swirling disc of light, three arms spiralling into it
+        pygame.draw.circle(surf, (34, 14, 60), P(0, 0), u * .98)
+        for rr, tint in ((.9, (150, 80, 255)), (.72, (220, 120, 210)), (.55, (255, 176, 96))):
+            pygame.draw.circle(surf, tint, P(0, 0), u * rr, max(2, line // 2))
+        for arm in range(3):
+            turn = arm * math.tau / 3
+            pts = [P(math.cos(turn + k * 2.4) * (.95 - k * .55), math.sin(turn + k * 2.4) * (.95 - k * .55))
+                   for k in (i / 12 for i in range(13))]
+            pygame.draw.lines(surf, pale, False, pts, max(2, line // 2))
+        pygame.draw.circle(surf, (0, 0, 0), P(0, 0), u * .36)
+        pygame.draw.circle(surf, (255, 232, 196), P(0, 0), u * .36, max(1, line // 3))
+
     def _icon_snowball(self, surf, P, u, pale, line):
         # a big snowball rolling right, a small one behind it, and the track it left
         pygame.draw.line(surf, pale, P(-1.0, .95), P(.95, .95), line)
