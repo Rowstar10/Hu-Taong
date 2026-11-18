@@ -58,10 +58,10 @@ class MatchSettings:
     """The rules of a match (Settings > Match, and Match Setup): the same for both players."""
 
     # Game modes, any of them together (see reset).  Chaos and Switch each come at a timing.
-    MODES = ("chaos", "switch", "curveball", "lantern_night", "twin_ball", "talisman_rush", "portal_pair")
+    MODES = ("chaos", "switch", "curveball", "lantern_night", "twin_ball", "talisman_rush", "black_hole")
     MODE_NAMES = {"chaos": "Chaos", "switch": "Switch", "curveball": "Curveball",
                   "lantern_night": "Lantern Night", "twin_ball": "Twin Ball", "talisman_rush": "Talisman Rush",
-                  "portal_pair": "Portal Pair"}
+                  "black_hole": "Black Hole"}
     CHAOS_TIMINGS = ("Every point", "Constant drift")
     SWITCH_TIMINGS = ("Every point", "Mid-rally")
     RUSH = 3.0                  # Talisman Rush: talismans come this many times as often
@@ -150,7 +150,8 @@ class MatchSettings:
         self.mode_lantern_night = False   # the court is always dark but for lanterns (the Lantern Night talisman, for good)
         self.mode_twin_ball = False  # every point is played with two balls, Red's and Blue's (the Twin Balls rules)
         self.mode_talisman_rush = False   # talismans on, and coming RUSH times as often
-        self.mode_portal_pair = False     # the Portal Pair talisman's portals, all match, growing all match
+        self.mode_black_hole = False      # a Black Hole all match, growing point after point till it collapses
+                                          # (1.8: Portal Pair was the mode until Rowan's second playtest)
 
         self.court = 0               # Classic: an open court
         self.online_host_blue = False    # online: the host plays Blue and the friend Red

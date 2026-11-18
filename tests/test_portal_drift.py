@@ -17,6 +17,16 @@ portal's spot was picked before the second's and could leave nowhere far enough 
 Rowan's 1.8 plan (2026-11-18): they grow bigger (to 120, from 96); a ball spends a moment inside
 (0.2 s, out of sight) while the way out flashes, and comes out 8% slower each trip, never slower
 than a serve nor faster than it went in.
+
+Rowan's second 1.8 playtest (same day): "I want the portal pairs to just be like the size that they
+are in the talisman power-up, and they don't grow in size, but they still drift across the court."
+They're 72 and stay it (the collapse went to the Black Hole, and the Portal Pair game mode became
+the Black Hole mode: see test_black_hole_grows).  "I don't like their dual-colouring as the way to
+determine the direction... change it to a dotted path line": dots along the way a ball comes out,
+faint, bright as one is about to.  And "the portals seemed to flip every now and then, not just
+rotate": a portal turned right round, and as its way out passed too steep it jumped from steeply up
+to steeply down.  Now one faces each way, and each sweeps up and down on its own side, turning back
+before it would send a ball out too steeply.
 """
 import math
 import random
@@ -51,7 +61,7 @@ class Portals(unittest.TestCase):
         self.pu.wait = 999.0
         ball = self.game.ball
         ball.x0, ball.x1 = 100, 100 + ball.width                  # (well away from where they open)
-        self.pu.open_portals(PowerUps.PORTAL_START_TALISMAN)
+        self.pu.open_portals()
         self.assertEqual(len(self.pu.portals), 2)
 
     def tearDown(self):
@@ -65,13 +75,14 @@ class Portals(unittest.TestCase):
             seen.append([dict(p) for p in self.pu.portals])
         return seen
 
-    def test_the_talismans_open_not_so_small(self):
+    def test_the_talismans_size_and_they_never_grow(self):
         self.pu.portals = []
         self.pu.collect({"kind": "portal", "x": 900, "y": 500}, self.game.p1)
-        for door in self.pu.portals:
-            self.assertEqual(door["r"], PowerUps.PORTAL_START_TALISMAN)
-        self.assertLess(PowerUps.PORTAL_START, PowerUps.PORTAL_START_TALISMAN)
-        self.assertLess(PowerUps.PORTAL_START_TALISMAN, PowerUps.PORTAL_R, "but not full size")
+        self.assertEqual([door["r"] for door in self.pu.portals], [72.0, 72.0])
+        for _ in range(8):
+            self.go_through(self.pu.portals[0])
+        self.assertEqual([door["r"] for door in self.pu.portals], [72.0, 72.0])
+        self.assertEqual(self.pu.holes, [], "nor collapse")
 
     def test_the_talismans_close_with_the_point(self):
         self.pu.on_point()
@@ -83,8 +94,9 @@ class Portals(unittest.TestCase):
         for i in range(2):
             path = sum(math.hypot(b[i]["x"] - a[i]["x"], b[i]["y"] - a[i]["y"]) for a, b in zip(frames, frames[1:]))
             self.assertGreater(path, PowerUps.PORTAL_DRIFT[0] * 5 * 0.9, "it didn't drift (or stuck)")
-            turned = abs((frames[-1][i]["angle"] - frames[0][i]["angle"] + math.pi) % math.tau - math.pi)
-            self.assertGreater(turned, 0.8, "its arrows didn't turn")
+            turned = sum(abs((b[i]["angle"] - a[i]["angle"] + math.pi) % math.tau - math.pi)
+                         for a, b in zip(frames, frames[1:]))
+            self.assertGreater(turned, 0.25, "it didn't turn")
 
     def test_slowly(self):
         frames = self.drift(2.0)
@@ -122,30 +134,42 @@ class Portals(unittest.TestCase):
                 break
             self.pu.update_portals(DT)
 
-    def test_each_ball_through_grows_both_to_their_full_size(self):
-        sizes = []
-        for _ in range((PowerUps.PORTAL_R - PowerUps.PORTAL_START_TALISMAN) // PowerUps.PORTAL_GROW):
-            self.go_through(self.pu.portals[0])                   # (one more and they collapse: 1.8,
-            sizes.append([p["r"] for p in self.pu.portals])      #  test_portal_collapse)
-        self.assertEqual(sizes[0], [PowerUps.PORTAL_START_TALISMAN + PowerUps.PORTAL_GROW] * 2)
-        self.assertEqual(sizes[-1], [PowerUps.PORTAL_R] * 2)
-        self.assertTrue(all(b >= a for (a, _), (b, _) in zip(sizes, sizes[1:])))
+    def test_one_faces_each_way_and_sweeps_up_and_down_without_flipping(self):
+        """However it sweeps, a portal faces its own side, never too steeply (so the way it's drawn
+        facing is the way a ball comes out), and turns smoothly: no jump from steeply up to steeply
+        down.  It sweeps right up to as steep as a ball may leave, and back."""
+        sides = sorted(math.copysign(1, math.cos(door["angle"])) for door in self.pu.portals)
+        self.assertEqual(sides, [-1, 1])
+        frames = [[dict(p) for p in self.pu.portals]] + self.drift(40.0)
+        for i in range(2):
+            side = math.copysign(1, math.cos(frames[0][i]["angle"]))
+            for a, b in zip(frames, frames[1:]):
+                angle = b[i]["angle"]
+                dx, dy = PowerUps.portal_exit(angle)
+                self.assertAlmostEqual(dx, math.cos(angle), places = 9, msg = "steeper than a ball may leave")
+                self.assertAlmostEqual(dy, math.sin(angle), places = 9)
+                self.assertGreater(dx * side, 0, "it turned right round")
+                jump = abs((angle - a[i]["angle"] + math.pi) % math.tau - math.pi)
+                self.assertLessEqual(jump, PowerUps.PORTAL_TURN[1] * DT + 1e-6, "it flipped")
+            steepest = min(abs(math.cos(f[i]["angle"])) for f in frames)
+            self.assertLess(steepest, PowerUps.PORTAL_STEEPEST + 0.03, "it sweeps as steep as it may")
+            ups = [math.sin(f[i]["angle"]) for f in frames]
+            self.assertTrue(min(ups) < -0.5 and max(ups) > 0.5, "up and down")
 
-    def test_never_out_steeper_than_before(self):
-        self.pu.portals[1]["angle"] = math.pi / 2                 # its arrows point straight down just now
-        self.pu.portals[1]["spin"] = 0.0
-        self.go_through(self.pu.portals[0])
-        ball = self.game.ball
-        speed = math.hypot(ball.vx, ball.vy)
-        self.assertAlmostEqual(speed, 600, delta = 1)
-        self.assertGreaterEqual(abs(ball.vx) / speed, PowerUps.PORTAL_STEEPEST - 1e-6)
-        self.assertGreater(ball.vy, 0, "still down, as far as it may")
+    def test_the_ball_comes_out_the_way_it_faces(self):
+        for _ in range(20):
+            self.drift(0.7)
+            self.go_through(self.pu.portals[0])
+            ball, out = self.game.ball, self.pu.portals[1]
+            self.assertAlmostEqual(math.atan2(ball.vy, ball.vx), app.renderer.portal_facing(out), places = 6)
 
     def test_says_so(self):
         about = BY_KEY["portal"].about
         self.assertIn("drifting", about)
-        self.assertIn("grow", about)
-        self.assertIn("turn", about)
+        self.assertIn("one facing each way", about)
+        self.assertIn("dotted line", about)
+        self.assertIn("sweeps up and down", about)
+        self.assertNotIn("grow", about)
 
     def test_replays_and_the_friends_screen_show_them(self):
         self.go_through(self.pu.portals[0])
@@ -197,85 +221,32 @@ class Portals(unittest.TestCase):
         self.go_through(self.pu.portals[0], 400.0)
         self.assertAlmostEqual(math.hypot(ball.vx, ball.vy), 400.0, delta = 1, msg = "nor faster than it went in")
 
-    def test_bigger(self):
-        self.assertEqual(PowerUps.PORTAL_R, 120)
+    def test_the_talismans_size(self):
+        self.assertEqual(PowerUps.PORTAL_R, 72)
 
 
-class PortalPairMode(unittest.TestCase):
-    """The mode: the talisman's portals, open all match, growing all match."""
+class NoPortalPairMode(unittest.TestCase):
+    """Rowan's second 1.8 playtest: the Portal Pair game mode became the Black Hole mode (see
+    test_black_hole_grows), and the Portal Pair talisman turns up in a Black Hole match."""
 
-    def setUp(self):
+    def test_gone(self):
+        self.assertNotIn("portal_pair", m.MODES)
+        self.assertFalse(hasattr(m, "mode_portal_pair"))
+        self.assertNotIn("Portal Pair match", BY_KEY["portal"].about)
+        self.assertNotIn("portal_pair", app.renderer.MODE_TIPS)
+
+    def test_the_talisman_turns_up_in_a_black_hole_match(self):
         random.seed(23)
         m.reset()
-        m.mode_portal_pair = True
-        self.game = Hu_Taong(app)
-        self.game.start()
-        self.game.countdown, self.game.paused = None, False
-        self.pu = self.game.powerups
-        self.pu.wait = 999.0
-
-    def tearDown(self):
-        self.game.stop()
-        m.reset()
-
-    def next_point(self):
-        g = self.game
-        g.on_score(g.ball, {"normal": (1, 0)})
-        g.message_timer = 0.001
-        g.update(0.01)
-
-    def grow(self, times):
-        ball = self.game.ball
-        for _ in range(times):
-            door = self.pu.portals[0]
-            ball.x0, ball.y0 = door["x"] - ball.width / 2, door["y"] - ball.height / 2
-            ball.x1, ball.y1 = ball.x0 + ball.width, ball.y0 + ball.height
-            ball.vx, ball.vy, ball.portal_cool = 600.0, 0.0, 0.0
-            self.pu.portal_trips = 0
-            self.pu.update_portals(1 / 60)
-            while ball.transit:                                  # (a moment inside: 1.8)
-                self.pu.update_portals(1 / 60)
-
-    def test_open_from_the_first_serve_small(self):
-        self.assertEqual(len(self.pu.portals), 2)
-        self.assertEqual([p["r"] for p in self.pu.portals], [PowerUps.PORTAL_START] * 2)
-
-    def test_they_last_the_match_and_keep_their_size(self):
-        self.grow(2)
-        size = self.pu.portals[0]["r"]
-        self.assertGreater(size, PowerUps.PORTAL_START)
-        for _ in range(3):
-            self.next_point()
-            self.assertEqual(len(self.pu.portals), 2, "closed at the end of a point")
-            self.assertEqual(self.pu.portals[0]["r"], size, "shrank back between points")
-
-    def test_still_no_bigger_than_full_size(self):
-        self.grow(4)
-        self.next_point()
-        self.grow(5)                                              # (one more and they collapse: 1.8)
-        self.assertEqual([p["r"] for p in self.pu.portals], [PowerUps.PORTAL_R] * 2)
-
-    def test_a_loop_shuts_them_till_the_next_serve_as_big_as_they_were(self):
-        self.grow(3)
-        size = self.pu.portals[0]["r"]
-        self.pu.close_portals()
-        self.assertEqual(self.pu.portals, [])
-        self.next_point()
-        self.assertEqual([p["r"] for p in self.pu.portals], [size] * 2)
-
-    def test_no_portal_pair_talisman(self):
-        self.assertFalse(self.pu.spawnable(BY_KEY["portal"]))
-        self.assertIn("in a Portal Pair match", BY_KEY["portal"].about)
-
-    def test_switched_off_mid_match_they_go_at_the_next_serve(self):
-        m.mode_portal_pair = False
-        self.next_point()
-        self.assertEqual(self.pu.portals, [])
-
-    def test_saved_and_on_match_setup(self):
-        from core import save_data
-        self.assertIn("mode_portal_pair", save_data.collect(app)["gameplay"])
-        self.assertIn("portal_pair", app.renderer.MODE_TIPS)
+        m.mode_black_hole = True
+        game = Hu_Taong(app)
+        game.start()
+        try:
+            self.assertEqual(game.powerups.portals, [])
+            self.assertTrue(game.powerups.spawnable(BY_KEY["portal"]))
+        finally:
+            game.stop()
+            m.reset()
 
 
 class FriendsScreen(unittest.TestCase):
@@ -331,13 +302,13 @@ class AlwaysOpen(unittest.TestCase):
             pu, ball = game.powerups, game.ball
             stones = [o for o in game.objects if getattr(o, "is_obstacle", False)]
             try:
-                for start in (PowerUps.PORTAL_START, PowerUps.PORTAL_START_TALISMAN, PowerUps.PORTAL_R):
+                for start in (PowerUps.PORTAL_R,):
                     room = pu.portal_room(start)
                     for i in range(150):
                         x = (100, 960, 1800)[i % 3]
                         ball.x0, ball.x1 = x, x + ball.width
                         pu.portals = []
-                        pu.open_portals(start)
+                        pu.open_portals()
                         with self.subTest(court = court, start = start, try_ = i):
                             self.assertEqual(len(pu.portals), 2, "no portals opened")
                             a, b = pu.portals
@@ -352,22 +323,23 @@ class AlwaysOpen(unittest.TestCase):
 
 
 class BuiltAhead(unittest.TestCase):
-    def test_every_size_they_grow_through(self):
+    def test_open_flashing_and_every_size_they_shut_through(self):
         from tests.test_warm_art import Counting
         app.dt = 1 / 60
-        portals = [{"x": 700, "y": 400, "angle": a, "r": float(R), "flash": f}
-                   for R in range(PowerUps.PORTAL_GROW, PowerUps.PORTAL_R + 1, PowerUps.PORTAL_GROW)
-                   for a in (0.0, 1.4, 3.0) for f in (0.0, 0.5, 1.0)]
+        portals = [{"x": 700, "y": 400, "angle": a, "r": float(PowerUps.PORTAL_R), "flash": f}
+                   for a in (0.0, 0.6, -1.1, 3.0, 2.3) for f in (0.0, 0.25, 0.5, 0.75, 1.0)]
+        closing = [{"x": 1200, "y": 600, "angle": 0.4, "r": float(PowerUps.PORTAL_R), "flash": 0.0, "shut": s / 20}
+                   for s in range(1, 21)]
         with Counting() as c:
-            app.renderer.draw_portals(app.virtual, SimpleNamespace(portals = portals, closing = []), 0, 0)
+            app.renderer.draw_portals(app.virtual, SimpleNamespace(portals = portals, closing = closing), 0, 0)
         self.assertEqual(c.built, [])
 
 
 class Ovals(unittest.TestCase):
     """Rowan's playtest (2026-11-18): keeping track of the turning arrows was hard ("what about
     having them slightly ellipse shaped, so the ball will fly out the widest side").  A portal is an
-    oval, wide across its face and shallow along its way out; the front (the way out) is rimmed
-    bright, and no arrows are drawn."""
+    oval, wide across its face and shallow along its way out, and no arrows are drawn.  (Its front
+    was rimmed bright, until the second playtest: see DottedWay.)"""
 
     def test_wide_across_and_shallow_along_the_way_out(self):
         r = app.renderer
@@ -387,6 +359,68 @@ class Ovals(unittest.TestCase):
                    {"x": 1200, "y": 700, "angle": 2.0, "r": 120.0, "flash": 1.0}]
         self.assertEqual(straight_lines(lambda: app.renderer.draw_portals(
             app.virtual, SimpleNamespace(portals = portals, closing = []), 0, 0)), 0)
+
+
+class DottedWay(unittest.TestCase):
+    """Rowan's second playtest: dots from each portal's front along the way a ball comes out of it,
+    faint, and brighter and bigger as a ball is about to come out; bouncing off the top and bottom
+    as a ball would, and stopping at a stone.  None as a portal shuts."""
+    EDGE = (14, 18, 38)                                           # (each dot's dark edge)
+
+    def dots(self, door, stones = (), closing = False):
+        import pygame
+        seen, real = [], pygame.draw.circle
+
+        def circle(surface, colour, centre, radius, *a, **k):
+            seen.append((centre, radius, tuple(colour)[:3]))
+            return real(surface, colour, centre, radius, *a, **k)
+        pygame.draw.circle = circle
+        try:
+            app.dt = 1 / 60
+            app.renderer.draw_portals(app.virtual, SimpleNamespace(
+                portals = [] if closing else [door], closing = [door] if closing else [],
+                game = SimpleNamespace(objects = list(stones))), 0, 0)
+        finally:
+            pygame.draw.circle = real
+        R = app.renderer.portal_size(door)
+        return [(c, r, col) for c, r, col in seen
+                if col != self.EDGE and math.hypot(c[0] - door["x"], c[1] - door["y"]) > R]
+
+    def door(self, x = 700.0, y = 540.0, angle = 0.3, flash = 0.0):
+        return {"x": x, "y": y, "angle": angle, "r": float(PowerUps.PORTAL_R), "flash": flash}
+
+    def test_along_the_way_out(self):
+        door = self.door()
+        dots = self.dots(door)
+        self.assertGreaterEqual(len(dots), 12)
+        ux, uy = math.cos(0.3), math.sin(0.3)
+        for (x, y), _, _ in dots:
+            ahead = (x - door["x"]) * ux + (y - door["y"]) * uy
+            off = abs((x - door["x"]) * uy - (y - door["y"]) * ux)
+            self.assertGreater(ahead, 0)
+            self.assertLess(off, 1.5)
+
+    def test_brighter_and_bigger_as_a_ball_is_about_to_come_out(self):
+        faint, bright = self.dots(self.door()), self.dots(self.door(flash = 1.0))
+        self.assertGreater(sum(r for _, r, _ in bright), sum(r for _, r, _ in faint) * 1.25)
+        self.assertGreater(sum(sum(col) for _, _, col in bright) / len(bright),
+                           sum(sum(col) for _, _, col in faint) / len(faint) + 60)
+
+    def test_bouncing_off_the_bottom_as_a_ball_would(self):
+        dots = self.dots(self.door(x = 900.0, y = 950.0, angle = 1.0))
+        ys = [y for (_, y), _, _ in dots]
+        self.assertLessEqual(max(ys), BASE_H - 15)
+        self.assertLess(ys[-1], max(ys) - 50, "back up after the bounce")
+
+    def test_stopping_at_a_stone(self):
+        stone = SimpleNamespace(is_obstacle = True, x0 = 950, y0 = 0, x1 = 1010, y1 = BASE_H)
+        dots = self.dots(self.door(angle = 0.0), [stone])
+        self.assertTrue(dots)
+        self.assertLess(max(x for (x, _), _, _ in dots), 950)
+
+    def test_none_as_it_shuts(self):
+        door = dict(self.door(), shut = 0.5)
+        self.assertEqual(self.dots(door, closing = True), [])
 
 
 if __name__ == "__main__":

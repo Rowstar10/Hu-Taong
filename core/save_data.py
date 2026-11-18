@@ -11,7 +11,7 @@ from game.powerups import KINDS as POWERUP_KINDS
 # now: "gameplay" holds the Match rules, "interface" the keys, the countdown and the effects as
 # well.  Every version shares the one save, so 1.6 still reads what 1.7 writes, and the other way.
 MODES = ["mode_chaos", "chaos_timing", "mode_switch", "switch_timing", "mode_curveball",
-         "mode_lantern_night", "mode_twin_ball", "mode_talisman_rush", "mode_portal_pair"]
+         "mode_lantern_night", "mode_twin_ball", "mode_talisman_rush", "mode_black_hole"]
 GAMEPLAY = ["paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "ball_speed",
             "winning_score_index", "win_by_two", "ai_difficulty", "adaptive_ai",
             "vs_ai", "play_as_blue", "middle_wall", "ai_style", "pace", "physics", "speed_cap",
@@ -71,10 +71,12 @@ def _limits(app):
 
 
 def _old_modes(m):
-    """The modes as 1.6 saved them, written alongside so 1.6 still reads a 1.7 save."""
+    """The modes as older versions saved them, written alongside so they still read this save:
+    1.6's, and 1.7's Portal Pair, which is the Black Hole mode from 1.8."""
     return {"chaos_mode": m.chaos_timing + 1 if m.mode_chaos else 0,
             "chaos_switch": m.switch_timing + 1 if m.mode_switch else 0,
-            "curveball": m.mode_curveball, "lantern_night": m.mode_lantern_night}
+            "curveball": m.mode_curveball, "lantern_night": m.mode_lantern_night,
+            "mode_portal_pair": m.mode_black_hole}
 
 
 def _section(s, keys):
@@ -171,6 +173,8 @@ def load(app):
     if isinstance(old, dict) and "pu_shape" not in old and isinstance(old.get("pu_chaos"), bool):
         s.match.pu_shape = old["pu_chaos"]          # Shape Shift was the Chaos Mode + talisman
     _migrate_modes(s.match, old)
+    if isinstance(old, dict) and "mode_black_hole" not in old and old.get("mode_portal_pair") is True:
+        s.match.mode_black_hole = True              # 1.7's Portal Pair mode is the Black Hole mode now (1.8)
     _restore_section(s, data.get("display"), limits)
     shown = data.get("display") or {}
     if isinstance(shown, dict) and "court_dim_level" not in shown:

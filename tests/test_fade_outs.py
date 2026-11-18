@@ -76,7 +76,7 @@ class OnTheCourt(Match):
         self.assertEqual(self.pu.ball_alpha(), 1.0)
 
     def test_closing_portals_shrink_away(self):
-        self.pu.open_portals(PowerUps.PORTAL_START_TALISMAN)
+        self.pu.open_portals()
         self.pu.close_portals()
         self.assertEqual(self.pu.portals, [])
         self.assertEqual(len(self.pu.closing), 2)
@@ -91,7 +91,7 @@ class OnTheCourt(Match):
         self.assertEqual(self.pu.closing, [])
 
     def test_the_talismans_portals_shrink_away_at_the_points_end(self):
-        self.pu.open_portals(PowerUps.PORTAL_START_TALISMAN)
+        self.pu.open_portals()
         self.pu.on_point()
         self.assertEqual(len(self.pu.closing), 2)
 

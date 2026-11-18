@@ -4,7 +4,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
 from config import BASE_W, BASE_H
-from helpers import clamp, clamp01, lerp
+from helpers import clamp, clamp01, lerp, reflect_in_range
 from render import theme
 from render.art import ADD, blank, mix, scaled, v_gradient
 from core.settings import key_name
@@ -558,14 +558,11 @@ class Renderer:
                                        bottom=(255, 200, 80), glow=None))
         for n in range(1, 6):                                 # the Firecracker's 5-to-1 over the ball
             jobs.append(lambda n=n: self.cracker_digit(n))
-        for R in range(PowerUps.PORTAL_GROW, PowerUps.PORTAL_R + 1, PowerUps.PORTAL_GROW):   # every size a portal grows through
-            jobs.append(lambda R=R: art.glow(int(R * 2.2) // 4 * 4, scaled((150, 100, 255), .7)))  # (and shrinks)
-        jobs.append(lambda: self.portal_front_glow())
-        for R in (64, 96, 120):                               # (each size of a portal's flash, at each strength)
-            jobs.append(lambda R=R: [self.portal_burst(R, level / 4) for level in range(1, 5)])
-        jobs.append(lambda: [self.hole_sprites(level) for level in range(1, 9)])      # Black Hole (1.8)
-        jobs.append(lambda: [self.collapse_flare(level) for level in range(1, 5)])
-        jobs.append(lambda: [art.glow(level * 18 + 24, scaled((240, 230, 255), level / 8)) for level in range(1, 9)])
+        for R in range(self.PORTAL_STEP, PowerUps.PORTAL_R + 1, self.PORTAL_STEP):   # every size a portal shuts through
+            jobs.append(lambda R=R: art.glow(int(R * 2.2) // 4 * 4, scaled((150, 100, 255), .7)))
+        jobs.append(lambda: [self.portal_burst(PowerUps.PORTAL_R, level / 4) for level in range(1, 5)])
+        jobs.append(lambda: [self.path_dot(level) for level in range(1, self.PATH_LEVELS + 1)])
+        jobs.append(lambda: [self.hole_sprites(level) for level in range(1, self.HOLE_LEVELS + 1)])      # Black Hole (1.8)
         jobs.append(lambda: [art.glow(level * 14 + 16, scaled((255, 236, 210), level / 8)) for level in range(1, 9)])
         jobs.append(lambda: art.glow(5, (150, 104, 230)))
         for mark in "三二一":
@@ -752,12 +749,11 @@ class Renderer:
                      "~ The Twin Balls talisman doesn't turn up",
         "talisman_rush": "Talisman Rush\nTalismans turn up three times as often, as many at once as come.\n"
                          "• Even with Power-Ups off: the ones switched on in Power-Ups are used",
-        "portal_pair": "Portal Pair\nTwo linked portals drift about the court all match: in one, out the other.\n"
-                       "• They open small, grow a little each time a ball goes through, and stay that big point after point\n"
-                       "• Each is an oval, and the ball comes out of its bright wide side; they slowly turn\n"
-                       "• At full size, the next ball through sets them collapsing into a black hole: a ball it swallows\n"
-                       "  comes out as Twin Balls, and mini black holes come and go till the point ends; then they open small again\n"
-                       "~ The Portal Pair talisman doesn't turn up"}
+        "black_hole": "Black Hole\nA black hole drifts about mid-court all match, pulling the ball in and flinging it out.\n"
+                      "• It grows with each ball it swallows, and stays that big point after point\n"
+                      "• Grown twice, the next ball it swallows makes it collapse in on itself: the ball bursts out as\n"
+                      "  Twin Balls, and mini black holes come and go till the point ends; a new one opens at the next serve\n"
+                      "~ The Black Hole talisman doesn't turn up"}
 
     def modes_section(self, ui, s, font, m=None, columns=3):
         """The game modes, any of them together: an on/off for each, and for Chaos and Switch one
@@ -777,7 +773,7 @@ class Renderer:
             return CycleToggle(f"cycle_mode_{key}", texts, font, level, glyphs, tip=self.MODE_TIPS[key])
 
         buttons = [cycled("chaos", m.CHAOS_TIMINGS, "关乱狂"), cycled("switch", m.SWITCH_TIMINGS, "关换狂"),
-                   mode("portal_pair"), mode("curveball"), mode("lantern_night"), mode("twin_ball"),
+                   mode("black_hole"), mode("curveball"), mode("lantern_night"), mode("twin_ball"),
                    mode("talisman_rush")]
         buttons += [Space() for _ in range(-len(buttons) % columns)]
         rows = Grid([buttons[i:i + columns] for i in range(0, len(buttons), columns)],
@@ -2304,23 +2300,27 @@ class Renderer:
         return self.art.gilded(str(n), self.art.ui(56), top=(255, 170, 150), bottom=(226, 34, 30), glow=None)
 
     def draw_portals(self, screen, powerups, ox, oy):
-        """Portal Pair: two swirling ovals, linked, each coming out of its bright side (1.8 playtest:
-        the turning arrows were hard to keep track of).  Closing ones shrink away (1.8)."""
+        """Portal Pair: two swirling ovals, linked, each with a dotted line along the way a ball comes
+        out of it (1.8 playtest: turning arrows, and then a bright side, were hard to keep track of).
+        Closing ones shrink away (1.8)."""
         portals = getattr(powerups, "portals", [])
         closing = getattr(powerups, "closing", [])
         if not portals and not closing:
             return
         t = self.app.fx.time
+        stones = [o for o in getattr(getattr(powerups, "game", None), "objects", ()) if getattr(o, "is_obstacle", False)]
         for i, door in enumerate(portals + closing):
             shut = door.get("shut", 1.0) if door in closing else 1.0
             R = self.portal_size(door)
             if shut < 1.0:
-                R = max(PowerUps.PORTAL_GROW, int(R * shut / PowerUps.PORTAL_GROW) * PowerUps.PORTAL_GROW)
+                R = max(self.PORTAL_STEP, int(R * shut / self.PORTAL_STEP) * self.PORTAL_STEP)
             x, y = door["x"] + ox, door["y"] + oy
             glow = self.art.glow(int(R * 2.2) // 4 * 4, scaled((150, 100, 255), .7))
             screen.blit(glow, glow.get_rect(center=(x, y)), special_flags=ADD)
             facing = self.portal_facing(door)
             flash = round(door.get("flash", 0.0) * 4) / 4         # (1.8: the way out, just before a ball comes out)
+            if shut >= 1.0:
+                self.draw_portal_path(screen, door, R, facing, t, flash, stones, ox, oy)
             if flash > 0:
                 burst = self.portal_burst(R, flash)
                 screen.blit(burst, burst.get_rect(center=(x, y)), special_flags=ADD)
@@ -2330,6 +2330,8 @@ class Renderer:
                 pygame.draw.lines(screen, (235, 255, 255), True, pulse, max(2, int(7 * flash)))
 
     PORTAL_SQUASH = 0.62        # a portal's depth along its way out, over its width across its face
+    PORTAL_STEP = 8             # a portal's radius as drawn goes in these steps (so each size's glow is built once)
+    PATH_GAP, PATH_DOTS, PATH_LEVELS = 30, 16, 6      # its dotted way out: px apart, how many dots, how many strengths
 
     @staticmethod
     def portal_facing(door):
@@ -2364,48 +2366,66 @@ class Renderer:
         size = 160 if R < 80 else 256 if R < 104 else 384
         return self.art.glow(size, scaled((200, 250, 255), max(1, min(4, round(flash * 4))) / 4))
 
-    def portal_front_glow(self):
-        return self.art.glow(44, scaled((120, 240, 255), .55))
-
     def draw_portal(self, screen, x, y, R, facing, t, spin, flash = 0.0):
-        """A portal (1.8 playtest: the turning arrows were hard to keep track of): an oval, wide
-        across its face and shallow along its way out, so a ball comes out of a wide side.  That
-        side, its front, has a bright rim with light spilling out of it; the back's rim is dim."""
-        dx, dy = math.cos(facing), math.sin(facing)
-        gfxdraw.filled_polygon(screen, self.portal_outline(x, y, R, facing), (20, 8, 40, 200))
+        """A portal: an oval, wide across its face and shallow along its way out, so a ball comes out
+        of a wide side; swirling inside, and rimmed with light all round.  (1.8 playtest: its way
+        out was a turning arrow, then its bright front; now it's dotted, see draw_portal_path.)"""
+        outline = self.portal_outline(x, y, R, facing)
+        gfxdraw.filled_polygon(screen, outline, (20, 8, 40, 200))
         gfxdraw.filled_polygon(screen, self.portal_outline(x, y, R, facing, 0.7), (60, 30, 120, 150))
         for k in range(10):                                    # a swirl inside
             px, py = self.portal_point(x, y, R, facing, spin * t * 3.2 + k * math.tau / 10,
                                        0.55 + 0.12 * math.sin(t * 4 + k))
             pygame.draw.circle(screen, (210, 190, 255), (int(px), int(py)), 3)
-        back = self.portal_outline(x, y, R, facing, 1.0, "back")
-        pygame.draw.lines(screen, (110, 76, 190), False, back, 3)
-        glow = self.portal_front_glow()
-        cx, cy = self.portal_point(x, y, R, facing, 0.0)
-        screen.blit(glow, glow.get_rect(center=(cx, cy)), special_flags=ADD)
-        front = self.portal_outline(x, y, R, facing, 1.0, "front")
-        pygame.draw.lines(screen, (24, 70, 100), False, front, 11)
-        pygame.draw.lines(screen, mix((160, 244, 255), (255, 255, 255), flash), False, front, 6)
-        for k in range(9):                                     # light spilling out of its front
-            f = (t * 0.8 + k * 0.618) % 1.0
-            sx, sy = self.portal_point(x, y, R, facing, -1.25 + 2.5 * ((k * 0.381966) % 1.0))
-            d = f * 70
-            pygame.draw.circle(screen, scaled((170, 245, 255), 1 - f), (int(sx + dx * d), int(sy + dy * d)),
-                               max(1, int(4 * (1 - f)) + 1))
+        pygame.draw.lines(screen, (40, 20, 90), True, outline, 9)
+        pygame.draw.lines(screen, mix((190, 150, 255), (255, 255, 255), flash), True, outline, 4)
 
-    @staticmethod
-    def portal_size(door):
-        """A portal's radius as drawn: in PORTAL_GROW steps, so each size's sprites are built once."""
-        step = PowerUps.PORTAL_GROW
+    def path_dot(self, level):
+        return self.art.glow(10, scaled((150, 235, 255), level / self.PATH_LEVELS))
+
+    def draw_portal_path(self, screen, door, R, facing, t, flash, stones, ox, oy):
+        """The way a ball comes out of a portal, dotted (1.8 playtest): from its front along the path
+        a ball takes, bouncing off the top and bottom, up to any stone in the way.  Small dim dots,
+        edged dark so they show over any background, drifting outwards; big and bright, and
+        glowing, as a ball is about to come out."""
+        dx, dy = math.cos(facing), math.sin(facing)
+        r = 16                                                 # (about a ball's radius)
+        start = R * self.PORTAL_SQUASH + 8
+        offset = (t * 45) % self.PATH_GAP
+        length = self.PATH_GAP * self.PATH_DOTS
+        for i in range(self.PATH_DOTS):
+            d = start + offset + i * self.PATH_GAP
+            px = door["x"] + dx * d
+            py, _ = reflect_in_range(door["y"] + dy * d, r, BASE_H - r)
+            if not r < px < BASE_W - r or any(o.x0 < px < o.x1 and o.y0 < py < o.y1 for o in stones):
+                break
+            fade = (1 - (d - start) / length) * min(1.0, (d - start) / self.PATH_GAP)    # (in at the portal, out far off)
+            centre = (int(px + ox), int(py + oy))
+            if flash > 0:
+                level = round(flash * fade * self.PATH_LEVELS)
+                if level > 0:
+                    dot = self.path_dot(level)
+                    screen.blit(dot, dot.get_rect(center=centre), special_flags=ADD)
+            size = round(1 + 2.5 * fade + 2 * flash * fade)
+            if size < 1:
+                continue
+            pygame.draw.circle(screen, (14, 18, 38), centre, size + 1)
+            pygame.draw.circle(screen, mix(scaled((140, 225, 255), 0.6 + 0.4 * fade), (255, 255, 255), flash), centre, size)
+
+    @classmethod
+    def portal_size(cls, door):
+        """A portal's radius as drawn: in PORTAL_STEP steps, so each size's sprites are built once."""
+        step = cls.PORTAL_STEP
         return max(step, int(round(door.get("r", PowerUps.PORTAL_R) / step)) * step)
 
     HOLE_TINT = (150, 70, 255)
+    HOLE_LEVELS = 12            # sizes of a black hole's disc: 8 as it opens, then up to 12 as it grows
     HOLE_MOTES = [(_r.uniform(0, math.tau), _r.random(), _r.uniform(0.22, 0.38))
                   for _r in [random.Random(1808)] for _ in range(40)]    # dust round a black hole: where, when, how fast
 
     def hole_sprites(self, level):
-        """A black hole's glowing disc and the glow round it, at one of eight sizes (it opens, and
-        implodes, through them)."""
+        """A black hole's glowing disc and the glow round it, at one of HOLE_LEVELS sizes (it opens,
+        grows and implodes through them)."""
         art = self.art
         disc = art.get(("hole_disc", level), self._hole_disc, level)
         glow = art.glow((int(150 * level / 8) // 4) * 4 + 8, scaled(self.HOLE_TINT, .55))
@@ -2430,9 +2450,10 @@ class Renderer:
 
     def draw_holes(self, screen, powerups, ox, oy):
         """Black holes (1.8): dust drawn in from the edge of the pull, a glowing disc swirling round
-        a black heart that pulses as it swallows a ball, and at the point's end, an implosion.  No
-        arrows: none shows which way a ball will come out (Rowan's playtest).  (Everything is worked out from the time and the hole itself, so replays
-        and the friend's screen draw the same.)"""
+        a black heart that pulses as it swallows a ball, bigger as it grows; a collapse; and at the
+        point's end, an implosion.  No arrows: none shows which way a ball will come out (Rowan's
+        playtest).  (Everything is worked out from the time and the hole itself, so replays and the
+        friend's screen draw the same.)"""
         holes = getattr(powerups, "holes", [])
         if not holes:
             return
@@ -2440,25 +2461,23 @@ class Renderer:
         mote = art.glow(5, (150, 104, 230))
         for hole in holes:
             x, y = hole["x"] + ox, hole["y"] + oy
-            reach, _pull, core = PowerUps.hole_style(hole["kind"])
+            reach, _pull, core = PowerUps.hole_style(hole)
             spin = hole.get("spin", 1)
             dying = hole.get("dying")
             kind = hole["kind"]
+            size = hole.get("size", 1.0)
             if dying is not None:
                 self.draw_implosion(screen, x, y, core, spin, 1 - dying / PowerUps.HOLE_IMPLODE,
-                                    0.4 if kind == PowerUps.HOLE_MINI else 1.0)
+                                    0.4 if kind == PowerUps.HOLE_MINI else size)
                 continue
             if kind == PowerUps.HOLE_MINI:
                 self.draw_mini(screen, hole, x, y, reach, core, t)
                 continue
-            if kind == PowerUps.HOLE_COLLAPSE and hole.get("age", 0.0) < PowerUps.COLLAPSE_TIME:
-                self.draw_collapse(screen, hole, x, y, core, t)
+            if hole.get("collapse") is not None:
+                self.draw_collapse(screen, hole, x, y, core, size, spin, t)
                 continue
-            if kind == PowerUps.HOLE_COLLAPSE:
-                s = 1.0
-            else:
-                s = min(1.0, hole.get("age", 1.0) / PowerUps.HOLE_OPEN)
-                s = 1 - (1 - s) ** 3                               # it bursts open, then settles
+            s = min(1.0, hole.get("age", 1.0) / PowerUps.HOLE_OPEN)
+            s = 1 - (1 - s) ** 3                                   # it bursts open, then settles
             # dust drawn in from the edge of its pull, faster as it nears the heart
             for a0, p0, rate in self.HOLE_MOTES:
                 p = (t * rate + p0) % 1.0
@@ -2466,12 +2485,12 @@ class Renderer:
                 a = a0 + spin * p * 5.0
                 screen.blit(mote, mote.get_rect(center=(x + math.cos(a) * rr, y + math.sin(a) * rr)), special_flags=ADD)
             # the glow and the disc
-            level = max(1, round(s * 8))
+            level = max(1, min(self.HOLE_LEVELS, round(s * 8 * size)))
             disc, glow = self.hole_sprites(level)
             screen.blit(glow, glow.get_rect(center=(x, y)), special_flags=ADD)
             screen.blit(disc, disc.get_rect(center=(x, y)))
             # bright streaks swirling round it, the inner ones faster
-            self.draw_hole_swirl(screen, x, y, core, spin, t, s)
+            self.draw_hole_swirl(screen, x, y, core, spin, t, s, spread = 76 * size)
             # the black heart, rimmed with light
             heart = max(2, int(core * s))
             pygame.draw.circle(screen, (0, 0, 0), (int(x), int(y)), heart)
@@ -2481,21 +2500,18 @@ class Renderer:
                 self.draw_swallowing(screen, x, y, core, spin, hole["flash"], t)
 
     @staticmethod
-    def draw_hole_swirl(screen, x, y, core, spin, t, s, inward = 0.0):
-        """Streaks of light circling a black hole's heart, each with a short tail; `inward` (0-1)
-        draws them spiralling down into it as it implodes."""
+    def draw_hole_swirl(screen, x, y, core, spin, t, s, inward = 0.0, spread = 76):
+        """Streaks of light circling a black hole's heart, each with a short tail, out to `spread` px
+        past it; `inward` (0-1) draws them spiralling down into it as it implodes."""
         for i in range(18):
             ring = (i % 6) / 5
-            rr = (core * 1.15 + 76 * ring * (1 - inward)) * s
+            rr = (core * 1.15 + spread * ring * (1 - inward)) * s
             a = spin * t * (4.4 - 2.8 * ring) * (1 + 3 * inward) + i * 2.39996
             tint = mix((255, 214, 150), (196, 130, 255), ring)
             for j in range(3):
                 aj = a - spin * j * 0.13
                 pygame.draw.circle(screen, scaled(tint, 1 - j * 0.3),
                                    (int(x + math.cos(aj) * rr), int(y + math.sin(aj) * rr)), max(1, 3 - j))
-
-    def collapse_flare(self, level):
-        return self.art.glow(int(PowerUps.PORTAL_R * 2.5) // 8 * 8, scaled((236, 220, 255), level / 4 * 0.6))
 
     def draw_swallowing(self, screen, x, y, core, spin, flash, t):
         """A black hole has a ball: it's drawn out into a streak spiralling into the heart, and the
@@ -2513,59 +2529,41 @@ class Renderer:
         pulse = int(core * (1.2 + 1.6 * min(1.0, k)))
         pygame.draw.circle(screen, scaled((255, 236, 210), max(0.2, flash)), (int(x), int(y)), pulse, max(1, int(5 * flash)))
 
-    def draw_collapse(self, screen, hole, x, y, core, t):
-        """Portal Pair's portals collapse (1.8), over COLLAPSE_TIME: they flare, then spiral in round
-        each other, shrinking, as streams of light pour into a black heart forming between them;
-        then they merge with a flash and a shockwave."""
-        art = self.art
-        age = hole.get("age", 0.0)
-        flare_end, spiral_end, total = PowerUps.COLLAPSE_FLARE, PowerUps.COLLAPSE_SPIRAL, PowerUps.COLLAPSE_TIME
-        spin = hole.get("spin", 1)
-        doors = hole.get("doors") or [(-200.0, 0.0), (200.0, 0.0)]
-        q = clamp((age - flare_end) / (spiral_end - flare_end), 0.0, 1.0)      # how far they've spiralled in
-        if age < spiral_end:
-            turn = spin * q * q * 2.5 * math.pi
-            near = (1 - q) ** 1.3
-            ca, sa = math.cos(turn), math.sin(turn)
-            step = PowerUps.PORTAL_GROW
-            R = max(step, int(PowerUps.PORTAL_R * (1 - 0.75 * q) / step) * step)
-            for i, (dx, dy) in enumerate(doors):
-                px, py = x + (dx * ca - dy * sa) * near, y + (dx * sa + dy * ca) * near
-                if age < flare_end:                            # flaring, brighter and brighter
-                    level = max(1, min(4, round(4 * age / flare_end * (0.75 + 0.25 * math.sin(t * 16)))))
-                    flare = self.collapse_flare(level)
-                    screen.blit(flare, flare.get_rect(center=(px, py)), special_flags=ADD)
-                glow = art.glow(int(R * 2.2) // 4 * 4, scaled((150, 100, 255), .7))
-                screen.blit(glow, glow.get_rect(center=(px, py)), special_flags=ADD)
-                self.draw_portal(screen, px, py, R, math.atan2(dy, dx) + turn, t, 1 if i else -1)
-                for k in range(8):                             # light pouring in, spiralling
-                    f = (t * 1.4 + k / 8) % 1.0
-                    bend = spin * f * 1.2
-                    sx, sy = px + (x - px) * f, py + (y - py) * f
-                    ox, oy = (sx - x) * math.cos(bend) - (sy - y) * math.sin(bend), (sx - x) * math.sin(bend) + (sy - y) * math.cos(bend)
-                    pygame.draw.circle(screen, mix((200, 160, 255), (255, 240, 220), f), (int(x + ox), int(y + oy)),
-                                       max(2, int(5 * (1 - f) + 1)))
-        # the black heart forming between them
-        grow = q if age < spiral_end else 1.0
-        if grow > 0.05:
-            disc, glow = self.hole_sprites(max(1, round(grow * 8)))
+    COLLAPSE_SQUEEZE = 0.7      # the share of a collapse its disc takes to spiral in; then it's a blazing point
+
+    def draw_collapse(self, screen, hole, x, y, core, size, spin, t):
+        """A full-grown Black Hole collapses in on itself (1.8 playtest), holding the ball, over
+        COLLAPSE_TIME: its disc spirals down into the heart, faster and faster, as light pours in
+        from all round and the heart blazes hotter; then it's a single blazing point, trembling, as
+        a ring of light closes in on it.  Then it bursts: draw_implosion's flash and ring."""
+        c = clamp(hole.get("collapse", 0.0) / PowerUps.COLLAPSE_TIME, 0.0, 1.0)
+        squeeze = min(1.0, c / self.COLLAPSE_SQUEEZE)
+        s = size * (1 - 0.9 * squeeze)
+        if s > 0.1:
+            disc, glow = self.hole_sprites(max(1, min(self.HOLE_LEVELS, round(s * 8))))
             screen.blit(glow, glow.get_rect(center=(x, y)), special_flags=ADD)
             screen.blit(disc, disc.get_rect(center=(x, y)))
-            self.draw_hole_swirl(screen, x, y, core, spin, t, grow)
-            heart = max(2, int(core * grow))
+        self.draw_hole_swirl(screen, x, y, core, spin, t, max(0.25, 1 - squeeze), inward = squeeze, spread = 76 * size)
+        for k in range(20):                                    # light pouring in from all round, spiralling
+            f = (t * 1.6 + k / 20) % 1.0                        # (0 far out, 1 at the heart)
+            a = k * 2.39996 + spin * f * 2.5
+            rr = (1 - f) ** 1.4 * 330 * size + 6
+            pygame.draw.circle(screen, mix((190, 140, 255), (255, 244, 225), f),
+                               (int(x + math.cos(a) * rr), int(y + math.sin(a) * rr)), max(2, int(2 + 4 * f)))
+        late = c >= self.COLLAPSE_SQUEEZE
+        level = max(1, min(8, round(2 + 6 * squeeze + (1.5 * math.sin(t * 38) if late else 0))))
+        flare = self.art.glow(level * 14 + 16, scaled((255, 236, 210), level / 8))
+        screen.blit(flare, flare.get_rect(center=(x, y)), special_flags=ADD)
+        if not late:                                           # the heart, shrinking
+            heart = max(3, int(core * (1 - 0.85 * squeeze)))
             pygame.draw.circle(screen, (0, 0, 0), (int(x), int(y)), heart)
-            pygame.draw.circle(screen, (255, 230, 196), (int(x), int(y)), heart, 2)
-        if age >= spiral_end:                                  # they merge: a flash and a shockwave
-            m = (age - spiral_end) / (total - spiral_end)
-            level = max(1, round((1 - m) * 8))
-            flash = art.glow(level * 18 + 24, scaled((240, 230, 255), level / 8))
-            screen.blit(flash, flash.get_rect(center=(x, y)), special_flags=ADD)
-            r = int(40 + 380 * (1 - (1 - m) ** 2))
-            fade = 1 - m
-            if fade > 0.05:
-                wave = pygame.Surface((r * 2 + 20, r * 2 + 20), pygame.SRCALPHA)
-                pygame.draw.circle(wave, (226, 196, 255, int(230 * fade)), (r + 10, r + 10), r, max(2, int(10 * fade)))
-                screen.blit(wave, wave.get_rect(center=(int(x), int(y))))
+            pygame.draw.circle(screen, (255, 236, 210), (int(x), int(y)), heart, 2)
+            return
+        q = (c - self.COLLAPSE_SQUEEZE) / (1 - self.COLLAPSE_SQUEEZE)
+        jx, jy = int(math.sin(t * 71) * 3), int(math.cos(t * 59) * 3)        # a blazing point, trembling
+        pygame.draw.circle(screen, (255, 252, 240), (int(x) + jx, int(y) + jy), max(3, int(8 - 4 * q)))
+        ring = int((1 - q) ** 1.5 * 170 * size) + 8                           # and a ring of light closing in
+        pygame.draw.circle(screen, mix((200, 150, 255), (255, 240, 220), q), (int(x), int(y)), ring, max(2, int(2 + 4 * q)))
 
     def draw_mini(self, screen, hole, x, y, reach, core, t):
         """A mini black hole (1.8): a small swirling disc round a black heart, fading in and out
@@ -2595,8 +2593,9 @@ class Renderer:
         """A black hole implodes at the point's end: its disc spirals down into the heart, then a
         flash, and a ring of light racing out and fading."""
         t = self.app.fx.time
-        if k < 0.55:
-            q = k / 0.55
+        burst = 1 - PowerUps.HOLE_BURST                      # (where its flash starts: a collapse shows only that)
+        if k < burst:
+            q = k / burst
             s = (1 - q) * scale
             level = max(1, round(s * 8))
             disc, glow = self.hole_sprites(level)
@@ -2607,16 +2606,18 @@ class Renderer:
             pygame.draw.circle(screen, (0, 0, 0), (int(x), int(y)), heart)
             pygame.draw.circle(screen, (255, 240, 220), (int(x), int(y)), heart, 2)
             return
-        q = (k - 0.55) / 0.45
+        q = (k - burst) / PowerUps.HOLE_BURST
         level = max(1, round((1 - q) * 8))
         flash = self.art.glow(level * 14 + 16, scaled((255, 236, 210), level / 8))
         screen.blit(flash, flash.get_rect(center=(x, y)), special_flags=ADD)
         r = int(20 + 300 * scale * (1 - (1 - q) ** 2))
         fade = 1 - q
         if fade > 0.05:
-            ring = pygame.Surface((r * 2 + 20, r * 2 + 20), pygame.SRCALPHA)
-            pygame.draw.circle(ring, (220, 180, 255, int(220 * fade)), (r + 10, r + 10), r, max(2, int(8 * fade)))
-            screen.blit(ring, ring.get_rect(center=(int(x), int(y))))
+            # (ring by ring, blended straight onto the court: a surface the ring's size, made every
+            # frame, was slow to make once a grown hole's ring was wide)
+            tint = (220, 180, 255, int(220 * fade))
+            for w in range(max(2, int(8 * fade))):
+                gfxdraw.circle(screen, int(x), int(y), r - w, tint)
 
     def draw_wind(self, screen, powerups):
         """Wind Gust: leaves blowing up or down the court, swaying as they go."""

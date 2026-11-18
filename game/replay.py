@@ -27,10 +27,11 @@ RATE = 60                    # frames a second
 MOST_FRAMES = RATE * 60 * 30 # half an hour; a longer match keeps its last half hour
 MAGIC = b"HUTAONG-REPLAY 1\n"
 KIND_KEYS = [kind.key for kind in KINDS]
-ROWS = 3        # the rows' layout: 2 from 1.7 (each portal's size), 3 from 1.8 (each portal's flash, and
-                # the blue ball's visibility); none said in a header means 1
+ROWS = 4        # the rows' layout: 2 from 1.7 (each portal's size), 3 from 1.8 (each portal's flash, and
+                # the blue ball's visibility), 4 from 1.8's second playtest (each black hole's size, and how
+                # far it has collapsed); none said in a header means 1
 NO_AIM = 9.0                        # (Sticky Goo's aim, in a row, when it hasn't locked: 1.8)
-HOLE_FIELDS = 15                    # a black hole's numbers in a row (1.8)
+HOLE_FIELDS = 10                    # a black hole's numbers in a row (1.8; 15 in layout 3)
 RENAMED = {"chaos": "shape"}        # power-ups since renamed: Chaos Mode + is Shape Shift (1.6)
 STYLES = ["tomb", "pillar"]
 GREAT = 14.0                 # a point's best moment worth an instant replay scores at least this
@@ -275,12 +276,10 @@ class Recorder:
         holes = getattr(pu, "holes", [])
         values.append(len(holes))
         for hole in holes:
-            way, arrows = hole.get("way"), list(hole.get("arrows", ()))[:2]
-            arrows += [NO_AIM] * (2 - len(arrows))
-            doors = list(hole.get("doors", ((0.0, 0.0), (0.0, 0.0))))       # (Portal Pair's, as they collapse)
+            collapse = hole.get("collapse")
             values += [hole["x"], hole["y"], hole["kind"], hole.get("power", 1.0), hole.get("age", 0.0),
                        hole.get("flash", 0.0), hole["dying"] if hole.get("dying") is not None else -1.0,
-                       hole.get("spin", 1), way if way is not None else NO_AIM, *arrows, *doors[0], *doors[1]]
+                       hole.get("spin", 1), hole.get("size", 1.0), collapse if collapse is not None else -1.0]
         return array("f", values).tobytes()
 
     def track_pass(self):
@@ -605,6 +604,7 @@ class ReplayView:
         rows = info.get("rows", 1)
         self.portal_fields = 5 if rows >= 3 else 4 if rows >= 2 else 3     # 1.6's: no size; 1.7's: no flash
         self.extra_fields = 8 if rows >= 3 else 7                           # 1.7's blue ball: no visibility
+        self.hole_fields = HOLE_FIELDS if rows >= 4 else 15                 # (layout 3's had arrows)
         self.running = True
         self.paused = False
 
@@ -768,15 +768,19 @@ class ReplayView:
         if pos < len(a):
             n_holes = int(a[pos])
             pos += 1
+            fields = self.hole_fields
             for _ in range(n_holes):
-                if pos + HOLE_FIELDS <= len(a):
-                    v = a[pos:pos + HOLE_FIELDS]
-                    pu.holes.append({"x": v[0], "y": v[1], "kind": int(v[2]), "power": v[3], "age": v[4],
-                                     "flash": v[5], "dying": None if v[6] < 0 else v[6],
-                                     "spin": 1 if v[7] >= 0 else -1, "way": None if v[8] >= NO_AIM else v[8],
-                                     "arrows": [angle for angle in v[9:11] if angle < NO_AIM],
-                                     "doors": [(v[11], v[12]), (v[13], v[14])]})
-                pos += HOLE_FIELDS
+                if pos + fields <= len(a):
+                    v = a[pos:pos + fields]
+                    hole = {"x": v[0], "y": v[1], "kind": int(v[2]), "power": v[3], "age": v[4],
+                            "flash": v[5], "dying": None if v[6] < 0 else v[6], "spin": 1 if v[7] >= 0 else -1,
+                            "size": 1.0, "collapse": None}
+                    if fields >= 15:
+                        hole["kind"] = 1 if hole["kind"] == 2 else hole["kind"]     # (Portal Pair's collapse)
+                    else:
+                        hole["size"], hole["collapse"] = v[8], None if v[9] < 0 else v[9]
+                    pu.holes.append(hole)
+                pos += fields
         self.objects = [*self.stones, self.p1, self.p2, ball, *self.extra_balls]
 
 

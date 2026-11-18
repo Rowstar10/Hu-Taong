@@ -13,8 +13,12 @@ only a ball aimed at it.  Now it's gravity: a ball speeds up as it falls in, its
 bleeds away near the heart so it spirals in, and a slow ball is drawn in from well off-centre; a
 ball that gets away leaves as fast as it came.  All black holes, Portal Pair's and the mini ones
 too.  And "the black holes also have an arrow appear when it shoots the ball out. I don't think I
-want that": the talisman's heart just pulses now, and the AI can't read the way out either.  The AI judges its pull, the friend's screen online flies the ball
-through it as the host's game does, and replays show it.
+want that": the talisman's heart just pulses now, and the AI can't read the way out either.  The AI
+judges its pull, the friend's screen online flies the ball through it as the host's game does, and
+replays show it.
+
+Rowan's second playtest (same day): it pulls harder, drifts, grows and collapses; see
+test_black_hole_grows.
 """
 import math
 import random
@@ -137,7 +141,7 @@ class Opening(Match):
         self.assertEqual(hole["power"], 1.0)
 
     def test_portals_keep_clear_of_it(self):
-        self.pu.open_portals(PowerUps.PORTAL_START_TALISMAN)
+        self.pu.open_portals()
         door = self.pu.portals[0]
         hole = self.hole_at(door["x"] + 260, door["y"])
         door["vx"], door["vy"] = 50.0, 0.0                      # drifting straight at it
@@ -203,7 +207,10 @@ class Swallowed(Match):
     def test_falls_in_and_is_flung_out(self):
         hole = self.hole_at(960, 540)
         self.place(600, 540, 1200.0, 0.0)
-        seen = self.fly(0.25)
+        for _ in range(60):
+            self.fly(DT)
+            if self.ball.transit:
+                break
         self.assertTrue(self.ball.transit, "fell in")
         self.assertEqual(self.pu.ball_alpha(), 0.0, "out of sight inside")
         self.assertEqual(hole["flash"] > 0.5, True)
@@ -229,7 +236,8 @@ class Swallowed(Match):
         for i in range(40):
             way = 1 if i % 2 else -1
             self.ball.transit = None
-            self.place(960 - way * 40, 540, way * 900.0, 0.0)          # (touching its heart)
+            self.pu.holes[0]["eaten"] = 0                           # (it doesn't grow till it collapses: see
+            self.place(960 - way * 40, 540, way * 900.0, 0.0)          #  test_black_hole_grows; touching its heart)
             self.ball.hole_cool = 0.0
             self.pu.update_holes(DT)
             self.assertTrue(self.ball.transit)
@@ -274,7 +282,7 @@ class PointsEnd(Match):
 
     def test_none_at_the_serve(self):
         self.hole_at()
-        self.pu.serve_portals()
+        self.pu.serve_holes()
         self.assertEqual(self.pu.holes, [])
 
 
@@ -364,7 +372,7 @@ class Replays(Match):
         self.fly(0.3)
         rec.capture(1 / 60)                                         # opening
         hole["age"], hole["power"] = 5.0, 1.0
-        hole["way"], hole["flash"] = 0.4, 0.8
+        hole["flash"] = 0.8
         rec.capture(1 / 60)                                         # flaring
         self.pu.on_point()
         rec.capture(1 / 60)                                         # imploding
@@ -372,7 +380,7 @@ class Replays(Match):
         frames = len(view.clip.frames)
         app.dt = DT
         for i, check in ((frames - 3, lambda h: 0 < h["power"] < 1),
-                         (frames - 2, lambda h: abs(h["way"] - 0.4) < 1e-4 and abs(h["flash"] - 0.8) < 1e-4),
+                         (frames - 2, lambda h: abs(h["flash"] - 0.8) < 1e-4),
                          (frames - 1, lambda h: h["dying"] is not None)):
             view.show(i)
             self.assertEqual(len(view.powerups.holes), 1)

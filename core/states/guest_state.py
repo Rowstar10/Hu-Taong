@@ -469,7 +469,8 @@ class GuestMatchState(State):
         # black holes pull it (1.8), but not one that has just flung a ball out (the host's game
         # doesn't pull a ball for a moment after flinging it)
         holes = [hole for hole in getattr(view.powerups, "holes", [])
-                 if hole.get("power", 0) > 0 and hole.get("dying") is None and hole.get("flash", 0) <= 0]
+                 if hole.get("power", 0) > 0 and hole.get("dying") is None and hole.get("collapse") is None
+                 and hole.get("flash", 0) <= 0]
         serve = getattr(self, "serve_speed", 0)
         entry = math.hypot(vx, vy)                         # (taken as the speed it came into any pull at)
         cool, inside, coming = 0.0, 0.0, None
