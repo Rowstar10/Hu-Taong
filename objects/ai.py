@@ -26,18 +26,23 @@ from helpers import clamp, lerp, reflect_in_range
 # returns are never quicker than Rowan's original AI's at the same level (its strike is capped, so
 # a person can keep up).  The other styles land at about 88/72/41/17/8 (Guardian), 86/81/69/25/10
 # (Striker, whose returns are much quicker) and 90/78/58/38/16 (Trickster).
+# 1.9 (Rowan: "make the hard and insane AIs a little harder"): Hard and Insane read the ball better,
+# react quicker, lapse less and place their returns a little more; their shots are no harder (the
+# strike is as it was, so a person can still keep up).  Until then Hard was (0.115, 82, 47, 0.87,
+# 0.56, 0.04) and Insane (0.075, 42, 40, 0.95, 0.80, 0.015) in the rows below.
 SKILL = {
-    "reaction":  (0.28, 0.23, 0.15, 0.115, 0.075),   # seconds behind what is really happening
-    "misread":   (270, 205, 120, 82, 42),            # px of guessing error per second the ball is still away
-    "wobble":    (80, 68, 52, 47, 40),               # px of error that never goes away, however close the ball
+    "reaction":  (0.28, 0.23, 0.15, 0.107, 0.065),   # seconds behind what is really happening
+    "misread":   (270, 205, 120, 76, 34),            # px of guessing error per second the ball is still away
+    "wobble":    (80, 68, 52, 44, 35),               # px of error that never goes away, however close the ball
     "foresight": (0, 1, 1, 1, 2),                    # wall bounces it can follow in its head
-    "pace":      (0.55, 0.64, 0.78, 0.87, 0.95),     # share of the paddle's top speed it uses
-    "aim":       (0.00, 0.15, 0.38, 0.56, 0.80),     # how much it tries to place its returns
-    "lapse":     (0.19, 0.13, 0.06, 0.04, 0.015),    # chance of a moment's hesitation on each shot
+    "pace":      (0.55, 0.64, 0.78, 0.885, 0.97),    # share of the paddle's top speed it uses
+    "aim":       (0.00, 0.15, 0.38, 0.59, 0.86),     # how much it tries to place its returns
+    "lapse":     (0.19, 0.13, 0.06, 0.034, 0.01),    # chance of a moment's hesitation on each shot
     "press":     (0.10, 0.19, 0.33, 0.43, 0.55),     # how far it steps in to meet the ball
     "strike":    (0.25, 0.30, 0.40, 0.45, 0.52),     # share of its top speed it drives into the ball with
-    "chase":     (0.00, 0.12, 0.30, 0.45, 0.65),     # chance it chases a ball that has got past, not give up
 }
+# (1.9: every AI now goes back round a ball that has got past it, at every level: it used to be a
+# chance, "chase", from none at Baby to 65% at Insane, and the rest stepped aside and let it in)
 
 # What each style does to the numbers above (one factor, or one per difficulty), plus habits of its own:
 #   bank      how much it likes returns that bounce off the walls on the way
@@ -53,7 +58,7 @@ SKILL = {
 STYLES = {
     "Balanced":  {"bank": 0.3},
     "Guardian":  {"press": 0.15, "aim": 0.5, "strike": 0.8, "misread": (0.6, 0.6, 0.7, 0.8, 0.85),
-                  "wobble": (0.7, 0.7, 0.78, 0.82, 0.9), "lapse": 0.4, "chase": 1.6, "foresight": (1, 1, 1, 1, 1.5),
+                  "wobble": (0.7, 0.7, 0.78, 0.82, 0.9), "lapse": 0.4, "foresight": (1, 1, 1, 1, 1.5),
                   "bank": 0.2, "nerve": 0.6, "guard": 1.0},
     "Striker":   {"press": 2.0, "aim": 1.35, "lapse": 1.2, "strike": 1.9, "wobble": (1, 1, 1, 1, 0.9),
                   "bank": 0.2, "nerve": 1.15, "charge": 1.0},
@@ -109,7 +114,6 @@ class PaddleAI:
         self.hesitate = 0.0
         self.sway = random.uniform(0, math.tau)
         self.t_hit = math.inf
-        self.chase = False
         self.pickup = None          # the power-up it has decided to go for
         self.pickup_cooldown = 0.0
         self.heading = None         # direction of the ball last frame, to notice a sudden change
@@ -236,7 +240,6 @@ class PaddleAI:
         self.noise = random.gauss(0, 1)
         self.aim = None
         self.hesitate = random.uniform(0.12, 0.3) if random.random() < k["lapse"] else 0.0
-        self.chase = random.random() < k["chase"]
         # A trickster picks a trick for this shot (see TRICKS)
         self.power, self.fake, self.plan, self.pounce = 1.0, False, None, None
         if random.random() < k["mix"]:
@@ -382,11 +385,15 @@ class PaddleAI:
         travel = abs(offset) * 1.5 * p.height / 2 * 0.9
         return 0.16 + k["reaction"] + travel / (p.speed * k["pace"] * 0.5)
 
+    RECOVER_PACE = 0.5      # going back round a ball that got past, it closes this share of the gap to full speed
+
     def recover(self, bx, by, r, k):
-        """No middle wall, and the ball has got between the paddle and its own goal (after Chaos
-        Switch + moved it, or it pushed too far up).  Get out of the ball's row first, so it isn't
-        knocked in from behind, then race back to its usual line (or just past the ball, if that's
-        nearer the goal) so it arrives with time to line up the save."""
+        """The ball has got between the paddle and its own goal (a black hole flung it, it came out
+        of a portal, the paddle pushed too far up...).  Get out of the ball's row first, so it isn't
+        knocked in from behind, then go back round it to a spot between it and the goal: the first
+        one it can reach in time (cut_off), or else just goal-side of the ball, out of its row,
+        till it's past it and can line up the save.  (1.9, Rowan: "make all AIs better at moving
+        backwards and circling around behind the ball"; every AI does this now, wall up or down.)"""
         p = self.paddle
         forward = 1 if p.is_left else -1
         px, py = (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2
@@ -397,6 +404,13 @@ class PaddleAI:
             goal_side = bx - forward * (p.width / 2 + r + 90)
             x = min(line, goal_side) if forward > 0 else max(line, goal_side)
             y = py
+            vx, vy = self.seen[-1][3], self.seen[-1][4]
+            if self.towards_goal(vx) and abs(by - py) >= safety:
+                # out of its row already: head for where it'll meet the ball once round it, but
+                # no nearer the ball's row than it must keep while still beside it
+                t_ball = max(0.0, (bx - x) * forward / max(1.0, -forward * vx))
+                meet, _ = reflect_in_range(by + vy * t_ball, r, BASE_H - r)
+                y = meet if abs(meet - by) >= safety else by + math.copysign(safety, py - by)
         if abs(by - py) < safety:
             # still in the ball's row: slide out of it while closing in, but stay behind the ball
             room_above, room_below = by - p.height, BASE_H - p.height - by
@@ -608,19 +622,12 @@ class PaddleAI:
                 way = -way
             self.target = (px, py + way * 400)
             return self.steer(self.target, k)
-        if behind and (self.chase or not p.game.wall_up):
-            # The ball got past: keep clear of it so it isn't knocked in, and race back goal-side
-            # of it (a touch on the paddle's end still sends it back).  With the wall down every AI
-            # does this, as Open Court lets the ball get anywhere.
+        if behind:
+            # The ball got past: keep clear of it so it isn't knocked in, and go back round it,
+            # goal-side, to save it (a touch on the paddle's end still sends it back).  (Until 1.9
+            # only some AIs tried, at random, and only with the wall down; the rest stepped aside.)
             target = self.recover(bx, by, r, k)
-        elif behind:
-            # Too late to play it: step aside rather than knock it into its own goal
-            safety = p.height * 0.6 + r + 12
-            if abs(by - py) < safety:
-                away = 1 if by < BASE_H / 2 else -1
-                target = (px, clamp(by + away * safety, p.height / 2, BASE_H - p.height / 2))
-            else:
-                target = self.target
+            k = dict(k, pace = k["pace"] + (1 - k["pace"]) * self.RECOVER_PACE)    # (it hurries back)
         elif incoming:
             target = self.meet(bx, by, vx, vy, r, k)
             # If the other paddle is still closing on the ball it may yet change its course: don't

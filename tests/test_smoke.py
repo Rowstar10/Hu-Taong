@@ -113,8 +113,27 @@ class Screens(unittest.TestCase):
 
 # Seconds a computer v computer point may run before it counts as one that never ends.  (90 until
 # the 1.8 playtest's stronger Black Hole: about one point in 250 with it then ran just past 90 s,
-# longest 93 s in 32 four-minute matches, against 76 s without it.)
-LONGEST = 120
+# longest 93 s in 32 four-minute matches, against 76 s without it.  120 until 1.9, whose AIs go back
+# round a ball that got past them: their rallies run longer, a 142 s one once, 60-odd hits a minute.)
+LONGEST = 200
+# ...and how long a point may go with no paddle touching a ball: a point that never ends is a ball
+# stuck somewhere, not a long rally (1.9)
+NO_HIT = 30
+
+
+class Quiet:
+    """The longest spell in a match with no paddle touching a ball."""
+
+    def __init__(self, game):
+        self.game, self.hits, self.spell, self.longest, self.score = game, 0, 0.0, 0.0, (0, 0)
+
+    def tick(self, dt):
+        game = self.game
+        hits, score = len(game.recorder.shots), (game.p1.score, game.p2.score)
+        if hits != self.hits or score != self.score:
+            self.hits, self.score, self.spell = hits, score, 0.0
+        self.spell += dt
+        self.longest = max(self.longest, self.spell)
 
 class LongMatch(unittest.TestCase):
     """Computer v computer for four minutes of game time, every power-up on, Chaotic."""
@@ -138,6 +157,7 @@ class LongMatch(unittest.TestCase):
                 game.start()
                 game.p1.ai_enabled = game.p2.ai_enabled = True
                 taken, points, longest, t_point, last = set(), 0, 0.0, 0.0, (0, 0)
+                quiet = Quiet(game)
                 collect = game.powerups.collect
 
                 def noting(item, owner):
@@ -147,6 +167,7 @@ class LongMatch(unittest.TestCase):
                 for _ in range(240 * 60):
                     game.update(1 / 60)
                     t_point += 1 / 60
+                    quiet.tick(1 / 60)
                     score = (game.p1.score, game.p2.score)
                     if score != last:
                         points, last = points + 1, score
@@ -154,6 +175,7 @@ class LongMatch(unittest.TestCase):
                 game.stop()
                 self.assertGreater(points, 4)
                 self.assertLess(longest, LONGEST, "a point that never ends")
+                self.assertLess(quiet.longest, NO_HIT, "no paddle touched a ball for 30 s: it's stuck")
                 self.assertGreater(len(taken), 12, sorted(taken))
 
 
@@ -181,6 +203,7 @@ class EveryPhysics(unittest.TestCase):
                 game.start()
                 game.p1.ai_enabled = game.p2.ai_enabled = True
                 taken, points, longest, t_point, last = set(), 0, 0.0, 0.0, (0, 0)
+                quiet = Quiet(game)
                 collect = game.powerups.collect
 
                 def noting(item, owner):
@@ -193,6 +216,7 @@ class EveryPhysics(unittest.TestCase):
                     if i % 900 == 0:
                         app.renderer.draw_world(app.virtual, game)
                     t_point += 1 / 60
+                    quiet.tick(1 / 60)
                     score = (game.p1.score, game.p2.score)
                     if score != last:
                         points, last = points + 1, score
@@ -200,6 +224,7 @@ class EveryPhysics(unittest.TestCase):
                 game.stop()
                 self.assertGreater(points, 0)                   # (Classic's rallies between computers run long:
                 self.assertLess(max(longest, t_point), LONGEST, "a point that never ends")    # 25-60 s a point)
+                self.assertLess(quiet.longest, NO_HIT, "no paddle touched a ball for 30 s: it's stuck")
                 self.assertGreater(len(taken), 5, sorted(taken))      # (2 minutes, a few at a time)
                 view = ReplayView(game.recorder.clip(), app)
                 view.show(len(view.clip.frames) - 1)
@@ -231,12 +256,14 @@ class EveryMode(unittest.TestCase):
                 game.start()
                 game.p1.ai_enabled = game.p2.ai_enabled = True
                 points, longest, t_point, last = 0, 0.0, 0.0, (0, 0)
+                quiet = Quiet(game)
                 for i in range(120 * 60):
                     game.update(1 / 60)
                     game.recorder.capture(1 / 60)
                     if i % 600 == 0:
                         app.renderer.draw_world(app.virtual, game)
                     t_point += 1 / 60
+                    quiet.tick(1 / 60)
                     score = (game.p1.score, game.p2.score)
                     if score != last:
                         points, last = points + 1, score
@@ -244,6 +271,7 @@ class EveryMode(unittest.TestCase):
                 game.stop()
                 self.assertGreater(points, 3)
                 self.assertLess(longest, LONGEST, "a point that never ends")
+                self.assertLess(quiet.longest, NO_HIT, "no paddle touched a ball for 30 s: it's stuck")
                 # (two minutes of this makes 3 to 7 mid-rally switches, by chance: it once made 2, in
                 # 1.8's full run, and the test fell over.  What matters is that they happen.)
                 self.assertGreater(game.switches, 0, "no switches")

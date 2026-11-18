@@ -2,6 +2,14 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
+## 1.9 — 2026-11-18
+
+Computer players that go back round a ball that's got past them, and a harder Hard and Insane.
+
+### Changed
+- Every computer player now goes back round a ball that has got between it and its goal, at every level, with the Middle Wall up or down. It keeps out of the ball's row so it doesn't knock it in, hurries back, and lines up the save. Before, only some tried, at random, and with the Middle Wall up the rest stepped aside and let it in.
+- Hard and Insane read the ball better, react quicker, hesitate less and place their returns a little more. Their shots are no harder.
+
 ## 1.8 — 2026-11-18
 
 Three physics to choose from, a Speed Cap so a charge shot can always be reached, the Black Hole talisman and game mode, and a review of the talismans.
