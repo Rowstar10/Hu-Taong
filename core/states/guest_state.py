@@ -486,7 +486,7 @@ class GuestMatchState(State):
                 pace = PowerUps.pace_of(vx, vy, serve)
                 ax = ay = 0.0
                 for hole in holes:
-                    if PowerUps.falls_in(hole, cx, cy, vx, vy, h, r):
+                    if PowerUps.swallows(hole) and PowerUps.falls_in(hole, cx, cy, vx, vy, h, r):
                         return hole["x"], hole["y"], 0.0, 0.0     # in: where it comes out is the host's call
                     px, py = PowerUps.hole_pull(hole, cx, cy, pace)
                     ax, ay = ax + px, ay + py

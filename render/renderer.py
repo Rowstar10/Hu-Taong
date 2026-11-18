@@ -3,7 +3,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
 from config import BASE_W, BASE_H
-from helpers import clamp01, lerp
+from helpers import clamp, clamp01, lerp
 from render import theme
 from render.art import ADD, blank, mix, scaled, v_gradient
 from core.settings import key_name
@@ -561,6 +561,12 @@ class Renderer:
             jobs.append(lambda R=R: (art.get(("portal_ring", R), self._portal_ring, R),
                                      art.glow(int(R * 2.2) // 4 * 4, scaled((150, 100, 255), .7))))
         jobs.append(lambda: [self.hole_sprites(level) for level in range(1, 9)])      # Black Hole (1.8)
+        for R in range(PowerUps.PORTAL_GROW, PowerUps.PORTAL_START, PowerUps.PORTAL_GROW):   # (Portal Pair's, collapsing)
+            jobs.append(lambda R=R: (art.get(("portal_ring", R), self._portal_ring, R),
+                                     art.glow(int(R * 2.2) // 4 * 4, scaled((150, 100, 255), .7))))
+        jobs.append(lambda: [self.collapse_flare(level) for level in range(1, 5)])
+        jobs.append(lambda: [art.glow(level * 18 + 24, scaled((240, 230, 255), level / 8)) for level in range(1, 9)])
+        jobs.append(lambda: [self.arrow_glow(tint) for tint in self.ARROW_TINTS + (self.MINI_TINT,)])
         jobs.append(lambda: [self.hole_flare_glow(level) for level in range(1, 5)])
         jobs.append(lambda: [art.glow(level * 14 + 16, scaled((255, 236, 210), level / 8)) for level in range(1, 9)])
         jobs.append(lambda: art.glow(5, (150, 104, 230)))
@@ -751,6 +757,8 @@ class Renderer:
         "portal_pair": "Portal Pair\nTwo linked portals drift about the court all match: in one, out the other.\n"
                        "• They open small, grow a little each time a ball goes through, and stay that big point after point\n"
                        "• The ball leaves the way the arrows point, and they slowly turn\n"
+                       "• At full size, the next ball through sets them collapsing into a black hole: a ball it swallows\n"
+                       "  comes out as Twin Balls, and mini black holes come and go till the point ends; then they open small again\n"
                        "~ The Portal Pair talisman doesn't turn up"}
 
     def modes_section(self, ui, s, font, m=None, columns=3):
@@ -2403,11 +2411,22 @@ class Renderer:
             reach, _pull, core = PowerUps.hole_style(hole["kind"])
             spin = hole.get("spin", 1)
             dying = hole.get("dying")
+            kind = hole["kind"]
             if dying is not None:
-                self.draw_implosion(screen, x, y, core, spin, 1 - dying / PowerUps.HOLE_IMPLODE)
+                self.draw_implosion(screen, x, y, core, spin, 1 - dying / PowerUps.HOLE_IMPLODE,
+                                    0.4 if kind == PowerUps.HOLE_MINI else 1.0)
                 continue
-            s = min(1.0, hole.get("age", 1.0) / PowerUps.HOLE_OPEN)
-            s = 1 - (1 - s) ** 3                                   # it bursts open, then settles
+            if kind == PowerUps.HOLE_MINI:
+                self.draw_mini(screen, hole, x, y, reach, core, t)
+                continue
+            if kind == PowerUps.HOLE_COLLAPSE and hole.get("age", 0.0) < PowerUps.COLLAPSE_TIME:
+                self.draw_collapse(screen, hole, x, y, core, t)
+                continue
+            if kind == PowerUps.HOLE_COLLAPSE:
+                s = 1.0
+            else:
+                s = min(1.0, hole.get("age", 1.0) / PowerUps.HOLE_OPEN)
+                s = 1 - (1 - s) ** 3                               # it bursts open, then settles
             # dust drawn in from the edge of its pull, faster as it nears the heart
             for a0, p0, rate in self.HOLE_MOTES:
                 p = (t * rate + p0) % 1.0
@@ -2428,7 +2447,12 @@ class Renderer:
             pygame.draw.circle(screen, (200, 150, 255), (int(x), int(y)), int(heart * (1.3 + 0.06 * math.sin(t * 5))), 1)
             # the way a swallowed ball will come out
             flash, way = hole.get("flash", 0.0), hole.get("way")
-            if flash > 0 and way is not None:
+            if kind == PowerUps.HOLE_COLLAPSE:
+                for angle, tint in zip(hole.get("arrows", ()), self.ARROW_TINTS):     # red's way, and blue's
+                    self.draw_hole_arrow(screen, x, y, core + 6, angle, tint, 0.6 + 0.4 * flash, t)
+                if flash > 0:
+                    self.draw_swallowing(screen, x, y, core, spin, flash, t)
+            elif flash > 0 and way is not None:
                 self.draw_hole_flare(screen, x, y, core, way, flash, t)
 
     @staticmethod
@@ -2460,13 +2484,140 @@ class Renderer:
                 pygame.draw.line(screen, colour, (cx - px * 17, cy - py * 17), tip, width)
                 pygame.draw.line(screen, colour, (cx + px * 17, cy + py * 17), tip, width)
 
-    def draw_implosion(self, screen, x, y, core, spin, k):
+    ARROW_TINTS = ((255, 120, 100), (110, 170, 255))          # Portal Pair's black hole: red's arrow, blue's
+    MINI_TINT = (120, 230, 255)                               # a mini black hole's arrow
+
+    def arrow_glow(self, tint):
+        return self.art.glow(36, scaled(tint, .6))
+
+    def collapse_flare(self, level):
+        return self.art.glow(int(PowerUps.PORTAL_R * 2.5) // 8 * 8, scaled((236, 220, 255), level / 4 * 0.6))
+
+    def draw_hole_arrow(self, screen, x, y, start, angle, tint, k, t, whiten = 0.45):
+        """An arrow out of a black hole, the way a ball will leave it: three chevrons running out
+        from `start` px, on a glow."""
+        dx, dy = PowerUps.portal_exit(angle)
+        px, py = -dy, dx
+        glow = self.arrow_glow(tint)
+        screen.blit(glow, glow.get_rect(center=(x + dx * (start + 46), y + dy * (start + 46))), special_flags=ADD)
+        bright = scaled(mix(tint, (255, 255, 255), whiten), k)
+        for n in range(3):
+            d = start + 6 + n * 24 + (t * 60) % 24
+            cx, cy = x + dx * d, y + dy * d
+            tip = (cx + dx * 15, cy + dy * 15)
+            for colour, width in ((scaled(tint, .3), 9), (bright, 5)):
+                pygame.draw.line(screen, colour, (cx - px * 16, cy - py * 16), tip, width)
+                pygame.draw.line(screen, colour, (cx + px * 16, cy + py * 16), tip, width)
+
+    def draw_swallowing(self, screen, x, y, core, spin, flash, t):
+        """Portal Pair's black hole has a ball: it's drawn out into a streak spiralling into the
+        heart, and the heart pulses."""
+        held = PowerUps.HOLE_HOLD / PowerUps.HOLE_FLARE
+        k = (1 - flash) / held                                # 0 as it falls in, 1 as it comes out
+        if k < 1:
+            for i in range(9):
+                f = i / 8
+                rr = core + (50 * (1 - k) + 6) * (1 - f)
+                a = spin * (t * 6 + f * 2.4)
+                size = max(2, int((10 - 7 * f) * (1 - 0.6 * k)))
+                pygame.draw.circle(screen, mix((255, 250, 235), (255, 196, 120), f),
+                                   (int(x + math.cos(a) * rr), int(y + math.sin(a) * rr)), size)
+        pulse = int(core * (1.2 + 1.6 * min(1.0, k)))
+        pygame.draw.circle(screen, scaled((255, 236, 210), max(0.2, flash)), (int(x), int(y)), pulse, max(1, int(5 * flash)))
+
+    def draw_collapse(self, screen, hole, x, y, core, t):
+        """Portal Pair's portals collapse (1.8), over COLLAPSE_TIME: they flare, then spiral in round
+        each other, shrinking, as streams of light pour into a black heart forming between them;
+        then they merge with a flash and a shockwave, and the black hole's two arrows light up."""
+        art = self.art
+        age = hole.get("age", 0.0)
+        flare_end, spiral_end, total = PowerUps.COLLAPSE_FLARE, PowerUps.COLLAPSE_SPIRAL, PowerUps.COLLAPSE_TIME
+        spin = hole.get("spin", 1)
+        doors = hole.get("doors") or [(-200.0, 0.0), (200.0, 0.0)]
+        q = clamp((age - flare_end) / (spiral_end - flare_end), 0.0, 1.0)      # how far they've spiralled in
+        if age < spiral_end:
+            turn = spin * q * q * 2.5 * math.pi
+            near = (1 - q) ** 1.3
+            ca, sa = math.cos(turn), math.sin(turn)
+            step = PowerUps.PORTAL_GROW
+            R = max(step, int(PowerUps.PORTAL_R * (1 - 0.75 * q) / step) * step)
+            for (dx, dy), angle, tint in zip(doors, hole.get("arrows", (0.0, math.pi)), self.ARROW_TINTS):
+                px, py = x + (dx * ca - dy * sa) * near, y + (dx * sa + dy * ca) * near
+                if age < flare_end:                            # flaring, brighter and brighter
+                    level = max(1, min(4, round(4 * age / flare_end * (0.75 + 0.25 * math.sin(t * 16)))))
+                    flare = self.collapse_flare(level)
+                    screen.blit(flare, flare.get_rect(center=(px, py)), special_flags=ADD)
+                glow = art.glow(int(R * 2.2) // 4 * 4, scaled((150, 100, 255), .7))
+                screen.blit(glow, glow.get_rect(center=(px, py)), special_flags=ADD)
+                ring = art.get(("portal_ring", R), self._portal_ring, R)
+                screen.blit(ring, ring.get_rect(center=(px, py)))
+                if q < 0.6:                                    # its arrow, red or blue: the way that twin will go
+                    self.draw_hole_arrow(screen, px, py, R * 0.25, angle, tint, 1 - q / 0.6, t)
+                for k in range(8):                             # light pouring in, spiralling
+                    f = (t * 1.4 + k / 8) % 1.0
+                    bend = spin * f * 1.2
+                    sx, sy = px + (x - px) * f, py + (y - py) * f
+                    ox, oy = (sx - x) * math.cos(bend) - (sy - y) * math.sin(bend), (sx - x) * math.sin(bend) + (sy - y) * math.cos(bend)
+                    pygame.draw.circle(screen, mix((200, 160, 255), (255, 240, 220), f), (int(x + ox), int(y + oy)),
+                                       max(2, int(5 * (1 - f) + 1)))
+        # the black heart forming between them
+        grow = q if age < spiral_end else 1.0
+        if grow > 0.05:
+            disc, glow = self.hole_sprites(max(1, round(grow * 8)))
+            screen.blit(glow, glow.get_rect(center=(x, y)), special_flags=ADD)
+            screen.blit(disc, disc.get_rect(center=(x, y)))
+            self.draw_hole_swirl(screen, x, y, core, spin, t, grow)
+            heart = max(2, int(core * grow))
+            pygame.draw.circle(screen, (0, 0, 0), (int(x), int(y)), heart)
+            pygame.draw.circle(screen, (255, 230, 196), (int(x), int(y)), heart, 2)
+        if age >= spiral_end:                                  # they merge: a flash and a shockwave
+            m = (age - spiral_end) / (total - spiral_end)
+            level = max(1, round((1 - m) * 8))
+            flash = art.glow(level * 18 + 24, scaled((240, 230, 255), level / 8))
+            screen.blit(flash, flash.get_rect(center=(x, y)), special_flags=ADD)
+            r = int(40 + 380 * (1 - (1 - m) ** 2))
+            fade = 1 - m
+            if fade > 0.05:
+                wave = pygame.Surface((r * 2 + 20, r * 2 + 20), pygame.SRCALPHA)
+                pygame.draw.circle(wave, (226, 196, 255, int(230 * fade)), (r + 10, r + 10), r, max(2, int(10 * fade)))
+                screen.blit(wave, wave.get_rect(center=(int(x), int(y))))
+            for angle, tint in zip(hole.get("arrows", ()), self.ARROW_TINTS):
+                self.draw_hole_arrow(screen, x, y, core + 6, angle, tint, m, t)
+
+    def draw_mini(self, screen, hole, x, y, reach, core, t):
+        """A mini black hole (1.8): a small swirling disc round a black heart, fading in and out,
+        with its one arrow circling it (bright as it shoots a ball out)."""
+        s = hole.get("power", 1.0)
+        if s <= 0.02:
+            return
+        art = self.art
+        spin = hole.get("spin", 1)
+        mote = art.glow(5, (150, 104, 230))
+        for a0, p0, rate in self.HOLE_MOTES[:14]:
+            p = (t * rate * 1.4 + p0) % 1.0
+            rr = core + (reach - core) * (1 - p) ** 1.7 * s
+            a = a0 + spin * p * 5.0
+            screen.blit(mote, mote.get_rect(center=(x + math.cos(a) * rr, y + math.sin(a) * rr)), special_flags=ADD)
+        disc, glow = self.hole_sprites(max(1, round(3 * s)))
+        screen.blit(glow, glow.get_rect(center=(x, y)), special_flags=ADD)
+        screen.blit(disc, disc.get_rect(center=(x, y)))
+        self.draw_hole_swirl(screen, x, y, core * 0.6, spin, t, s * 0.55)
+        heart = max(2, int(core * s))
+        pygame.draw.circle(screen, (0, 0, 0), (int(x), int(y)), heart)
+        pygame.draw.circle(screen, (255, 230, 196), (int(x), int(y)), heart, 2)
+        arrows = hole.get("arrows") or [0.0]
+        flash = hole.get("flash", 0.0)
+        pygame.draw.circle(screen, scaled((120, 200, 255), 0.35 * s), (int(x), int(y)), int(core * 2.4), 1)
+        self.draw_hole_arrow(screen, x, y, core + 2, arrows[0], self.MINI_TINT, max(0.3, s) * (0.7 + 0.3 * flash), t,
+                             whiten = 0.45 + 0.55 * flash)
+
+    def draw_implosion(self, screen, x, y, core, spin, k, scale = 1.0):
         """A black hole implodes at the point's end: its disc spirals down into the heart, then a
         flash, and a ring of light racing out and fading."""
         t = self.app.fx.time
         if k < 0.55:
             q = k / 0.55
-            s = 1 - q
+            s = (1 - q) * scale
             level = max(1, round(s * 8))
             disc, glow = self.hole_sprites(level)
             screen.blit(glow, glow.get_rect(center=(x, y)), special_flags=ADD)
@@ -2480,7 +2631,7 @@ class Renderer:
         level = max(1, round((1 - q) * 8))
         flash = self.art.glow(level * 14 + 16, scaled((255, 236, 210), level / 8))
         screen.blit(flash, flash.get_rect(center=(x, y)), special_flags=ADD)
-        r = int(20 + 300 * (1 - (1 - q) ** 2))
+        r = int(20 + 300 * scale * (1 - (1 - q) ** 2))
         fade = 1 - q
         if fade > 0.05:
             ring = pygame.Surface((r * 2 + 20, r * 2 + 20), pygame.SRCALPHA)

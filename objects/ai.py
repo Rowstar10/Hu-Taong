@@ -338,16 +338,20 @@ class PaddleAI:
         y, bounces = reflect_in_range(raw, r, BASE_H - r)
         powerups = getattr(p.game, "powerups", None)
         field = powerups.ball_accel() if powerups else 0.0
-        if powerups and getattr(powerups, "holes", None) and powerups.pulling():
-            # A black hole bends its path (1.8): it judges the pull by eye, as it does the wind, and
-            # a sharper AI a little better.  Heading into the hole, there's no telling where it'll
-            # come out, so it waits in the middle of its goal
+        holes = getattr(powerups, "holes", None) and powerups.pulling()
+        # A black hole bends its path (1.8): it judges the pull by eye, as it does the wind, and a
+        # sharper AI a little better.  Heading into the hole, there's no telling where it'll come
+        # out, so it waits in the middle of its goal.  (Not getting here for a while, it's read
+        # as below.)
+        path = None
+        if holes:
             judged = (0.8 + 0.2 * min(1.0, k["foresight"] / 2)) * (1 + 0.06 * self.noise)
             path = powerups.hole_path(bx, by, vx, vy, r, contact_x, judged, field * judged)
-            if path is None:
-                self.t_hit = math.inf
-                return line, BASE_H / 2
-            t_hit, y = path
+        if path and path[2]:
+            self.t_hit = math.inf
+            return line, BASE_H / 2
+        if path:
+            t_hit, y, _ = path
             self.t_hit = t_hit
         elif field:
             # The wind bends its path: it reads the arc by eye, like a player, and a sharper AI

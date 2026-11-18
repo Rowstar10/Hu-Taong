@@ -4,7 +4,8 @@ A black hole opens mid-court until the point ends.  It pulls the balls (never th
 the closer they come and the faster they go, bending their paths but keeping their speed.  A ball
 that touches its black heart falls in: it's held there, out of sight, while an arrow flares the way
 it will come out, then it's flung out that way as fast as it went in (never slower than a serve,
-never steeper than a portal sends a ball).  A ball circling in its pull too long is drawn in.  At
+never steeper than a portal sends a ball), on towards the side it was heading for, at any angle.
+(Any way at all, computer v computer points ran past two minutes: it soaked up attacking shots.)  A ball circling in its pull too long is drawn in.  At
 the point's end it implodes.  The AI judges its pull, the friend's screen online flies the ball
 through it as the host's game does, and replays show it.
 """
@@ -173,6 +174,7 @@ class Swallowed(Match):
         self.assertEqual(hole["flash"] > 0.5, True)
         way = hole["way"]
         self.assertGreaterEqual(abs(math.cos(way)), PowerUps.PORTAL_STEEPEST - 1e-6, "never straight up or down")
+        self.assertGreater(math.cos(way), 0, "on towards the side it was heading for")
         self.assertFalse(self.ball.can_collide_with(self.game.p1))
         inside = 0
         while self.ball.transit:
@@ -185,6 +187,21 @@ class Swallowed(Match):
         heading = math.atan2(self.ball.vy, self.ball.vx)
         self.fly(PowerUps.HOLE_COOL * 0.9)
         self.assertAlmostEqual(math.atan2(self.ball.vy, self.ball.vx), heading, places = 4)
+
+    def test_flung_on_towards_the_same_side_at_any_angle(self):
+        self.hole_at(960, 540)
+        angles = []
+        for i in range(40):
+            way = 1 if i % 2 else -1
+            self.ball.transit = None
+            self.place(960 - way * 40, 540, way * 900.0, 0.0)          # (touching its heart)
+            self.ball.hole_cool = 0.0
+            self.pu.update_holes(DT)
+            self.assertTrue(self.ball.transit)
+            angle = self.ball.transit["angle"]
+            self.assertGreater(math.cos(angle) * way, 0)
+            angles.append(math.atan2(math.sin(angle), abs(math.cos(angle))))
+        self.assertGreater(max(angles) - min(angles), 1.5, "any angle")
 
     def test_never_flung_slower_than_a_serve(self):
         self.hole_at(960, 540)
@@ -244,6 +261,7 @@ class TheAI(Match):
         contact_x = _line - (self.game.p2.width / 2 + self.ball.width / 2)
         path = self.pu.hole_path(700.0, straight_y, 1000.0, 0.0, self.ball.width / 2, contact_x)
         self.assertIsNotNone(path)
+        self.assertFalse(path[2])
         self.assertLess(abs(y - path[1]), abs(y - straight_y), "nearer the bent path than the straight one")
         self.assertLess(path[1], straight_y - 30)
 
@@ -251,6 +269,15 @@ class TheAI(Match):
         self.hole_at(1100, 540)
         _line, y = self.target(540)
         self.assertEqual(y, BASE_H / 2)
+
+    def test_a_ball_not_getting_here_for_a_while_is_read_as_usual(self):
+        self.hole_at(1100, 540)
+        self.assertIsNone(self.pu.hole_path(700.0, 300.0, 50.0, 0.0, 20.0, 1700.0))
+        ai = self.game.p2.ai
+        ai.reset()
+        ai.noise, ai.aim = 0.0, 0.0
+        _line, y = ai.meet(300.0, 300.0, 60.0, 0.0, self.ball.width / 2, ai.params())
+        self.assertNotEqual(y, BASE_H / 2, "not waiting in the middle")
 
     def test_reads_a_swallowed_ball_from_the_flare(self):
         self.hole_at(960, 540)

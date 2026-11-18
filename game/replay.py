@@ -30,7 +30,7 @@ KIND_KEYS = [kind.key for kind in KINDS]
 ROWS = 3        # the rows' layout: 2 from 1.7 (each portal's size), 3 from 1.8 (each portal's flash, and
                 # the blue ball's visibility); none said in a header means 1
 NO_AIM = 9.0                        # (Sticky Goo's aim, in a row, when it hasn't locked: 1.8)
-HOLE_FIELDS = 11                    # a black hole's numbers in a row (1.8)
+HOLE_FIELDS = 15                    # a black hole's numbers in a row (1.8)
 RENAMED = {"chaos": "shape"}        # power-ups since renamed: Chaos Mode + is Shape Shift (1.6)
 STYLES = ["tomb", "pillar"]
 GREAT = 14.0                 # a point's best moment worth an instant replay scores at least this
@@ -277,9 +277,10 @@ class Recorder:
         for hole in holes:
             way, arrows = hole.get("way"), list(hole.get("arrows", ()))[:2]
             arrows += [NO_AIM] * (2 - len(arrows))
+            doors = list(hole.get("doors", ((0.0, 0.0), (0.0, 0.0))))       # (Portal Pair's, as they collapse)
             values += [hole["x"], hole["y"], hole["kind"], hole.get("power", 1.0), hole.get("age", 0.0),
                        hole.get("flash", 0.0), hole["dying"] if hole.get("dying") is not None else -1.0,
-                       hole.get("spin", 1), way if way is not None else NO_AIM, *arrows]
+                       hole.get("spin", 1), way if way is not None else NO_AIM, *arrows, *doors[0], *doors[1]]
         return array("f", values).tobytes()
 
     def track_pass(self):
@@ -773,7 +774,8 @@ class ReplayView:
                     pu.holes.append({"x": v[0], "y": v[1], "kind": int(v[2]), "power": v[3], "age": v[4],
                                      "flash": v[5], "dying": None if v[6] < 0 else v[6],
                                      "spin": 1 if v[7] >= 0 else -1, "way": None if v[8] >= NO_AIM else v[8],
-                                     "arrows": [angle for angle in v[9:11] if angle < NO_AIM]})
+                                     "arrows": [angle for angle in v[9:11] if angle < NO_AIM],
+                                     "doors": [(v[11], v[12]), (v[13], v[14])]})
                 pos += HOLE_FIELDS
         self.objects = [*self.stones, self.p1, self.p2, ball, *self.extra_balls]
 

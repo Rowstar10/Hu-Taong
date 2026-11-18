@@ -124,9 +124,9 @@ class Portals(unittest.TestCase):
 
     def test_each_ball_through_grows_both_to_their_full_size(self):
         sizes = []
-        for _ in range(10):
-            self.go_through(self.pu.portals[0])
-            sizes.append([p["r"] for p in self.pu.portals])
+        for _ in range((PowerUps.PORTAL_R - PowerUps.PORTAL_START_TALISMAN) // PowerUps.PORTAL_GROW):
+            self.go_through(self.pu.portals[0])                   # (one more and they collapse: 1.8,
+            sizes.append([p["r"] for p in self.pu.portals])      #  test_portal_collapse)
         self.assertEqual(sizes[0], [PowerUps.PORTAL_START_TALISMAN + PowerUps.PORTAL_GROW] * 2)
         self.assertEqual(sizes[-1], [PowerUps.PORTAL_R] * 2)
         self.assertTrue(all(b >= a for (a, _), (b, _) in zip(sizes, sizes[1:])))
@@ -252,7 +252,7 @@ class PortalPairMode(unittest.TestCase):
     def test_still_no_bigger_than_full_size(self):
         self.grow(4)
         self.next_point()
-        self.grow(10)
+        self.grow(5)                                              # (one more and they collapse: 1.8)
         self.assertEqual([p["r"] for p in self.pu.portals], [PowerUps.PORTAL_R] * 2)
 
     def test_a_loop_shuts_them_till_the_next_serve_as_big_as_they_were(self):

@@ -159,6 +159,10 @@ KINDS = (
          "• The way out flashes just before the ball comes out\n"
          "• It leaves the way that portal's arrows point, and they slowly turn\n"
          "• They grow a little each time a ball goes through\n"
+         "• Once they're full size, the next ball through sets them collapsing into a black hole with two arrows,\n"
+         "  red and blue: a ball it swallows comes out as Twin Balls, one along each arrow\n"
+         "• Then mini black holes come and go until the point ends, each pulling the ball in and shooting it out\n"
+         "  along its own circling arrow\n"
          "• Paddles pass straight through them\n"
          "• Lasts until the point ends\n"
          "• Doesn't turn up in a Portal Pair match"),
@@ -166,7 +170,8 @@ KINDS = (
          "A black hole opens mid-court until the point ends: it pulls the ball in and flings it out.",
          "A black hole opens in the middle of the court.\n"
          "• It pulls the ball towards it, harder the closer the ball comes; paddles feel nothing\n"
-         "• A ball that falls in is flung out a moment later, any way but straight up or down, as fast as it went in\n"
+         "• A ball that falls in is flung out a moment later, as fast as it went in, still heading for the same\n"
+         "  side but at any angle (never straight up or down)\n"
          "• An arrow flares the way it will come out\n"
          "• Lasts until the point ends, then it implodes"),
 )
@@ -233,6 +238,18 @@ class PowerUps:
     HOLE_TRAP = 2.5                         # seconds a ball can circle in its pull before it's drawn in
     HOLE_CLEAR = 240                        # px it opens clear of stones, portals and the ball
     HOLE_TALISMAN, HOLE_COLLAPSE, HOLE_MINI = 1, 2, 3      # kinds of black hole (in replay rows too)
+    COLLAPSE_TIME = 2.5                     # Portal Pair (1.8): seconds full-size portals take to collapse into a black hole:
+    COLLAPSE_FLARE, COLLAPSE_SPIRAL = 0.6, 2.0   # flaring till 0.6 s, spiralling in round each other till 2.0, then merging
+    COLLAPSE_TURN = 0.3                     # radians/s its two arrows slowly circle at, once it's formed
+    MINI_REACH, MINI_PULL, MINI_CORE = 220, HOLE_PULL / 3, 22    # its mini black holes: a weaker pull, not so far...
+    MINI_LIFE = (3.0, 5.0)                  # ...each there this long...
+    MINI_FADE = 0.5                         # ...fading in and out over this...
+    MINI_EVERY = (1.5, 3.0)                 # ...a new one every so often...
+    MINI_FIRST = 0.6                        # ...the first this soon after the Twin Balls come out...
+    MINI_MOST = 3                           # ...up to this many at once...
+    MINI_GOAL_GAP = 350                     # ...this far from either goal...
+    MINI_HOLD = 0.2                         # ...holding a ball this long while its arrow flashes...
+    MINI_TURN = (0.9, 1.5)                  # ...the arrow circling at this many radians/s
     LANTERN_FADE = (0.6, 0.9)               # Lantern Night: seconds for night to fall, and to lift
     LANTERN_LIGHT = 300                     # px of lantern light round each paddle
     BLAST_R = 280                           # Firecracker: how far its blast flattens stones
@@ -274,6 +291,8 @@ class PowerUps:
         self.closing = []        # portals shrinking away as they close: the same, with "shut" going 1 to 0 (1.8)
         self.portal_trips = 0    # trips through them since a paddle last touched a ball
         self.holes = []          # Black Hole (1.8): {"x", "y", "kind", "age", "power", "spin", "way", "flash", "dying"}
+        self.collapse_due = False  # Portal Pair (1.8): a ball went in at full size; they collapse as it comes out
+        self.minis = None        # ...and after the collapse, mini black holes come and go: {"next": seconds}
         self.portal_grown = 0.0  # Portal Pair match: how big they'd grown when a loop shut them
         self.ball_v = (game.ball.vx, game.ball.vy)   # the ball's velocity last frame, before any hit
         self.wait = self.next_wait()
@@ -313,7 +332,7 @@ class PowerUps:
                               self.switch_plus, self.shape_shift, self.curve_on) if on)
         n += len(self.tombs)
         n += bool(self.twin) and not s.mode_twin_ball
-        n += bool(self.portals) and not s.mode_portal_pair
+        n += (bool(self.portals) or self.collapsed()) and not s.mode_portal_pair
         n += any(h["kind"] == self.HOLE_TALISMAN and h["dying"] is None for h in self.holes)
         return n
 
@@ -427,7 +446,7 @@ class PowerUps:
         if kind.key == "lantern":
             return self.lantern is None and not self.settings.mode_lantern_night
         if kind.key == "portal":
-            return not self.portals and not self.settings.mode_portal_pair
+            return not self.portals and not self.collapsed() and not self.settings.mode_portal_pair
         if kind.key == "hole":
             return not any(h["kind"] == self.HOLE_TALISMAN for h in self.holes)
         if kind.key == "tomb":
@@ -447,14 +466,12 @@ class PowerUps:
     def split_ball(self):
         """Twin Balls: the ball splits in two, red (the ball itself) and blue (a new one), heading off
         on mirrored paths so they part straight away."""
-        from objects.ball import Ball
         game, ball = self.game, self.game.ball
         if ball.stuck:
             self.unstick_now(ball)
         r = ball.diameter / 2
         cx, cy = (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2
-        blue = Ball(game, diameter = ball.diameter, x = ball.x0, y = ball.y0, speed = ball.speed, color = "white")
-        blue.drift = getattr(ball, "drift", None)
+        blue = self.new_blue(ball)
         # They fly apart at mirrored angles, each at half the speed the ball had (two at full speed
         # at once would be too much to handle)
         before = math.hypot(ball.vx, ball.vy)
@@ -473,10 +490,17 @@ class PowerUps:
         blue.y0 = clamp(cy - r + apart, 0, BASE_H - 2 * r)
         blue.y1 = blue.y0 + 2 * r
         blue.x0, blue.x1 = cx - r, cx + r
-        blue.last_paddle = ball.last_paddle
         ball.side, blue.side = "red", "blue"
         self.twin = {"left": UNTIL_POINT, "ball": blue}            # until the point ends
         game.app.fx.spark(cx, cy, 30, (255, 236, 200), speed = 420, life = .6)
+
+    def new_blue(self, ball):
+        """Twin Balls' blue ball, made like the ball (it joins the court as it's made)."""
+        from objects.ball import Ball
+        blue = Ball(self.game, diameter = ball.diameter, x = ball.x0, y = ball.y0, speed = ball.speed, color = "white")
+        blue.drift = getattr(ball, "drift", None)
+        blue.last_paddle = ball.last_paddle
+        return blue
 
     def twin_serve(self):
         """Twin Ball (a game mode): every point is served with both balls, Red's (the ball itself) and
@@ -577,6 +601,8 @@ class PowerUps:
             items.append(("lantern", max(0.0, self.lantern.get("left", 0.0)), "Night: lanterns only"))
         if self.portals:
             items.append(("portal", UNTIL_POINT, "Two linked portals"))
+        elif self.collapsed():
+            items.append(("portal", UNTIL_POINT, "The portals collapsed: black holes"))
         if any(h["kind"] == self.HOLE_TALISMAN and h["dying"] is None for h in self.holes):
             items.append(("hole", UNTIL_POINT, "Black Hole: pulls the ball in and flings it out"))
         return items
@@ -616,6 +642,7 @@ class PowerUps:
                     self.lantern["lifting"] = self.LANTERN_FADE[1]     # its time is up: dawn comes
         self.update_portals(dt)
         self.update_holes(dt)
+        self.update_minis(dt)
         if self.update_snow(dt):
             return                          # a paddle was shoved into its goal: the point is over
 
@@ -1063,6 +1090,8 @@ class PowerUps:
                 hook = getattr(self.game, "on_portal", None)
                 if hook:
                     hook(door, out)
+                if all(p.get("r", self.PORTAL_R) >= self.PORTAL_R for p in self.portals):
+                    self.collapse_due = True        # full size: they collapse as this ball comes out (1.8)
                 for p in self.portals:                     # both grow a little, to their full size
                     p["r"] = min(float(self.PORTAL_R), p.get("r", self.PORTAL_R) + self.PORTAL_GROW)
                 self.portal_trips += 1
@@ -1090,6 +1119,7 @@ class PowerUps:
         x, y, vx, vy = self.transit_exit(ball)
         out, r = ball.transit["out"], ball.width / 2
         hole = "angle" in ball.transit
+        transit_speed = ball.transit["speed"]
         ball.transit = None
         ball.x0, ball.y0, ball.x1, ball.y1 = x - r, y - r, x + r, y + r
         ball.vx, ball.vy = vx, vy
@@ -1098,8 +1128,12 @@ class PowerUps:
             ball.hole_cool, ball.hole_time = self.HOLE_COOL, 0.0
             self.game.app.fx.spark(x, y, 30, (255, 196, 120), speed = 520, life = .55)
             self.game.app.sound_manager.play("countdown_go.wav", multiplier = 0.5)
+            if out["kind"] == self.HOLE_COLLAPSE:
+                self.spit(ball, out, transit_speed)
             return
         self.game.app.fx.spark(out["x"], out["y"], 22, (120, 230, 255), speed = 340, life = .5)
+        if self.collapse_due and self.portals:
+            self.collapse_portals()
 
     def close_portals(self):
         """The portals snap shut (a ball was looping through them with no paddle near).  In a Portal
@@ -1110,6 +1144,7 @@ class PowerUps:
         self.shut(self.portals)
         self.portals = []
         self.portal_trips = 0
+        self.collapse_due = False
 
     def shut(self, portals):
         """These portals shrink away rather than vanish (1.8)."""
@@ -1119,6 +1154,7 @@ class PowerUps:
         """At each serve: a Portal Pair match has its portals (opened at the first serve, and again
         after a loop shut them, never smaller than they'd grown); otherwise none stay open."""
         self.holes = []                             # (any black hole has imploded by the serve)
+        self.minis = None
         if not self.settings.mode_portal_pair:
             self.portals = []
         elif not self.portals:
@@ -1129,7 +1165,24 @@ class PowerUps:
     @classmethod
     def hole_style(cls, kind):
         """How far a black hole of this kind pulls, how hard, and the radius of its heart."""
+        if kind == cls.HOLE_MINI:
+            return cls.MINI_REACH, cls.MINI_PULL, cls.MINI_CORE
         return cls.HOLE_REACH, cls.HOLE_PULL, cls.HOLE_CORE
+
+    @classmethod
+    def swallows(cls, hole):
+        """Can a ball fall into this hole now?  Not Portal Pair's before it has formed (nor once it
+        has a ball inside), nor a mini black hole while it's faint, fading in or out."""
+        if hole["kind"] == cls.HOLE_COLLAPSE:
+            return hole.get("age", 0.0) >= cls.COLLAPSE_TIME and not hole.get("full")
+        if hole["kind"] == cls.HOLE_MINI:
+            return hole.get("power", 1.0) >= 0.5
+        return True
+
+    def collapsed(self):
+        """Portal Pair's portals have collapsed this point: its black hole, then the mini ones."""
+        return bool(self.minis) or any(h["kind"] in (self.HOLE_COLLAPSE, self.HOLE_MINI) and h["dying"] is None
+                                       for h in self.holes)
 
     @classmethod
     def hole_pull(cls, hole, x, y, pace = 1.0):
@@ -1213,9 +1266,24 @@ class PowerUps:
             return
         for hole in self.holes:
             hole["flash"] = max(0.0, hole.get("flash", 0.0) - dt / self.HOLE_FLARE)
-            if hole["dying"] is None:
-                hole["age"] += dt
+            if hole["dying"] is not None:
+                continue
+            hole["age"] += dt
+            held = hole.get("held", 0.0) > 0               # (its arrows hold still while a ball's inside)
+            if held:
+                hole["held"] -= dt
+            if hole["kind"] == self.HOLE_COLLAPSE:
+                hole["power"] = min(1.0, hole["age"] / self.COLLAPSE_TIME)    # its pull grows as it collapses
+                if hole["age"] >= self.COLLAPSE_TIME and not held:
+                    hole["arrows"] = [(a + turn * dt) % math.tau for a, turn in zip(hole["arrows"], hole["turns"])]
+            elif hole["kind"] == self.HOLE_MINI:
+                hole["left"] -= dt
+                hole["power"] = clamp(min(hole["age"], hole["left"]) / self.MINI_FADE, 0.0, 1.0)
+                if not held:
+                    hole["arrows"][0] = (hole["arrows"][0] + hole["turn"] * dt) % math.tau
+            else:
                 hole["power"] = min(1.0, hole["age"] / self.HOLE_OPEN)
+        self.holes = [h for h in self.holes if h["kind"] != self.HOLE_MINI or h["dying"] is not None or h["left"] > 0]
         pulling = self.pulling()
         if not pulling:
             return
@@ -1228,7 +1296,7 @@ class PowerUps:
                 continue
             cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
             r = b.width / 2
-            into = next((h for h in pulling if self.falls_in(h, cx, cy, b.vx, b.vy, dt, r)), None)
+            into = next((h for h in pulling if self.swallows(h) and self.falls_in(h, cx, cy, b.vx, b.vy, dt, r)), None)
             if into:
                 self.swallow(b, into)
                 continue
@@ -1241,24 +1309,42 @@ class PowerUps:
                 b.hole_time = 0.0
                 continue
             b.hole_time = getattr(b, "hole_time", 0.0) + dt
-            if b.hole_time > self.HOLE_TRAP:
-                self.swallow(b, min(pulling, key = lambda h: math.hypot(cx - h["x"], cy - h["y"])))
+            ready = [h for h in pulling if self.swallows(h)]
+            if b.hole_time > self.HOLE_TRAP and ready:
+                self.swallow(b, min(ready, key = lambda h: math.hypot(cx - h["x"], cy - h["y"])))
                 continue
             b.vx, b.vy = self.bend(b.vx, b.vy, ax, ay, dt)
 
-    def fling_angle(self, hole):
-        """The way a black hole flings out what it swallowed: any way at all, but never steeper than
-        a portal sends a ball (straight up or down, it would bounce between top and bottom)."""
-        dx, dy = self.portal_exit(random.uniform(0, math.tau))
-        return math.atan2(dy, dx)
+    def fling_angle(self, hole, way):
+        """The way a black hole flings out what it swallowed: on towards the same side (`way`, 1 for
+        right), at any angle, but never steeper than a portal sends a ball (straight up or down, it
+        would bounce between top and bottom).  (Any way at all, it soaked up attacking shots and
+        sent half of them back: computer v computer points ran past two minutes.)"""
+        steepest = math.acos(self.PORTAL_STEEPEST)
+        angle = random.uniform(-steepest, steepest)
+        return angle if way > 0 else math.pi - angle
 
     def swallow(self, b, hole):
         """A ball falls into a black hole: held at its heart, out of sight, while an arrow flares
         the way it will come out; then flung out that way as fast as it went in (never slower than
         a serve)."""
-        speed = max(math.hypot(b.vx, b.vy), getattr(b, "speed", 0) * math.sqrt(2))
-        angle = self.fling_angle(hole)
-        b.transit = {"out": hole, "left": self.HOLE_HOLD, "speed": speed, "angle": angle}
+        coming, serve = math.hypot(b.vx, b.vy), getattr(b, "speed", 0) * math.sqrt(2)
+        speed, hold = max(coming, serve), self.HOLE_HOLD
+        if hole["kind"] == self.HOLE_MINI:
+            # a mini black hole is a portal too: out along its circling arrow, a little slower, as
+            # out of a portal (never slower than a serve, nor faster than it went in)
+            dx, dy = self.portal_exit(hole["arrows"][0])
+            speed, hold = max(coming * (1 - self.PORTAL_SLOW), min(coming, serve)), self.MINI_HOLD
+        elif hole["kind"] == self.HOLE_COLLAPSE:
+            # Portal Pair's: out along an arrow, the blue ball along the blue one (see spit)
+            dx, dy = self.portal_exit(hole["arrows"][1 if getattr(b, "side", None) == "blue" else 0])
+            hole["full"] = True
+        else:
+            fling = self.fling_angle(hole, 1 if b.vx > 0 else -1 if b.vx < 0 else random.choice((-1, 1)))
+            dx, dy = math.cos(fling), math.sin(fling)
+        angle = math.atan2(dy, dx)
+        hole["held"] = hold
+        b.transit = {"out": hole, "left": hold, "speed": speed, "angle": angle}
         r = b.width / 2
         b.x0, b.y0, b.x1, b.y1 = hole["x"] - r, hole["y"] - r, hole["x"] + r, hole["y"] + r
         b.vx = b.vy = 0.0
@@ -1271,17 +1357,19 @@ class PowerUps:
     def hole_path(self, x, y, vx, vy, r, line_x, judged = 1.0, field = 0.0, most = 3.0):
         """Where a ball flying from (x, y) at (vx, vy) reaches x = line_x, pulled by the black holes
         (each taken as `judged` times as strong as it is) and pushed by `field` (the wind):
-        (seconds, y), or None if it falls into a hole first, or doesn't get there.  For the AI."""
+        (seconds, y, False), or (seconds, None, True) if it falls into a hole first, or None if it
+        doesn't get there within `most` seconds.  For the AI."""
         holes = self.pulling()
         step = 1 / 60
         way = 1 if line_x > x else -1
+        swallows = [self.swallows(hole) for hole in holes]
         pace = self.pace_of(vx, vy, getattr(self.game.ball, "speed", 0))
         t = 0.0
         for _ in range(int(most / step)):
             ax, ay = 0.0, field
-            for hole in holes:
-                if self.falls_in(hole, x, y, vx, vy, step, r):
-                    return None
+            for hole, can in zip(holes, swallows):
+                if can and self.falls_in(hole, x, y, vx, vy, step, r):
+                    return t, None, True
                 px, py = self.hole_pull(hole, x, y, pace)
                 ax, ay = ax + px * judged, ay + py * judged
             vx, vy = self.bend(vx, vy, ax, ay, step)
@@ -1292,8 +1380,101 @@ class PowerUps:
                 y, vy = 2 * (BASE_H - r) - y, -abs(vy)
             t += step
             if (x - line_x) * way >= 0:
-                return t, y
+                return t, y, False
         return None
+
+    # ---------------- Portal Pair's collapse ----------------
+
+    def collapse_portals(self):
+        """Full-size portals collapse (1.8): over COLLAPSE_TIME they flare, spiral in round each
+        other and merge into a black hole between them, its pull growing as they do.  It keeps two
+        arrows, red and blue, the ways the portals pointed, slowly circling; see spit."""
+        a, b = self.portals
+        stones = [o for o in self.game.objects if getattr(o, "is_obstacle", False)]
+        hx, hy = (a["x"] + b["x"]) / 2, (a["y"] + b["y"]) / 2
+        for k in (0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8):            # (between them, clear of any stone)
+            x, y = a["x"] + (b["x"] - a["x"]) * k, a["y"] + (b["y"] - a["y"]) * k
+            if all(not (o.x0 - 70 < x < o.x1 + 70 and o.y0 - 70 < y < o.y1 + 70) for o in stones):
+                hx, hy = x, y
+                break
+        arrows = [math.atan2(*reversed(self.portal_exit(door["angle"]))) for door in (a, b)]
+        turns = [math.copysign(self.COLLAPSE_TURN, door.get("spin", 1.0) or 1.0) for door in (a, b)]
+        self.holes.append({"x": hx, "y": hy, "kind": self.HOLE_COLLAPSE, "age": 0.0, "power": 0.0,
+                           "spin": 1 if a.get("spin", 1.0) >= 0 else -1, "way": None, "flash": 0.0,
+                           "dying": None, "arrows": arrows, "turns": turns,
+                           "doors": [(door["x"] - hx, door["y"] - hy) for door in (a, b)]})
+        self.portals = []
+        self.portal_trips = 0
+        self.collapse_due = False
+        self.portal_grown = 0.0                     # (a Portal Pair match's open small again at the next serve)
+        app = self.game.app
+        for door in (a, b):
+            app.fx.spark(door["x"], door["y"], 30, (210, 170, 255), speed = 360, life = .7)
+        app.sound_manager.play("countdown_tick.wav")
+
+    def spit(self, ball, hole, speed):
+        """Portal Pair's black hole spits out what it swallowed: a lone ball comes out as Twin Balls,
+        red along the red arrow and blue along the blue, at half its speed as Twin Balls split
+        (never slower than half a serve); with two balls in play already, the ball comes out alone
+        along its own.  Then the hole implodes, and mini black holes come and go till the point ends."""
+        game = self.game
+        app = game.app
+        if ball is game.ball and self.twin is None:
+            blue = self.new_blue(ball)
+            each = max(speed * 0.5, ball.speed * math.sqrt(2) * 0.5)
+            r = ball.width / 2
+            for b, angle, tint in ((ball, hole["arrows"][0], (255, 120, 100)), (blue, hole["arrows"][1], (110, 170, 255))):
+                dx, dy = self.portal_exit(angle)
+                cx = hole["x"] + dx * (self.HOLE_CORE + r + 6)
+                cy = clamp(hole["y"] + dy * (self.HOLE_CORE + r + 6), r + 2, BASE_H - r - 2)
+                b.x0, b.y0, b.x1, b.y1 = cx - r, cy - r, cx + r, cy + r
+                b.vx, b.vy = each * dx, each * dy
+                b.portal_cool, b.hole_cool, b.hole_time = self.PORTAL_COOL, self.HOLE_COOL, 0.0
+                for n in range(1, 5):                                 # streaks along its arrow
+                    app.fx.spark(cx + dx * 30 * n, cy + dy * 30 * n, 6, tint, speed = 160, life = .45)
+            ball.side, blue.side = "red", "blue"
+            self.twin = {"left": UNTIL_POINT, "ball": blue}
+        hole["dying"], hole["power"] = self.HOLE_IMPLODE, 0.0
+        self.minis = {"next": self.MINI_FIRST}
+        renderer = getattr(app, "renderer", None)
+        if renderer is not None:
+            renderer.shake(10, 0.3)
+
+    def update_minis(self, dt):
+        """After the collapse, mini black holes fade in at random spots every so often, up to
+        MINI_MOST at once, until the point ends."""
+        if not self.minis:
+            return
+        self.minis["next"] -= dt
+        if self.minis["next"] > 0:
+            return
+        self.minis["next"] = random.uniform(*self.MINI_EVERY)
+        if sum(1 for h in self.holes if h["kind"] == self.HOLE_MINI and h["dying"] is None) < self.MINI_MOST:
+            self.open_mini()
+
+    def open_mini(self):
+        """A mini black hole fades in, standing still: well out from both goals, clear of the stones,
+        the balls and the other holes (or as clear as it can find)."""
+        game = self.game
+        stones = [o for o in game.objects if getattr(o, "is_obstacle", False)]
+        balls = [((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2) for b in self.balls()]
+        best, best_room = None, -math.inf
+        for _ in range(80):
+            x = random.uniform(self.MINI_GOAL_GAP, BASE_W - self.MINI_GOAL_GAP)
+            y = random.uniform(150, BASE_H - 150)
+            room = min([math.hypot(x - bx, y - by) - 200 for bx, by in balls] +
+                       [math.hypot(x - clamp(x, o.x0, o.x1), y - clamp(y, o.y0, o.y1)) - 70 for o in stones] +
+                       [math.hypot(x - h["x"], y - h["y"]) - 300 for h in self.holes] + [math.inf])
+            if room > best_room:
+                best, best_room = (x, y), room
+            if room >= 0:
+                break
+        x, y = best
+        spin = random.choice((-1, 1))
+        self.holes.append({"x": x, "y": y, "kind": self.HOLE_MINI, "age": 0.0, "power": 0.0, "spin": spin,
+                           "way": None, "flash": 0.0, "dying": None, "arrows": [random.uniform(0, math.tau)],
+                           "turn": spin * random.uniform(*self.MINI_TURN), "left": random.uniform(*self.MINI_LIFE),
+                           "held": 0.0})
 
     # ---------------- Snowball ----------------
 
@@ -1434,6 +1615,8 @@ class PowerUps:
                 hole["power"] = 0.0
         for b in self.balls():
             b.hole_cool = b.hole_time = 0.0
+        self.collapse_due = False
+        self.minis = None                           # (no more mini black holes)
         for b in self.balls():
             b.curve = 0.0
         for paddle in (self.game.p1, self.game.p2):

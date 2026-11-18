@@ -35,6 +35,8 @@ class Ball(GameObject):
         self.curve = 0.0         # Curveball: px/s^2 it bends up (negative) or down as it flies
         self.portal_cool = 0.0   # Portal Pair: a moment after coming out of a portal
         self.transit = None      # Portal Pair: inside one, on the way out of the other (1.8)
+        self.hole_cool = 0.0     # Black Hole: a moment after being flung out, when it isn't pulled (1.8)
+        self.hole_time = 0.0     # ...and how long it has been in a pull without falling in
         self.press = None        # (what last knocked it sideways, which side of that it was on, when)
         self.press_clock = 0.0   # seconds the ball has moved, to time those knocks
 
@@ -206,4 +208,5 @@ class Ball(GameObject):
         self.curve = 0.0
         self.portal_cool = 0.0
         self.transit = None
+        self.hole_cool = self.hole_time = 0.0
         self.press = None
