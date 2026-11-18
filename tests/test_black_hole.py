@@ -290,10 +290,30 @@ class Swallowed(Match):
 
     def test_circling_too_long_its_drawn_in(self):
         self.hole_at(960, 540)
-        self.place(960, 540 + 250, 700.0, 0.0)
+        self.place(960, 540 + 120, 700.0, 0.0)
         self.ball.hole_time = PowerUps.HOLE_TRAP
         self.pu.update_holes(DT)
         self.assertTrue(self.ball.transit)
+
+    def test_a_slow_ball_crossing_the_pull_isnt_snatched_from_far_off(self):
+        """Rowan's playtest after 1.8's fourth: "Sometimes a black hole sucks in a ball from too far
+        away... when the ball is slow enough?"  It was: 2.5 s anywhere in the pull drew a ball
+        straight into the heart, and a slow ball can take longer than that to cross the pull (in
+        computer v computer matches, 14 swallows in 97, from 230 to 530 px off).  Only time spent
+        circling close in counts now, and only a ball close in is drawn in."""
+        self.hole_at(960, 540)
+        for off in (300.0, 220.0, 170.0):                          # (close in is 0.35 of its 450 px reach)
+            with self.subTest(off = off):
+                self.ball.transit, self.ball.hole_cool = None, 0.0
+                self.place(960, 540 + off, 350.0, 0.0)              # slow, going across, well off the heart
+                self.ball.hole_time = PowerUps.HOLE_TRAP + 1.0       # (as if it had been in the pull a while)
+                self.pu.update_holes(DT)
+                self.assertIsNone(self.ball.transit, "snatched from far off")
+        self.ball.hole_time = 0.0
+        self.place(960, 540 + 300, 350.0, 0.0)
+        for _ in range(round(1.0 / DT)):
+            self.pu.update_holes(DT)                                # (held there, not flown on)
+        self.assertEqual(self.ball.hole_time, 0.0, "its time far off doesn't count")
 
 
 class PointsEnd(Match):

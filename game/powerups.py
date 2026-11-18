@@ -258,7 +258,9 @@ class PowerUps:
     HOLE_IMPLODE = 0.7                      # ...and to implode at the point's end...
     HOLE_BURST = 0.45                       # ...the last share of that its flash and ring of light (all a collapse shows)
     HOLE_FLARE = HOLE_HOLD + HOLE_COOL      # seconds the way out flares for, from when a ball falls in
-    HOLE_TRAP = 2.5                         # seconds a ball can circle in its pull before it's drawn in
+    HOLE_TRAP = 2.5                         # seconds a ball can circle in its pull before it's drawn in...
+    HOLE_TRAP_NEAR = 0.35                   # ...counting only while it's this share of the reach from the heart (a
+                                            #    slow ball crossing the pull was snatched from 500 px off: playtest)
     HOLE_CLEAR = 240                        # px it opens clear of stones, portals and the ball...
     HOLE_SERVE_GAP = 200                    # ...and a Black Hole match's of where the ball is served from, drifting too
     HOLE_TALISMAN, HOLE_MINI = 1, 3         # kinds of black hole, in replay rows too: the Black Hole (the talisman's
@@ -1393,10 +1395,12 @@ class PowerUps:
                 self.leave_pull(b)
                 continue
             b.hole_speed = entry
-            b.hole_time = getattr(b, "hole_time", 0.0) + dt
-            ready = [h for h in pulling if self.swallows(h)]
-            if b.hole_time > self.HOLE_TRAP and ready:
-                self.swallow(b, min(ready, key = lambda h: math.hypot(cx - h["x"], cy - h["y"])))
+            close = [h for h in pulling if self.swallows(h) and
+                     math.hypot(cx - h["x"], cy - h["y"]) < self.HOLE_TRAP_NEAR * self.hole_style(h)[0]]
+            if close:
+                b.hole_time = getattr(b, "hole_time", 0.0) + dt     # (circling close in, not just passing)
+            if b.hole_time > self.HOLE_TRAP and close:
+                self.swallow(b, min(close, key = lambda h: math.hypot(cx - h["x"], cy - h["y"])))
                 continue
             b.vx, b.vy = vx, vy
 
