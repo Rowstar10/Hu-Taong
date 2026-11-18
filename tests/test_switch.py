@@ -227,7 +227,7 @@ class Shown(SwitchMatch):
             app.renderer.text = real
         self.assertIn("AI takes over", texts)                 # the left paddle: the AI plays the right now
         self.assertIn(f"{self.p1.controls_label} takes over", texts)
-        self.assertIn("Switch on the next hit", texts)
+        self.assertIn("Swap on the next hit", texts)        # (Switch till 1.9)
 
     def test_colours_drawn_where_the_players_are(self):
         self.assertTrue(self.arm())

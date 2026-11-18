@@ -59,12 +59,13 @@ class MatchSettings:
 
     # Game modes, any of them together (see reset).  Chaos and Switch each come at a timing.
     MODES = ("chaos", "switch", "curveball", "lantern_night", "twin_ball", "talisman_rush", "black_hole")
-    MODE_NAMES = {"chaos": "Chaos", "switch": "Switch", "curveball": "Curveball",
-                  "lantern_night": "Lantern Night", "twin_ball": "Twin Ball", "talisman_rush": "Talisman Rush",
+    # (1.9, Rowan: Chaos is called Shape Shift, Switch Soul Swap and Talisman Rush CHAOS on screen.
+    # Their settings keep their old names, so every version still reads the one save.)
+    MODE_NAMES = {"chaos": "Shape Shift", "switch": "Soul Swap", "curveball": "Curveball",
+                  "lantern_night": "Lantern Night", "twin_ball": "Twin Ball", "talisman_rush": "CHAOS",
                   "black_hole": "Black Hole"}
     CHAOS_TIMINGS = ("Every point", "Constant drift")
     SWITCH_TIMINGS = ("Every point", "Mid-rally")
-    RUSH = 3.0                  # Talisman Rush: talismans come this many times as often
     # How a ball comes off a paddle (1.8, see objects/paddle.py): 1.7's engine; classic Pong (angle
     # by where it meets the paddle, a little faster every hit); or Hu Taong 0.9's
     PHYSICS = ("Current", "Classic", "v0.9")
@@ -107,7 +108,7 @@ class MatchSettings:
         self.ai_styles = ["Balanced", "Guardian", "Striker", "Trickster"]
 
         # Power-ups
-        self.powerup_rate_options = ["Rare", "Normal", "Frequent", "Chaotic"]
+        self.powerup_rate_options = ["Rare", "Normal", "Frequent"]    # (Chaotic is CHAOS's own since 1.9)
         self.at_once_options = [1, 2, 3]      # talismans in play at once (1.8)
 
         # Courts: the stones a match starts with (see game/courts.py); the last one is Random
@@ -149,7 +150,7 @@ class MatchSettings:
         self.mode_curveball = False  # every hit bends the way the paddle was moving (the Curveball talisman, for good)
         self.mode_lantern_night = False   # the court is always dark but for lanterns (the Lantern Night talisman, for good)
         self.mode_twin_ball = False  # every point is played with two balls, Red's and Blue's (the Twin Balls rules)
-        self.mode_talisman_rush = False   # talismans on, and coming RUSH times as often
+        self.mode_talisman_rush = False   # CHAOS (Talisman Rush till 1.9): talismans on, every 1.5-3 s, no limit
         self.mode_black_hole = False      # a Black Hole all match, growing point after point till it collapses
         self.hole_twins = True       # a Black Hole that collapses lets out Twin Balls (off: just the ball: 1.8)
                                           # (1.8: Portal Pair was the mode until Rowan's second playtest)
@@ -187,7 +188,7 @@ class MatchSettings:
     @property
     def talisman_limit(self):
         """How many talismans may be in play at once, their effects and any waiting on the court
-        (Talisman Rush lifts the limit)."""
+        (CHAOS lifts the limit)."""
         return math.inf if self.mode_talisman_rush else self.at_once_options[self.talismans_at_once]
 
     @property
@@ -200,7 +201,7 @@ class MatchSettings:
 
     @property
     def talismans_on(self):
-        """Talismans turn up: Power-Ups on, or Talisman Rush."""
+        """Talismans turn up: Power-Ups on, or CHAOS."""
         return self.powerups or self.mode_talisman_rush
 
     @property

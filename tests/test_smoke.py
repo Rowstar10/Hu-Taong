@@ -141,7 +141,7 @@ class LongMatch(unittest.TestCase):
     def setUp(self):
         self.g = g = app.settings.match
         g.reset_powerups()
-        g.powerup_rate = 3
+        g.mode_talisman_rush = True                # (CHAOS: talismans every 1.5-3 s, Chaotic, 1.9)
         g.talismans_at_once = len(g.at_once_options) - 1      # (1.8: as many at once as allowed, to see them all)
         g.winning_score_index = g.winning_scores.index("Endless Mode")
 
@@ -186,7 +186,7 @@ class EveryPhysics(unittest.TestCase):
     def setUp(self):
         self.g = g = app.settings.match
         g.reset_powerups()
-        g.powerup_rate = 3
+        g.mode_talisman_rush = True                # (CHAOS: talismans every 1.5-3 s, Chaotic, 1.9)
         g.talismans_at_once = len(g.at_once_options) - 1      # (1.8: as many at once as allowed, to see them all)
         g.winning_score_index = g.winning_scores.index("Endless Mode")
 

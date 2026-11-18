@@ -110,8 +110,8 @@ class Hu_Taong(GameBase):
         self.soul_undo = False          # Soul Swap left the players on each other's paddles: undo at the serve
         self.next_switch = self.switch_gap()
         self.switch_warning = None      # seconds a mid-rally Switch has been armed, waiting for a hit
-        self.switch_flash = 0.0         # time left on the "Switch!" banner
-        self.switch_banner = "换 Switch!"
+        self.switch_flash = 0.0         # time left on the "Swap!" banner
+        self.switch_banner = "换 Swap!"  # (it said "Switch!" for the mode till 1.9, when it was renamed Soul Swap)
         self.switches = 0
 
         self.banter = None              # [text, paddle, time left]
@@ -655,7 +655,7 @@ class Hu_Taong(GameBase):
 
         self.switches += 1
         self.switch_flash = 1.3
-        self.switch_banner = "换 Switch!"
+        self.switch_banner = "换 Swap!"
         self.recorder.on_swap(0)
         self.app.sound_manager.play("hmyoop!.wav")
         for paddle, tint in ((a, "blue"), (b, "red")):

@@ -78,8 +78,8 @@ KINDS = (
          "your opponent take over each other's paddle, and the goal it defends.\n"
          "• Your keys, your score and your colour stay yours\n"
          "• The paddles stay where they are\n"
-         "• When the point ends, you're back on your own paddles (in a Switch match, the switch goes on from there)\n"
-         "• Doesn't turn up in a Switch match with mid-rally switches"),
+         "• When the point ends, you're back on your own paddles (in a Soul Swap match, the swapping goes on from there)\n"
+         "• Doesn't turn up in a Soul Swap match with mid-rally swaps"),
     Kind("blink", "Blink Ball", "闪", "Wild", 10,
          "For 10 seconds the ball blinks to a nearby spot every so often, swerving a little each time.",
          "The ball blinks to a random spot close by, every 0.1 to 0.5 seconds.\n"
@@ -118,7 +118,7 @@ KINDS = (
          "• Speeds stay as they are\n"
          "• Giant Paddle and Shrink Curse still act on top\n"
          "• Everything goes back to normal for the next serve\n"
-         "• Doesn't turn up in a Chaos match with Constant drift"),
+         "• Doesn't turn up in a Shape Shift match with Constant drift"),
     Kind("curve", "Curveball", "旋", "Wild", 0,
          "Until the point ends, every hit curves the way the paddle was moving as it hit.",
          "Curveball is on until the point ends.\n"
@@ -192,7 +192,8 @@ FAMILY_NOTES = {"Boon": "Boon: helps whoever takes it",
 class PowerUps:
     RADIUS = 56          # how close a paddle or ball must come to take one (and the talisman's size)
     LIFETIME = 20.0      # seconds of play a talisman waits on the court (it stays through points: 1.8)
-    WAITS = ((14, 22), (8, 14), (4, 8), (1.5, 3))   # seconds between talismans: Rare, Normal, Frequent, Chaotic
+    WAITS = ((14, 22), (8, 14), (4, 8), (1.5, 3))   # seconds between talismans: Rare, Normal, Frequent, Chaotic...
+    CHAOTIC = 3                                     # ...which only CHAOS uses (1.9: Spawn offers the first three)
 
     GIANT, SHRINK = 1.5, 0.8                # paddle height (Shrink Curse took a third off until 1.8)
     SWIFT = 1.5                             # paddle speed (Swift Step's hits are no harder: see Paddle.on_contact)
@@ -335,7 +336,7 @@ class PowerUps:
         return self.game.settings
 
     def kinds(self):
-        """The power-ups switched on in Settings (Talisman Rush brings them even with Power-Ups off)."""
+        """The power-ups switched on in Settings (CHAOS brings them even with Power-Ups off)."""
         s = self.settings
         if not s.talismans_on:
             return []
@@ -362,15 +363,16 @@ class PowerUps:
 
     def room(self):
         """Can another talisman turn up?  Only while those in play and those waiting on the court come
-        to fewer than Talismans at once allows (Talisman Rush lifts the limit)."""
+        to fewer than Talismans at once allows (CHAOS lifts the limit)."""
         waiting = sum(1 for item in self.pickups if item["kind"] not in self.NOT_COUNTED)
         return self.in_play() + waiting < self.settings.talisman_limit
 
     def next_wait(self):
-        """Seconds to the next talisman, at the Spawn rate; Talisman Rush cuts it to a third."""
-        lo, hi = self.WAITS[self.settings.powerup_rate]
-        rush = self.settings.RUSH if self.settings.mode_talisman_rush else 1.0
-        return random.uniform(lo, hi) / rush
+        """Seconds to the next talisman, at the Spawn rate; with CHAOS, always Chaotic's (1.9, Rowan's
+        call: as Talisman Rush, it made whatever rate was set three times as often)."""
+        rate = self.CHAOTIC if self.settings.mode_talisman_rush else min(self.settings.powerup_rate, self.CHAOTIC - 1)
+        lo, hi = self.WAITS[rate]
+        return random.uniform(lo, hi)
 
     def opponent(self, paddle):
         game = self.game

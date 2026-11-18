@@ -733,14 +733,14 @@ class Renderer:
     # ── Match setup ────────────────────────────────────────────────────────────
 
     MODE_TIPS = {
-        "chaos": "Chaos\nShakes up the ball's and paddles' sizes and speeds.\n"
+        "chaos": "Shape Shift\nShakes up the ball's and paddles' sizes and speeds.\n"
                  "• Every point: new random sizes and speeds each point, fixed through the rally\n"
                  "• Constant drift: sizes keep drifting all match, both paddles together and the ball on its own; speeds stay put\n"
                  "~ Click to step through. The Shape Shift talisman doesn't turn up with Constant drift",
-        "switch": "Switch\nThe players take over each other's paddle, and the goal it defends.\n"
+        "switch": "Soul Swap\nThe players take over each other's paddle, and the goal it defends.\n"
                   "• Your keys and your score stay yours; the paddles stay where they are\n"
                   "• Every point: after each point, paddle colour and all\n"
-                  "• Mid-rally: at random moments both paddles glow, and the next hit switches; your colour stays yours\n"
+                  "• Mid-rally: at random moments both paddles glow, and the next hit swaps them; your colour stays yours\n"
                   "~ Click to step through. The Soul Swap talisman doesn't turn up mid-rally",
         "curveball": "Curveball\nEvery hit bends the way the paddle was moving, all match.\n"
                      "~ The Curveball talisman doesn't turn up",
@@ -750,8 +750,9 @@ class Renderer:
                      "• Red scores only with the red ball, in Blue's goal; Blue only with the blue one, in Red's\n"
                      "• A ball that reaches its own colour's goal just bounces off\n"
                      "~ The Twin Balls talisman doesn't turn up",
-        "talisman_rush": "Talisman Rush\nTalismans turn up three times as often, as many at once as come.\n"
-                         "• Even with Power-Ups off: the ones switched on in Power-Ups are used",
+        "talisman_rush": "CHAOS\nA new talisman every 1.5 to 3 seconds, as many at once as come.\n"
+                         "• Even with Power-Ups off: the ones switched on in Choose Talismans are used\n"
+                         "• Spawn rate and Talismans at Once don't apply",
         "black_hole": "Black Hole\nA black hole drifts about mid-court all match, pulling the ball in and flinging it out.\n"
                       "• It grows with each ball it swallows, and stays that big point after point\n"
                       "• Grown five times, the next ball it swallows makes it collapse in on itself: the ball bursts\n"
@@ -1056,7 +1057,7 @@ class Renderer:
 
             joined = Text(lambda: (net.summary + ("  -  You play " + ("Red" if net.side == 1 else "Blue")))
                           if net and net.role == "guest" and net.summary else "", ty, theme.GOLD,
-                          samples=["First to 21  -  Court: Narrow Pass  -  Power-ups off  -  Chaos: Constant drift  -  Switch: Mid-rally  -  3 more modes  -  You play Blue"])
+                          samples=["First to 21  -  Court: Narrow Pass  -  Power-ups off  -  Shape Shift: Constant drift  -  Soul Swap: Mid-rally  -  3 more modes  -  You play Blue"])
             waiting = Text(status, f, theme.FLAME, samples=["In! Waiting for the host to start the match"])
 
             if state.mode == "browse":
@@ -1085,7 +1086,7 @@ class Renderer:
                     rows.append([Text(r.get("name", "A room") + lock, sm, theme.GOLD_BRIGHT,
                                       samples=["W" * 28 + "  (password)"], align="left"),
                                  Text(r.get("rules", ""), ty, theme.PARCHMENT,
-                                      samples=["First to 21  -  Court: Narrow Pass  -  Power-ups off  -  Chaos: Constant drift  -  Switch: Mid-rally  -  3 more modes"],
+                                      samples=["First to 21  -  Court: Narrow Pass  -  Power-ups off  -  Shape Shift: Constant drift  -  Soul Swap: Mid-rally  -  3 more modes"],
                                       align="left"),
                                  Button(f"join_room_{i}", word, sm,
                                         (theme.DARK_GRAY, theme.DARK_GRAY) if full else (theme.GREEN, theme.GREEN_HOVER),
@@ -1243,15 +1244,15 @@ class Renderer:
             rates = [f"Spawn: {r}" for r in g.powerup_rate_options]
             rate_tip = lambda: options_tip("Spawn Rate", "How often a new talisman appears.",
                                            [("Rare", "every 14-22 s"), ("Normal", "every 8-14 s"),
-                                            ("Frequent", "every 4-8 s"), ("Chaotic", "every 1.5-3 s")],
-                                           g.powerup_rate, "Talisman Rush makes any of these three times as often")
+                                            ("Frequent", "every 4-8 s")],
+                                           g.powerup_rate, "CHAOS brings one every 1.5-3 s, whatever this is set to")
             at_once = [f"At Once: {n}" for n in g.at_once_options]
             at_once_tip = lambda: options_tip(
                 "Talismans at Once", "How many talismans can be in play at once: their effects, and any waiting "
                 "on the court.  A new one only turns up while there's room.",
                 [(str(n), None) for n in g.at_once_options], g.talismans_at_once,
                 "Safety Teleport, Double or Nothing, Lantern Night and Open Court don't count, nor do game "
-                "modes.  Talisman Rush lifts the limit")
+                "modes.  CHAOS lifts the limit")
             # (Choose Talismans under Power-Ups, Rowan's playtest: the switch and what it switches on together)
             talismans = self.section(ui, s, "Talismans",
                                      Grid([[self.toggle(sm, "toggle_powerups", "Power-Ups", lambda: g.powerups),
@@ -3057,7 +3058,7 @@ class Renderer:
         sign = art.gilded("换", art.brush(250), thickness=0, top=(255, 226, 170), bottom=(214, 96, 40))
         sign.set_alpha(int(70 + 120 * pulse))
         screen.blit(sign, sign.get_rect(center=(W // 2, H // 2 - 40)))
-        self.text(screen, "Switch on the next hit", self.fnt(0.034), theme.FLAME, center=(W // 2, H // 2 + 110))
+        self.text(screen, "Swap on the next hit", self.fnt(0.034), theme.FLAME, center=(W // 2, H // 2 + 110))
 
         font = self.fnt(0.024)
         for paddle, other in ((game.p1, game.p2), (game.p2, game.p1)):
@@ -3076,7 +3077,7 @@ class Renderer:
             screen.blit(art.inset(plate.w, plate.h), plate)
             self.text(screen, text, font, theme.FLAME, center=plate.center)
 
-    def draw_switch_banner(self, screen, left, text="换 Switch!"):
+    def draw_switch_banner(self, screen, left, text="换 Swap!"):
         w, h = 520, 120
         m = self.art.PLAQUE_MARGIN
         y = int(BASE_H * 0.3)

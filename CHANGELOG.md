@@ -4,11 +4,16 @@ Every version of Hu Taong, newest first. Toki Hub shows each version's section o
 
 ## 1.9 — 2026-11-18
 
-Computer players that go back round a ball that's got past them, and a harder Hard and Insane.
+Computer players that go back round a ball that's got past them, a harder Hard and Insane, and three game modes renamed.
 
 ### Changed
 - Every computer player now goes back round a ball that has got between it and its goal, at every level, with the Middle Wall up or down. It keeps out of the ball's row so it doesn't knock it in, hurries back, and lines up the save. Before, only some tried, at random, and with the Middle Wall up the rest stepped aside and let it in.
 - Hard and Insane read the ball better, react quicker, hesitate less and place their returns a little more. Their shots are no harder.
+- Three game modes have new names: Chaos is Shape Shift, Switch is Soul Swap, and Talisman Rush is CHAOS. Your settings carry over. In a Soul Swap match the banner says "Swap!".
+- CHAOS brings a new talisman every 1.5 to 3 seconds, whatever the spawn rate is set to. As Talisman Rush, it made the set rate three times as often.
+
+### Removed
+- Chaotic from the spawn rate: it's CHAOS's own now. If you had it set, you have Frequent.
 
 ## 1.8 — 2026-11-18
 

@@ -99,12 +99,16 @@ class TalismanRush(ModeMatch):
     def test_talismans_even_with_power_ups_off(self):
         self.assertTrue(self.pu.kinds())
 
-    def test_three_times_as_often(self):
-        for rate, (lo, hi) in enumerate(PowerUps.WAITS):
+    def test_always_chaotic(self):
+        """(1.9, Rowan: CHAOS, as it's called now, spawns at Chaotic's 1.5-3 s whatever Spawn says;
+        as Talisman Rush it made the rate set three times as often.)"""
+        lo, hi = PowerUps.WAITS[PowerUps.CHAOTIC]
+        self.assertEqual((lo, hi), (1.5, 3))
+        for rate in range(len(m.powerup_rate_options)):
             self.rules.powerup_rate = rate
             waits = [self.pu.next_wait() for _ in range(200)]
-            self.assertLessEqual(max(waits), hi / m.RUSH + 1e-9)
-            self.assertGreaterEqual(min(waits), lo / m.RUSH - 1e-9)
+            self.assertLessEqual(max(waits), hi + 1e-9)
+            self.assertGreaterEqual(min(waits), lo - 1e-9)
 
     def test_as_many_at_once_as_come(self):
         """(1.8: Talismans at Once sets a limit, 1 to 3; Talisman Rush lifts it.)"""
@@ -158,7 +162,7 @@ class WholeMatchTalismans(ModeMatch):
 
     def test_texts_say_which_mode(self):
         for key, mode in (("curve", "Curveball"), ("lantern", "Lantern Night"), ("twin", "Twin Ball"),
-                          ("shape", "Chaos")):
+                          ("shape", "Shape Shift"), ("swap", "Soul Swap")):
             self.assertIn(f"in a {mode} match", BY_KEY[key].about)
 
 

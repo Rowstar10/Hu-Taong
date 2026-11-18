@@ -655,7 +655,7 @@ class ReplayView:
         self.message_color = (255, 80, 80) if red else (60, 140, 255)
         self.switch_warning = a[23] if a[23] >= 0 else None
         self.switch_flash = a[24]
-        self.switch_banner = "换 Swap!" if a[25] else "换 Switch!"
+        self.switch_banner = "换 Swap!"      # (the mode's said "Switch!" till 1.9)
         banter = int(a[26])
         self.banter = ([self.strings[banter], self.p1 if a[27] == 1 else self.p2, a[28]]
                        if 0 <= banter < len(self.strings) else None)

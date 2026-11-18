@@ -97,8 +97,8 @@ class Summary(unittest.TestCase):
         m.mode_chaos, m.chaos_timing = True, 1
         m.mode_switch, m.switch_timing = True, 1
         line = self.net.settings_summary()
-        self.assertIn("Chaos: Constant drift", line)
-        self.assertIn("Switch: Mid-rally", line)
+        self.assertIn("Shape Shift: Constant drift", line)          # (Chaos and Switch till 1.9)
+        self.assertIn("Soul Swap: Mid-rally", line)
 
     def test_past_three_the_rest_are_counted(self):
         for mode in m.MODES:
