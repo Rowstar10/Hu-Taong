@@ -19,6 +19,13 @@ replays show it.
 
 Rowan's second playtest (same day): it pulls harder, drifts, grows and collapses; see
 test_black_hole_grows.
+
+Rowan's fourth playtest (same day): "once a ball has been pulled by the black hole's gravity, but
+not all the way in, and it keeps going forwards, but at a slower speed... it eventually escapes the
+reach of the black hole's gravity, and it speeds up again... I don't want it to go slow down, then
+suddenly speed up again."  A ball leaving the pull now keeps the speed it leaves at (it was put back
+to the speed it came in at).  Climbing out, it never slows below half a serve (nor below the speed it
+came in at), so a near miss can't leave it creeping.
 """
 import math
 import random
@@ -167,13 +174,34 @@ class Pull(Match):
         self.assertGreater(max(speed for inside, speed, _ in seen if not inside), serve * 1.3)
         self.assertTrue(any(inside for inside, _, _ in seen), "and falls in")
 
-    def test_a_near_miss_is_whipped_round_and_leaves_as_fast_as_it_came(self):
+    def test_a_near_miss_is_whipped_round(self):
         self.hole_at(960, 540)
         self.place(520, 740, 1500.0, 0.0)                        # quick, 200 px off
         self.fly(1.0)
         self.assertIsNone(self.ball.transit)
         self.assertLess(math.degrees(math.atan2(self.ball.vy, self.ball.vx)), -15, "bent well round")
-        self.assertAlmostEqual(math.hypot(self.ball.vx, self.ball.vy), 1500.0, delta = 1)
+
+    def test_it_never_suddenly_speeds_up_as_it_leaves_the_pull(self):
+        hole = self.hole_at(960, 540)
+        serve = self.ball.speed * math.sqrt(2)
+        for speed, off in ((1500.0, 200), (900.0, 260), (serve, 330), (2200.0, 150)):
+            with self.subTest(speed = speed, off = off):
+                self.ball.transit, self.ball.hole_speed, self.ball.hole_time, self.ball.hole_cool = None, None, 0.0, 0.0
+                self.place(960 - PowerUps.HOLE_REACH - 5, 540 + off, speed, 0.0)
+                seen, pulled = [], []
+                for _ in range(round(2.0 / DT)):
+                    self.fly(DT)
+                    if self.ball.transit:
+                        break
+                    cx, cy = self.centre()
+                    seen.append(math.hypot(self.ball.vx, self.ball.vy))
+                    pulled.append(math.hypot(cx - hole["x"], cy - hole["y"]) < PowerUps.HOLE_REACH)
+                if self.ball.transit:
+                    continue                                    # (drawn in: that's another test)
+                left = next(i for i in range(1, len(pulled)) if pulled[i - 1] and not pulled[i])
+                self.assertLess(seen[left], seen[left - 1] + 1, "it sped up as it left the pull")
+                self.assertTrue(all(abs(v - seen[left]) < 1 for v in seen[left:]), "and keeps its speed after")
+                self.assertGreaterEqual(min(seen), min(speed, PowerUps.HOLE_SLOWEST * serve) - 1, "never creeping")
 
     def test_harder_closer_in_and_on_faster_balls(self):
         hole = self.hole_at(960, 540)

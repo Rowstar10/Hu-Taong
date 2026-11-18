@@ -1,5 +1,6 @@
 import math
 import random
+import time
 
 from config import BASE_W, BASE_H, DYNAMIC
 from helpers import clamp, lerp
@@ -39,8 +40,11 @@ class Ball(GameObject):
         self.hole_time = 0.0     # ...and how long it has been in a pull without falling in
         self.press = None        # (what last knocked it sideways, which side of that it was on, when)
         self.press_clock = 0.0   # seconds the ball has moved, to time those knocks
+        self.rattled = -1.0      # when a ball rattling between two paddles last made its sound (1.8; real
+                                 # time: the physics' own clock barely moves while it rattles)
 
     PRESS_WINDOW = 0.02          # knocked from both sides within this: it's caught in a squeeze
+    RATTLE_FX = 0.05             # rattling between two paddles: its sound and sparks this often at most
     HELD_BY = 4                  # Sticky Goo: px of a held ball that stay beside the paddle's face
 
     def scores_in(self, nx):
@@ -95,14 +99,29 @@ class Ball(GameObject):
             paddle = other
             paddle.flash = 1.0   # the renderer fades this out
 
+            # Caught between two paddles face to face, it rattles between them as long as they
+            # press in (1.5's way: 1.6 squirted it out, and Rowan's 1.8 playtest wanted the rattle
+            # back).  It goes up and down with them rather than with the angle of each knock: in
+            # 1.5 it crept along their faces and slid out past their ends, within a second at 240
+            # frames a second (it held at 120).  All that counts is the hit that caught it; the
+            # rattle's sound and sparks come RATTLE_FX apart, not hundreds of times a second.
+            squeezer = self.pressed_by(paddle) if nx != 0 and not self.stuck else None
+            rattle = squeezer is not None and squeezer.is_paddle
+            if rattle:
+                self.vy = (paddle.vy + squeezer.vy) / 2
             if self.last_paddle is not paddle:
-                self.rally_value += 1
-                if sound_manager.paddle_hit_sound:
-                    sound_manager.play(paddle.sound)
+                if not rattle:
+                    self.rally_value += 1
+                now = time.perf_counter()
+                if not rattle or now - self.rattled >= self.RATTLE_FX:
+                    if rattle:
+                        self.rattled = now
+                    if sound_manager.paddle_hit_sound:
+                        sound_manager.play(paddle.sound)
 
-                impact = theme.EMBER if paddle.colour == "red" else theme.SPIRIT_BLUE
-                fx.spark(cx, cy, 22, impact, speed = 520)
-                fx.burst(cx, cy, 2, 40, paddle.colour, life = (.7, 1.1))
+                    impact = theme.EMBER if paddle.colour == "red" else theme.SPIRIT_BLUE
+                    fx.spark(cx, cy, 22, impact, speed = 520)
+                    fx.burst(cx, cy, 2, 40, paddle.colour, life = (.7, 1.1))
 
             self.last_paddle = paddle
 
@@ -110,14 +129,12 @@ class Ball(GameObject):
             if powerups:
                 powerups.on_hit(self, paddle, data["normal"])
             hook = getattr(self.game, "on_hit", None)
-            if hook:
+            if hook and not rattle:
                 hook(self, paddle, data)
 
-            if nx != 0 and not self.stuck:
-                squeezer = self.pressed_by(paddle)
-                if squeezer is not None:
-                    self.squeeze_free(paddle, squeezer)
-                    return
+            if squeezer is not None and not rattle:
+                self.squeeze_free(paddle, squeezer)         # a paddle drove it into a stone: out it squirts
+                return
 
         if other.is_wall and other.is_goal:
             if not self.scores_in(nx):
@@ -147,9 +164,10 @@ class Ball(GameObject):
 
     def pressed_by(self, other):
         """Note that `other` (a paddle or a stone) just knocked the ball sideways, and answer what
-        knocked it from its other side a moment ago, if anything.  Two paddles face to face with
-        the Middle Wall down, or a paddle driving it into a stone, would bounce it between them on
-        the spot hundreds of times a second, and the point could never end."""
+        knocked it from its other side a moment ago, if anything.  A paddle driving it into a stone
+        would bounce it between them on the spot hundreds of times a second, and the point could
+        never end (see squeeze_free).  Two paddles face to face with the Middle Wall down do that
+        too, and it's left to: the players can let it go (see on_contact, 1.8)."""
         side = 1 if self.x0 + self.x1 > other.x0 + other.x1 else -1    # which side of `other` it's on
         last, self.press = self.press, (other, side, self.press_clock)
         if last is None or last[0] is other or last[1] != -side:
@@ -210,3 +228,4 @@ class Ball(GameObject):
         self.transit = None
         self.hole_cool = self.hole_time = 0.0
         self.press = None
+        self.rattled = -1.0

@@ -167,6 +167,7 @@ KINDS = (
          "A black hole opens in the middle of the court and drifts about the middle third, away from the goals.\n"
          "• Its gravity pulls the ball in, harder the closer it comes: the ball speeds up as it falls\n"
          "  towards it and spirals in, and a near miss is whipped round it; paddles feel nothing\n"
+         "• A ball that gets away goes on at the speed it climbs out at (never below half a serve's)\n"
          "• A ball that falls in is flung out a moment later, as fast as it went in, still heading for the same\n"
          "  side but at any angle (never straight up or down)\n"
          "• Its heart pulses as it swallows the ball: no telling which way it will come out until it does\n"
@@ -237,7 +238,9 @@ class PowerUps:
                                             #    2000 before the first playtest, which only bent paths and kept
                                             #    speeds; 6000 before the second, which wanted more pull)...
     HOLE_SWIRL = 3.0                        # ...how fast a ball's sideways speed bleeds away near it, so it spirals in...
-    HOLE_FASTEST = 2.0                      # ...and at most this many times as fast as it came in
+    HOLE_FASTEST = 2.0                      # ...and at most this many times as fast as it came in...
+    HOLE_SLOWEST = 0.5                      # ...and climbing out, slowed to no less than this share of a serve
+                                            #    (nor than it came in at); it keeps whatever speed it leaves at
     HOLE_CORE = 36                          # ...the radius of its black heart: a ball touching it falls in...
     HOLE_GROW = 0.2                         # ...each ball it swallows makes it this much bigger (its pull and heart)...
     HOLE_GROWTHS = 5                        # ...this many times; then the next ball it swallows makes it collapse
@@ -261,11 +264,12 @@ class PowerUps:
                                             #    or a Black Hole match's), and a mini one (2 was Portal Pair's collapse)
     COLLAPSE_TIME = 1.5                     # seconds a full-grown Black Hole takes to collapse in on itself, holding a ball
     MINI_REACH, MINI_PULL, MINI_CORE = 260, 2400, 22   # after it, mini black holes: a weaker pull, not so far...
-    MINI_LIFE = (3.0, 5.0)                  # ...each there this long...
+    MINI_LIFE = (5.0, 10.0)                 # ...each there this long (3-5 till Rowan's fourth playtest)...
     MINI_FADE = 0.5                         # ...fading in and out over this...
-    MINI_EVERY = (1.5, 3.0)                 # ...a new one every so often...
+    MINI_EVERY = (0.5, 1.5)                 # ...a new one every so often (1.5-3 till then)...
     MINI_FIRST = 0.6                        # ...the first this soon after the Twin Balls come out...
-    MINI_MOST = 3                           # ...up to this many at once...
+    MINI_MOST = 6                           # ...up to this many at once (3 till then)...
+    MINI_APART = 220                        # ...this far apart (300 till then)...
     MINI_EDGE = 150                         # ...in the middle third, this far from the top and bottom...
     MINI_HOLD = 0.2                         # ...holding a ball this long (no black hole shows an arrow: Rowan's playtest)
     LANTERN_FADE = (0.6, 0.9)               # Lantern Night: seconds for night to fall, and to lift
@@ -1266,9 +1270,12 @@ class PowerUps:
         if pulled:
             top = MAX_BALL_SPEEDUP * serve * math.sqrt(2) if serve else math.inf
             fastest = max(entry, min(entry * cls.HOLE_FASTEST, top))
+            slowest = min(entry, cls.HOLE_SLOWEST * serve * math.sqrt(2))
             speed = math.hypot(vx, vy)
             if speed > fastest:
                 vx, vy = vx * fastest / speed, vy * fastest / speed
+            elif 0 < speed < slowest:
+                vx, vy = vx * slowest / speed, vy * slowest / speed
         return vx, vy, pulled
 
     @staticmethod
@@ -1401,17 +1408,14 @@ class PowerUps:
         keep = [(BASE_W / 2, BASE_H / 2, self.HOLE_SERVE_GAP)] if hole.get("mode") else []
         core = self.hole_style(hole)[2]
         keep += [(door["x"], door["y"], door.get("r", self.PORTAL_R) + core + 90) for door in self.portals]
-        keep += [(h["x"], h["y"], 300) for h in self.holes if h is not hole and h["dying"] is None]
+        keep += [(h["x"], h["y"], self.MINI_APART) for h in self.holes if h is not hole and h["dying"] is None]
         self.drift(hole, dt, area, core + 70, keep)
 
     @staticmethod
     def leave_pull(b):
-        """Out of every pull: as fast as it came in again (gravity sped it up falling in, and slowed
-        it climbing out; this squares it), and its clocks reset."""
-        entry = getattr(b, "hole_speed", None)
-        speed = math.hypot(b.vx, b.vy)
-        if entry and speed:
-            b.vx, b.vy = b.vx * entry / speed, b.vy * entry / speed
+        """Out of every pull: its clocks reset, and it goes on at the speed it has.  (Until Rowan's
+        fourth playtest it was put back to the speed it came in at, so a ball slowed climbing out
+        of the pull suddenly sped up again as it left.)"""
         b.hole_speed, b.hole_time = None, 0.0
 
     def fling_angle(self, hole, way):
@@ -1472,10 +1476,6 @@ class PowerUps:
                 if can and self.falls_in(hole, x, y, vx, vy, step, r):
                     return t, None, True
             vx, vy, pulled = self.gravity(holes, x, y, vx, vy, step, entry, serve)
-            if not pulled:
-                speed = math.hypot(vx, vy)
-                if speed:
-                    vx, vy = vx * entry / speed, vy * entry / speed
             if field:
                 vx, vy = self.bend(vx, vy, 0.0, field, step)
             x, y = x + vx * step, y + vy * step
@@ -1557,7 +1557,7 @@ class PowerUps:
             y = random.uniform(self.MINI_EDGE, BASE_H - self.MINI_EDGE)
             room = min([math.hypot(x - bx, y - by) - 200 for bx, by in balls] +
                        [math.hypot(x - clamp(x, o.x0, o.x1), y - clamp(y, o.y0, o.y1)) - 70 for o in stones] +
-                       [math.hypot(x - h["x"], y - h["y"]) - 300 for h in self.holes] + [math.inf])
+                       [math.hypot(x - h["x"], y - h["y"]) - self.MINI_APART for h in self.holes] + [math.inf])
             if room > best_room:
                 best, best_room = (x, y), room
             if room >= 0:

@@ -65,9 +65,6 @@ class MatchSettings:
     CHAOS_TIMINGS = ("Every point", "Constant drift")
     SWITCH_TIMINGS = ("Every point", "Mid-rally")
     RUSH = 3.0                  # Talisman Rush: talismans come this many times as often
-    # How a ball comes off a paddle (1.8, see objects/paddle.py): 1.7's engine; classic Pong (angle
-    # by where it meets the paddle, a little faster every hit); or Hu Taong 0.9's
-    PHYSICS = ("Current", "Classic", "v0.9")
 
     def __init__(self, app):
         self.app = app
@@ -121,8 +118,6 @@ class MatchSettings:
     def reset(self):
         self.reset_ball_and_paddles()
         self.pace = 1.0
-        self.physics = 0             # PHYSICS[physics]: how a ball comes off a paddle
-        self.speed_cap = False       # a paddle can only pass on so much of its speed to the ball
 
         # Match setup (chosen on the Match Setup screen)
         self.vs_ai = True            # True: you play one paddle and the AI takes the other.
@@ -188,14 +183,6 @@ class MatchSettings:
         """How many talismans may be in play at once, their effects and any waiting on the court
         (Talisman Rush lifts the limit)."""
         return math.inf if self.mode_talisman_rush else self.at_once_options[self.talismans_at_once]
-
-    @property
-    def classic_physics(self):
-        return self.physics == 1
-
-    @property
-    def v09_physics(self):
-        return self.physics == 2
 
     @property
     def talismans_on(self):

@@ -27,6 +27,10 @@ So it grows five times (to twice its size, its reach half as much again), and th
 it collapse; it drifts faster.  And "black holes [shouldn't] spawn or drift too close to the goals,
 something like the middle third of the court": the Black Hole and the mini ones keep to the middle
 third (a Black Hole match's still clear of the serve; the talisman's no longer needs to be).
+
+Rowan's fourth playtest (same day): "I also want the mini black holes to spawn more frequently, and
+last for a bit longer.  Maybe one spawns randomly every 0.5 - 1.5 seconds, and they last randomly for
+5-10 seconds."  Up to six at once now (three would have held most of them back), 220 px apart.
 """
 import json
 import math
@@ -391,7 +395,17 @@ class MiniHoles(Match):
     def minis(self):
         return [h for h in self.pu.holes if h["kind"] == P.HOLE_MINI]
 
-    def test_come_and_go_up_to_three_until_the_point_ends(self):
+    def test_every_half_a_second_to_a_second_and_a_half_each_five_to_ten_seconds(self):
+        self.assertEqual((P.MINI_EVERY, P.MINI_LIFE, P.MINI_MOST), ((0.5, 1.5), (5.0, 10.0), 6))
+        self.start()
+        opened = []
+        real = self.pu.open_mini
+        self.pu.open_mini = lambda: (opened.append(1), real())
+        self.play(4.0, balls = [])
+        self.assertGreaterEqual(len(opened), 3)
+        self.assertGreaterEqual(len(self.minis()), 3, "and they're still there")
+
+    def test_come_and_go_up_to_six_until_the_point_ends(self):
         self.start()
         opened, most = [], 0
         real = self.pu.open_mini
@@ -407,7 +421,7 @@ class MiniHoles(Match):
         self.pu.on_point()
         self.assertIsNone(self.pu.minis)
 
-    def test_each_fades_in_lasts_three_to_five_seconds_drifting_and_fades_out(self):
+    def test_each_fades_in_lasts_its_while_drifting_and_fades_out(self):
         self.start()
         self.play(DT, balls = [])
         h = self.minis()[0]

@@ -26,7 +26,7 @@ MATCH_KEYS = ("toggle_mode_", "cycle_mode_chaos", "cycle_mode_switch", "cycle_wi
               "toggle_middle_wall", "cycle_countdown", "cycle_ai", "toggle_adaptive_ai", "toggle_powerups",
               "cycle_powerup_rate", "open_powerups", "cycle_court", "ball_speed_slider", "paddle_speed_slider",
               "ball_diameter_slider", "paddle_size_slider", "pace_slider", "randomise_all", "toggle_curveball",
-              "toggle_lantern_night", "cycle_chaos_mode", "cycle_chaos_switch", "cycle_physics", "toggle_speed_cap")
+              "toggle_lantern_night", "cycle_chaos_mode", "cycle_chaos_switch")
 PERSONAL = ("gameplay", "display", "audio", "interface")
 FOOTER = ("back", "reset_defaults", "reset_all")
 
@@ -107,21 +107,13 @@ class WhatGoesWhere(unittest.TestCase):
     def test_ball_and_paddles(self):
         keys = open_screen("ball_paddles").ui_hitboxes
         for key in ("ball_speed_slider", "paddle_speed_slider", "ball_diameter_slider", "paddle_size_slider",
-                    "pace_slider", "randomise_all", "reset_ball_and_paddles",
-                    "cycle_physics_left", "cycle_physics_right", "toggle_speed_cap"):      # (1.8)
+                    "pace_slider", "randomise_all", "reset_ball_and_paddles"):
             self.assertIn(key, keys)
 
-    def test_physics_and_the_speed_cap(self):
-        """1.8: the physics steps through Current, Classic and v0.9; the Speed Cap turns on and off."""
-        screen = open_screen("ball_paddles")
-        seen = []
-        for _ in range(3):
-            click(screen, "cycle_physics_right")
-            seen.append(s.match.PHYSICS[s.match.physics])
-        self.assertEqual(seen, ["Classic", "v0.9", "Current"])
-        click(screen, "toggle_speed_cap")
-        self.assertTrue(s.match.speed_cap)
-        s.match.reset()
+    def test_no_physics_or_speed_cap(self):
+        """1.8 had them here until Rowan's fourth playtest rolled them back."""
+        keys = open_screen("ball_paddles").ui_hitboxes
+        self.assertFalse([k for k in keys if "physics" in k or "speed_cap" in k])
 
     def test_gameplay_is_your_controls(self):
         keys = open_screen("gameplay").ui_hitboxes

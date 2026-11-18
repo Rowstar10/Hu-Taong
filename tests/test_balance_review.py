@@ -16,7 +16,6 @@ from tests import harness
 app = harness.app()
 
 from config import MAX_BALL_SPEEDUP                         # noqa: E402  (after the harness has set things up)
-from game import engines                                    # noqa: E402
 from game.physics import Physics                            # noqa: E402
 from game.powerups import BY_KEY, PowerUps                  # noqa: E402
 from game.replay import ReplayView                          # noqa: E402
@@ -49,10 +48,8 @@ class SpiritFire(Match):
         self.assertLessEqual(self.hit(3200.0, ("fire",)), self.top() + 1)
 
     def test_never_slower_than_without_it(self):
-        self.game.settings.physics = engines.V09                # (v0.9 has no top speed of its own)
-        plain = self.hit(5000.0)
-        self.assertGreater(plain, self.top(), "a hit past the top speed")
-        self.assertAlmostEqual(self.hit(5000.0, ("fire",)), plain, delta = 1)
+        for coming in (900.0, 3200.0, 5000.0):
+            self.assertGreaterEqual(self.hit(coming, ("fire",)), self.hit(coming) - 1)
 
     def test_says_so(self):
         self.assertIn("20% faster", BY_KEY["fire"].blurb)

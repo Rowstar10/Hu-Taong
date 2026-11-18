@@ -1,7 +1,8 @@
 """A smoke test: every screen draws a real frame, the ways in and out of a match work, and a long
 computer-v-computer match with every power-up runs without a hitch, (1.7) another with every
-game mode on at once, and (1.8) more under each physics and the Speed Cap.  Kept in the repo (1.6) so it outlives the scratch copies that kept getting
-cleared away; run it after any change to the screens.
+game mode on at once, and (1.8) one with the Middle Wall down, where two paddles can squeeze the ball.
+Kept in the repo (1.6) so it outlives the scratch copies that kept getting cleared away; run it after
+any change to the screens.
 """
 import unittest
 
@@ -157,9 +158,10 @@ class LongMatch(unittest.TestCase):
                 self.assertGreater(len(taken), 12, sorted(taken))
 
 
-class EveryPhysics(unittest.TestCase):
-    """1.8: computer v computer under Classic and v0.9 physics, and with the Speed Cap, every
-    talisman on, Chaotic, the Middle Wall up and down, recorded and played back as it goes."""
+class WallDown(unittest.TestCase):
+    """1.8: computer v computer with the Middle Wall down (two paddles can squeeze the ball between
+    them: test_paddle_sandwich), every talisman on, Chaotic, recorded and played back as it goes.
+    (Under each physics and with the Speed Cap too, until Rowan's fourth playtest rolled them back.)"""
 
     def setUp(self):
         self.g = g = app.settings.match
@@ -172,11 +174,11 @@ class EveryPhysics(unittest.TestCase):
         self.g.reset()
         self.g.reset_powerups()
 
-    def test_each_physics_with_every_talisman(self):
+    def test_with_every_talisman(self):
         from game.replay import ReplayView
-        for physics, cap, wall in ((1, False, True), (2, False, False), (0, True, False), (2, True, True)):
-            with self.subTest(physics = self.g.PHYSICS[physics], cap = cap, middle_wall = wall):
-                self.g.physics, self.g.speed_cap, self.g.middle_wall = physics, cap, wall
+        for wall in (False,):
+            with self.subTest(middle_wall = wall):
+                self.g.middle_wall = wall
                 game = Hu_Taong(app)
                 game.start()
                 game.p1.ai_enabled = game.p2.ai_enabled = True
@@ -244,7 +246,9 @@ class EveryMode(unittest.TestCase):
                 game.stop()
                 self.assertGreater(points, 3)
                 self.assertLess(longest, LONGEST, "a point that never ends")
-                self.assertGreater(game.switches, 2, "no switches")
+                # (two minutes of this makes 3 to 7 mid-rally switches, by chance: it once made 2, in
+                # 1.8's full run, and the test fell over.  What matters is that they happen.)
+                self.assertGreater(game.switches, 0, "no switches")
                 view = ReplayView(game.recorder.clip(), app)
                 view.show(len(view.clip.frames) - 1)
                 app.renderer.draw_world(app.virtual, view)

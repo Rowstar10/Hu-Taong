@@ -1,7 +1,8 @@
 """Power-up bugs found by the 1.4 power-up reviews, fixed in 1.6 (batch 1 of the power-up plan).
 
 - A ball caught between two paddles (Middle Wall down), or between a paddle and a stone, rattled
-  on the spot hundreds of times a second and the point could never end.
+  on the spot hundreds of times a second and the point could never end.  (Between two paddles it
+  rattles again from 1.8, as Rowan asked: see test_paddle_sandwich.)
 - Every point restarted the wait for the next talisman, so quick points never got one.
 - Ghost Ball, Wind Gust and Sticky Goo carried on into the next serve.
 - Under Twin Balls, Red's Safety Teleport watched the red ball, which can't score on Red.
@@ -69,17 +70,6 @@ class Match(unittest.TestCase):
 
 
 class SqueezedBall(Match):
-    def test_ball_between_two_paddles_gets_free(self):
-        p1, p2, ball = self.p1, self.p2, self.ball
-        self.pu.wall_down = UNTIL_POINT                 # Open Court: the paddles can meet mid-court
-        place(p2, 1082, 530)
-        place(p1, 1183, 530)                            # face to face, Blue left of Red
-        place(ball, 1132, 530)
-        ball.vx, ball.vy = 700.0, 40.0
-        app.keys_down.update({p2.right, p1.left})       # each drives at the other
-        self.run_for(1.5)
-        self.assertLess(len(self.hits), 20, f"{len(self.hits)} paddle hits in 1.5 s: the ball was stuck")
-
     def test_ball_between_a_paddle_and_a_tombstone_gets_free(self):
         p2, ball = self.p2, self.ball
         tomb = Obstacle(self.game, 1115, 429, 64, 124, life = UNTIL_POINT, style = "tomb")
