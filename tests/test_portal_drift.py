@@ -13,6 +13,10 @@ open bigger (but not too big).
 Found in the full test run (same day): on a court with stones, the talisman sometimes opened no
 portals at all (about one time in eight on the Graveyard with the ball by a goal), because the first
 portal's spot was picked before the second's and could leave nowhere far enough from it.
+
+Rowan's 1.8 plan (2026-11-18): they grow bigger (to 120, from 96); a ball spends a moment inside
+(0.2 s, out of sight) while the way out flashes, and comes out 8% slower each trip, never slower
+than a serve nor faster than it went in.
 """
 import math
 import random
@@ -106,13 +110,17 @@ class Portals(unittest.TestCase):
             closest = min(closest, math.hypot(b["x"] - a["x"], b["y"] - a["y"]))
         self.assertGreater(closest, 300, "the two drifted into each other")
 
-    def go_through(self, door):
+    def go_through(self, door, speed = 600.0):
         ball = self.game.ball
         ball.x0, ball.y0 = door["x"] - ball.width / 2, door["y"] - ball.height / 2
         ball.x1, ball.y1 = ball.x0 + ball.width, ball.y0 + ball.height
-        ball.vx, ball.vy, ball.portal_cool = 600.0, 0.0, 0.0
+        ball.vx, ball.vy, ball.portal_cool = speed, 0.0, 0.0
         self.pu.portal_trips = 0
         self.pu.update_portals(DT)
+        for _ in range(60):                                       # (a moment inside: 1.8)
+            if not ball.transit:
+                break
+            self.pu.update_portals(DT)
 
     def test_each_ball_through_grows_both_to_their_full_size(self):
         sizes = []
@@ -154,9 +162,43 @@ class Portals(unittest.TestCase):
     def test_1_6_replays_had_no_size(self):
         view = ReplayView(SimpleNamespace(info = {}, frames = [], events = [], moments = []), app)
         self.assertEqual(view.portal_fields, 3)
+        self.assertEqual(ReplayView(SimpleNamespace(info = {"rows": 2}, frames = [], events = [], moments = []),
+                                    app).portal_fields, 4, "1.7's: a size, no flash")
         for _ in range(2):
             self.game.recorder.capture(1 / 60)
-        self.assertEqual(ReplayView(self.game.recorder.clip(), app).portal_fields, 4)
+        self.assertEqual(ReplayView(self.game.recorder.clip(), app).portal_fields, 5)
+
+    def test_a_moment_inside_while_the_way_out_flashes(self):
+        ball, door, out = self.game.ball, self.pu.portals[0], self.pu.portals[1]
+        ball.x0, ball.y0 = door["x"] - ball.width / 2, door["y"] - ball.height / 2
+        ball.x1, ball.y1 = ball.x0 + ball.width, ball.y0 + ball.height
+        ball.vx, ball.vy, ball.portal_cool = 900.0, 0.0, 0.0
+        self.pu.update_portals(DT)
+        self.assertIsNotNone(ball.transit)
+        self.assertEqual(self.pu.ball_alpha(), 0.0, "out of sight inside")
+        self.assertGreater(out["flash"], 0.9, "the way out flashes")
+        self.assertFalse(ball.can_collide_with(self.game.p1))
+        inside = 0
+        while ball.transit:
+            self.pu.update_portals(DT)
+            inside += 1
+        self.assertAlmostEqual(inside * DT, PowerUps.PORTAL_TRANSIT, delta = 2 * DT)
+        self.assertLess(math.hypot((ball.x0 + ball.x1) / 2 - out["x"], (ball.y0 + ball.y1) / 2 - out["y"]),
+                        out["r"] + ball.width, "out of the other")
+        self.assertEqual(self.pu.ball_alpha(), 1.0)
+
+    def test_a_little_slower_each_trip_but_never_below_a_serve(self):
+        ball = self.game.ball
+        serve = ball.speed * math.sqrt(2)
+        self.go_through(self.pu.portals[0], 1500.0)
+        self.assertAlmostEqual(math.hypot(ball.vx, ball.vy), 1500.0 * (1 - PowerUps.PORTAL_SLOW), delta = 1)
+        self.go_through(self.pu.portals[0], serve + 20)
+        self.assertAlmostEqual(math.hypot(ball.vx, ball.vy), serve, delta = 1, msg = "no slower than a serve")
+        self.go_through(self.pu.portals[0], 400.0)
+        self.assertAlmostEqual(math.hypot(ball.vx, ball.vy), 400.0, delta = 1, msg = "nor faster than it went in")
+
+    def test_bigger(self):
+        self.assertEqual(PowerUps.PORTAL_R, 120)
 
 
 class PortalPairMode(unittest.TestCase):
@@ -191,6 +233,8 @@ class PortalPairMode(unittest.TestCase):
             ball.vx, ball.vy, ball.portal_cool = 600.0, 0.0, 0.0
             self.pu.portal_trips = 0
             self.pu.update_portals(1 / 60)
+            while ball.transit:                                  # (a moment inside: 1.8)
+                self.pu.update_portals(1 / 60)
 
     def test_open_from_the_first_serve_small(self):
         self.assertEqual(len(self.pu.portals), 2)
@@ -251,6 +295,20 @@ class FriendsScreen(unittest.TestCase):
         x, y, vx, vy = self.flown(at_y = 540 + 0.6 * 48 + 8)      # inside a full-size portal, outside this one
         self.assertAlmostEqual(vy, 0.0)
         self.assertGreater(x, 800)
+
+    def test_a_moment_inside_on_the_friends_screen_too(self):
+        """(1.8) The friend's screen holds the ball inside for as long as the host's game does."""
+        guest = GuestMatchState.__new__(GuestMatchState)
+        guest.view = SimpleNamespace(
+            stones = [], settings = SimpleNamespace(pace = 1.0), ball = SimpleNamespace(curve = 0.0),
+            powerups = SimpleNamespace(alpha = 1.0, ghostly = lambda: False, wind = 0.0,
+                                       portals = [{"x": 700.0, "y": 540.0, "angle": 0.0, "r": 48.0},
+                                                  {"x": 1300.0, "y": 300.0, "angle": 0.0, "r": 48.0}]))
+        x, y, vx, vy = guest.fly(650.0, 540.0, 1000.0, 0.0, 20.0, 0.1)
+        self.assertEqual((vx, vy), (0.0, 0.0), "still inside")
+        x, y, vx, vy = guest.fly(650.0, 540.0, 1000.0, 0.0, 20.0, 0.4)
+        self.assertGreater(x, 1300, "out of the other")
+        self.assertAlmostEqual(vx, 1000.0 * (1 - PowerUps.PORTAL_SLOW), delta = 1)
 
     def test_through_the_middle_and_out_the_other(self):
         x, y, vx, vy = self.flown(at_y = 540, out_angle = math.pi / 2)

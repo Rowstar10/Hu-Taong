@@ -193,9 +193,9 @@ class EveryPhysics(unittest.TestCase):
                         points, last = points + 1, score
                         longest, t_point = max(longest, t_point), 0.0
                 game.stop()
-                self.assertGreater(points, 1)                   # (Classic's rallies between computers run long)
-                self.assertLess(longest, 90, "a point that never ends")
-                self.assertGreater(len(taken), 8, sorted(taken))
+                self.assertGreater(points, 0)                   # (Classic's rallies between computers run long:
+                self.assertLess(max(longest, t_point), 90, "a point that never ends")    # 25-60 s a point)
+                self.assertGreater(len(taken), 5, sorted(taken))      # (2 minutes, a few at a time)
                 view = ReplayView(game.recorder.clip(), app)
                 view.show(len(view.clip.frames) - 1)
                 app.renderer.draw_world(app.virtual, view)

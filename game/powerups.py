@@ -154,7 +154,9 @@ KINDS = (
     Kind("portal", "Portal Pair", "门", "Wild", 0,
          "Two linked portals drift about the court until the point ends: in one, out the other.",
          "Two linked portals open on the court, drifting slowly about, each facing its own way.\n"
-         "• A ball that goes into one comes out of the other at the same speed\n"
+         "• A ball that goes into one comes out of the other a moment later, a little slower each time\n"
+         "  (never slower than a serve)\n"
+         "• The way out flashes just before the ball comes out\n"
          "• It leaves the way that portal's arrows point, and they slowly turn\n"
          "• They grow a little each time a ball goes through\n"
          "• Paddles pass straight through them\n"
@@ -195,7 +197,7 @@ class PowerUps:
     CURVE_FADE = 1.3                        # ...fading away at this rate as it flies (per second)
     WIND = 500                              # Wind Gust: px/s^2 at the height of a gust (360 was too gentle to notice)
     CRACKER_TOP = 2600                      # Firecracker: its bang shoots the ball off at double speed, up to this (3600 was unreturnable)
-    PORTAL_R = 96                           # Portal Pair: a portal's radius at its biggest...
+    PORTAL_R = 120                          # Portal Pair: a portal's radius at its biggest (96 until 1.8)...
     PORTAL_START = 48                       # ...as they open in a Portal Pair match (they grow all match)...
     PORTAL_START_TALISMAN = 72              # ...or from the talisman, for one point: not so small
     PORTAL_GROW = 8                         # every ball through grows both by this much (1.6's were 80 all along)
@@ -206,6 +208,9 @@ class PowerUps:
     PORTAL_STEEPEST = 0.45                  # a ball never leaves steeper than this (the cosine of its angle)
     PORTAL_COOL = 0.35                      # seconds before a ball can go through a portal again
     PORTAL_TRIPS = 3                        # trips with no paddle touch before they close (a loop)
+    PORTAL_SLOW = 0.08                      # each trip through takes this share off the ball's speed (1.8)...
+    PORTAL_TRANSIT = 0.2                    # ...after this long inside, while the way out flashes
+    PORTAL_FLASH = 0.35                     # seconds the way out's flash takes to fade
     LANTERN_FADE = (0.6, 0.9)               # Lantern Night: seconds for night to fall, and to lift
     LANTERN_LIGHT = 300                     # px of lantern light round each paddle
     BLAST_R = 280                           # Firecracker: how far its blast flattens stones
@@ -489,7 +494,9 @@ class PowerUps:
 
     def ball_alpha(self, ball=None):
         """How visible the ball is: a Ghost Ball fades out of sight and back at random moments.
-        (Twin Balls' blue ball is never a ghost.)"""
+        (Twin Balls' blue ball is never a ghost.)  A ball inside a portal can't be seen (1.8)."""
+        if getattr(ball if ball is not None else self.game.ball, "transit", None):
+            return 0.0
         if not self.ghost or (ball is not None and ball is not self.game.ball):
             return 1.0
         return self.ghost["alpha"]
@@ -968,29 +975,39 @@ class PowerUps:
     def update_portals(self, dt):
         """The portals drift and turn; a ball whose centre reaches one comes out of the other, at
         the same speed, the way that portal's arrows point, and both grow a little."""
+        for b in self.balls():
+            if getattr(b, "transit", None):        # (a ball inside comes out even if they've closed)
+                b.transit["left"] -= dt
+                if b.transit["left"] <= 0:
+                    self.come_out(b)
         if not self.portals:
             return
         self.drift_portals(dt)
+        for door in self.portals:
+            if door.get("flash"):
+                door["flash"] = max(0.0, door["flash"] - dt / self.PORTAL_FLASH)
         for b in self.balls():
             b.portal_cool = max(0.0, getattr(b, "portal_cool", 0.0) - dt)
-            if b.stuck or b.portal_cool > 0:
+            if b.stuck or b.portal_cool > 0 or getattr(b, "transit", None):
                 continue
             cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
             for i, door in enumerate(self.portals):
                 if math.hypot(cx - door["x"], cy - door["y"]) > door.get("r", self.PORTAL_R) * 0.6:
                     continue
                 out = self.portals[1 - i]
-                r = b.width / 2
-                dx, dy = self.portal_exit(out["angle"])
-                x = clamp(out["x"] + dx * (out.get("r", self.PORTAL_R) * 0.5 + r), r + 2, BASE_W - r - 2)
-                y = clamp(out["y"] + dy * (out.get("r", self.PORTAL_R) * 0.5 + r), r + 2, BASE_H - r - 2)
-                b.x0, b.y0, b.x1, b.y1 = x - r, y - r, x + r, y + r
+                # Inside for a moment (1.8), held at the portal's heart and out of sight, while the
+                # way out flashes; then out of the other, a little slower each trip (never slower
+                # than a serve, nor faster than it went in)
                 speed = math.hypot(b.vx, b.vy)
-                b.vx, b.vy = speed * dx, speed * dy
-                b.portal_cool = self.PORTAL_COOL
+                serve = getattr(b, "speed", 0) * math.sqrt(2)
+                slower = max(speed * (1 - self.PORTAL_SLOW), min(speed, serve))
+                b.transit = {"out": out, "left": self.PORTAL_TRANSIT, "speed": slower}
+                r = b.width / 2
+                b.x0, b.y0, b.x1, b.y1 = door["x"] - r, door["y"] - r, door["x"] + r, door["y"] + r
+                b.vx = b.vy = 0.0
+                out["flash"] = 1.0
                 fx = self.game.app.fx
                 fx.spark(door["x"], door["y"], 16, (170, 120, 255), speed = 260, life = .45)
-                fx.spark(out["x"], out["y"], 22, (120, 230, 255), speed = 340, life = .5)
                 self.game.app.sound_manager.play("countdown_tick.wav", multiplier = 0.5)
                 hook = getattr(self.game, "on_portal", None)
                 if hook:
@@ -1002,6 +1019,26 @@ class PowerUps:
                     self.close_portals()        # round and round with nobody touching it: a loop
                     return
                 break
+
+    def transit_exit(self, ball):
+        """Where a ball inside a portal will come out, and how: (x, y, vx, vy)."""
+        transit = ball.transit
+        out, r = transit["out"], ball.width / 2
+        dx, dy = self.portal_exit(out["angle"])
+        reach = out.get("r", self.PORTAL_R) * 0.5 + r
+        x = clamp(out["x"] + dx * reach, r + 2, BASE_W - r - 2)
+        y = clamp(out["y"] + dy * reach, r + 2, BASE_H - r - 2)
+        return x, y, transit["speed"] * dx, transit["speed"] * dy
+
+    def come_out(self, ball):
+        """Out of the far portal, the way its arrows point."""
+        x, y, vx, vy = self.transit_exit(ball)
+        out, r = ball.transit["out"], ball.width / 2
+        ball.transit = None
+        ball.x0, ball.y0, ball.x1, ball.y1 = x - r, y - r, x + r, y + r
+        ball.vx, ball.vy = vx, vy
+        ball.portal_cool = self.PORTAL_COOL
+        self.game.app.fx.spark(out["x"], out["y"], 22, (120, 230, 255), speed = 340, life = .5)
 
     def close_portals(self):
         """The portals snap shut (a ball was looping through them with no paddle near).  In a Portal

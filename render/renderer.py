@@ -2288,6 +2288,12 @@ class Renderer:
             screen.blit(glow, glow.get_rect(center=(x, y)), special_flags=ADD)
             ring = self.art.get(("portal_ring", R), self._portal_ring, R)
             screen.blit(ring, ring.get_rect(center=(x, y)))
+            flash = round(door.get("flash", 0.0) * 4) / 4         # (1.8: the way out, just before a ball comes out)
+            if flash > 0:
+                burst = self.art.glow(int(R * 3.2) // 8 * 8, scaled((200, 250, 255), flash))
+                screen.blit(burst, burst.get_rect(center=(x, y)), special_flags=ADD)
+                pulse = int(R * (1.05 + 0.3 * (1 - flash)))
+                pygame.draw.circle(screen, (235, 255, 255), (int(x), int(y)), pulse, max(2, int(7 * flash)))
             spin = 1 if i else -1
             for k in range(10):
                 a = spin * t * 3.2 + k * math.tau / 10

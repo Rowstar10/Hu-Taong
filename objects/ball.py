@@ -34,6 +34,7 @@ class Ball(GameObject):
         self.side = None         # Twin Balls: "red" or "blue", whose ball this is (it keeps that colour)
         self.curve = 0.0         # Curveball: px/s^2 it bends up (negative) or down as it flies
         self.portal_cool = 0.0   # Portal Pair: a moment after coming out of a portal
+        self.transit = None      # Portal Pair: inside one, on the way out of the other (1.8)
         self.press = None        # (what last knocked it sideways, which side of that it was on, when)
         self.press_clock = 0.0   # seconds the ball has moved, to time those knocks
 
@@ -72,8 +73,8 @@ class Ball(GameObject):
         self.vx, self.vy = paddle.vx, paddle.vy
 
     def can_collide_with(self, other):
-        if self.stuck:
-            return False            # nothing knocks it off while it's stuck
+        if self.stuck or self.transit:
+            return False            # nothing knocks it off while it's stuck, or inside a portal
         if getattr(other, "is_ball", False):
             return False            # Twin Balls pass through each other
         if getattr(other, "is_obstacle", False):
@@ -204,4 +205,5 @@ class Ball(GameObject):
         self.side = None
         self.curve = 0.0
         self.portal_cool = 0.0
+        self.transit = None
         self.press = None

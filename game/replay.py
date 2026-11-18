@@ -27,7 +27,8 @@ RATE = 60                    # frames a second
 MOST_FRAMES = RATE * 60 * 30 # half an hour; a longer match keeps its last half hour
 MAGIC = b"HUTAONG-REPLAY 1\n"
 KIND_KEYS = [kind.key for kind in KINDS]
-ROWS = 2        # the rows' layout: 2 from 1.7 (each portal's size); none said in a header means 1
+ROWS = 3        # the rows' layout: 2 from 1.7 (each portal's size), 3 from 1.8 (each portal's flash, and
+                # the blue ball's visibility); none said in a header means 1
 RENAMED = {"chaos": "shape"}        # power-ups since renamed: Chaos Mode + is Shape Shift (1.6)
 STYLES = ["tomb", "pillar"]
 GREAT = 14.0                 # a point's best moment worth an instant replay scores at least this
@@ -246,14 +247,14 @@ class Recorder:
         values.append(len(extra))
         for b in extra:
             values += [b.x0, b.y0, b.width, b.vx, b.vy, 2 if getattr(b, "side", None) == "blue" else 1,
-                       1 if getattr(b, "blazing", False) else 0]
+                       1 if getattr(b, "blazing", False) else 0, pu.ball_alpha(b)]
         # then the ball's spin, the wind, the night, the firecracker and the portals
         portals = getattr(pu, "portals", [])
         values += [getattr(ball, "curve", 0.0), pu.wind_force() if hasattr(pu, "wind_force") else 0.0,
                    pu.lantern_level() if hasattr(pu, "lantern_level") else 0.0,
                    pu.cracker_fuse(ball) if hasattr(pu, "cracker_fuse") else 0, len(portals)]
         for door in portals:
-            values += [door["x"], door["y"], door["angle"], door.get("r", PowerUps.PORTAL_R)]
+            values += [door["x"], door["y"], door["angle"], door.get("r", PowerUps.PORTAL_R), door.get("flash", 0.0)]
         # then the Firecracker's shockwaves, and how chipped each stone is
         blasts = getattr(pu, "blasts", [])
         values.append(len(blasts))
@@ -490,6 +491,7 @@ class ViewBall(_Box):
         self.blazing = False
         self.stuck = None
         self.side = None             # Twin Balls: "red" or "blue"
+        self.alpha = 1.0             # how visible (a ball inside a portal can't be seen)
 
 
 class ViewStone(_Box):
@@ -531,7 +533,7 @@ class ViewPowerUps:
         return any(k == key and left is not None for k, left, _ in self.effect_list(paddle))
 
     def ball_alpha(self, ball=None):
-        return self.alpha if ball is None or ball is self.game.ball else 1.0
+        return self.alpha if ball is None or ball is self.game.ball else getattr(ball, "alpha", 1.0)
 
     def wall_open(self):
         return any(key == "wall" for key, _ in self.court)
@@ -583,7 +585,9 @@ class ReplayView:
         self.objects = []
         self.remap = info.get("remap")
         self.strings = info.get("strings", [])
-        self.portal_fields = 4 if info.get("rows", 1) >= 2 else 3     # 1.6's rows: no portal size
+        rows = info.get("rows", 1)
+        self.portal_fields = 5 if rows >= 3 else 4 if rows >= 2 else 3     # 1.6's: no size; 1.7's: no flash
+        self.extra_fields = 8 if rows >= 3 else 7                           # 1.7's blue ball: no visibility
         self.running = True
         self.paused = False
 
@@ -686,7 +690,8 @@ class ReplayView:
         while len(self.extra_balls) < n_extra:
             self.extra_balls.append(ViewBall(self))
         del self.extra_balls[n_extra:]
-        same = len(b) > pos + 7 * n_extra - 1 and len(b) == len(a)
+        width = self.extra_fields
+        same = len(b) > pos + width * n_extra - 1 and len(b) == len(a)
         for extra in self.extra_balls:
             x, y = a[pos], a[pos + 1]
             if same and abs(b[pos] - x) < 150 and abs(b[pos + 1] - y) < 150:
@@ -696,7 +701,8 @@ class ReplayView:
             extra.vx, extra.vy = a[pos + 3], a[pos + 4]
             extra.side = "blue" if int(a[pos + 5]) == 2 else "red"
             extra.blazing = bool(a[pos + 6])
-            pos += 7
+            extra.alpha = a[pos + 7] if width >= 8 else 1.0
+            pos += width
         # the ball's spin, the wind, the night, the firecracker's fuse in seconds (before 1.6's
         # playtest, its hits left) and the portals (newer frames only)
         ball.curve, pu.wind, pu.night, pu.cracker, pu.portals = 0.0, 0.0, 0.0, 0.0, []
@@ -708,7 +714,8 @@ class ReplayView:
             for _ in range(n_portals):
                 if pos + fields <= len(a):
                     door = {"x": a[pos], "y": a[pos + 1], "angle": a[pos + 2]}
-                    door["r"] = a[pos + 3] if fields == 4 else 80.0       # (1.6's portals were always 80)
+                    door["r"] = a[pos + 3] if fields >= 4 else 80.0       # (1.6's portals were always 80)
+                    door["flash"] = a[pos + 4] if fields >= 5 else 0.0
                     pu.portals.append(door)
                 pos += fields
         pu.blasts = []

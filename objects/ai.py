@@ -178,11 +178,16 @@ class PaddleAI:
             # stuck to a paddle is read as leaving the way it will once it peels off: as the
             # holding paddle's movement aims it (Sticky Goo's arrow), not on its old return
             stuck = getattr(ball, "stuck", None)
-            if stuck and powerups and "vx" in stuck:
-                vx, vy = powerups.sling(stuck, stuck["paddle"], getattr(ball, "speed", 0))
+            if getattr(ball, "transit", None) and powerups:
+                # inside a portal: read, as a person would from the flash, as coming out of the other
+                x, y, vx, vy = powerups.transit_exit(ball)
+                self.seen.append((self.clock, x, y, vx, vy))
             else:
-                vx, vy = (stuck["vx"], stuck["vy"]) if stuck else (ball.vx, ball.vy)
-            self.seen.append((self.clock, (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2, vx, vy))
+                if stuck and powerups and "vx" in stuck:
+                    vx, vy = powerups.sling(stuck, stuck["paddle"], getattr(ball, "speed", 0))
+                else:
+                    vx, vy = (stuck["vx"], stuck["vy"]) if stuck else (ball.vx, ball.vy)
+                self.seen.append((self.clock, (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2, vx, vy))
         while len(self.seen) > 1 and self.seen[0][0] < self.clock - self.MEMORY:
             self.seen.popleft()
 

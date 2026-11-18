@@ -249,6 +249,7 @@ class GuestMatchState(State):
         self.own_box = (auth[0], auth[1], w, h)
         self.own_speed = info.get("speed", [1500, 1500])[side - 1]
         self.snow_size = float(info.get("snow", 0) or 0)       # (a big Snowball ploughs through Tombstones)
+        self.serve_speed = float(info.get("serve", 0) or 0)     # (a portal never slows the ball below a serve)
         if side != getattr(self, "pred_side", side):
             self.pred = None                       # a Switch: your paddle is the other one now
         self.pred_side = side
@@ -465,8 +466,14 @@ class GuestMatchState(State):
         curve = getattr(view.ball, "curve", 0.0)            # Curveball's spin, fading as it flies
         wind = getattr(view.powerups, "wind", 0.0)           # and Wind Gust's push
         portals = getattr(view.powerups, "portals", [])
-        cool = 0.0
+        cool, inside, coming = 0.0, 0.0, None
         for _ in range(steps):
+            if inside > 0:                                 # inside a portal for a moment (1.8)
+                inside -= h
+                if inside <= 0:
+                    cx, cy, vx, vy = coming
+                    cool = 0.35
+                continue
             if curve or wind:
                 vy = max(-2600.0, min(2600.0, vy + (curve + wind) * h))
                 curve *= math.exp(-1.3 * h)
@@ -477,11 +484,15 @@ class GuestMatchState(State):
                         out = portals[1 - i] if len(portals) > 1 else door
                         dx, dy = PortalSize.portal_exit(out["angle"])        # as the host's game does
                         speed = math.hypot(vx, vy)
+                        serve = getattr(self, "serve_speed", 0) * math.sqrt(2)
+                        speed = max(speed * (1 - PortalSize.PORTAL_SLOW), min(speed, serve))
                         reach = out.get("r", PortalSize.PORTAL_R) * 0.5 + r
-                        cx, cy = out["x"] + dx * reach, out["y"] + dy * reach
-                        vx, vy = speed * dx, speed * dy
-                        cool = 0.35
+                        coming = (out["x"] + dx * reach, out["y"] + dy * reach, speed * dx, speed * dy)
+                        cx, cy, vx, vy = door["x"], door["y"], 0.0, 0.0
+                        inside = PortalSize.PORTAL_TRANSIT
                         break
+                if inside > 0:
+                    continue
             nx, ny = cx + vx * h, cy + vy * h
             if ny < r:
                 ny, vy = 2 * r - ny, abs(vy)
