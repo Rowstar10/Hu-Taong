@@ -37,7 +37,7 @@ class Groups(unittest.TestCase):
                            "middle_wall", "ai_difficulty", "ai_style", "adaptive_ai", "court", "powerups",
                            "powerup_rate", "pu_fire", "countdown", "mode_chaos", "chaos_timing", "mode_switch",
                            "switch_timing", "mode_curveball", "mode_lantern_night", "mode_twin_ball",
-                           "mode_talisman_rush", "mode_black_hole"],
+                           "mode_talisman_rush", "mode_black_hole", "physics", "speed_cap"],
                  "gameplay": ["p1_up", "p2_right", "auto_pause", "touch_steer", "touch_sensitivity", "vibration"],
                  "display": ["max_fps", "dim", "court_dim_level", "effects", "screen_shake", "ball_trail"],
                  "interface": ["tooltips", "ai_banter", "hud", "instant_replay", "hide_cursor"]}

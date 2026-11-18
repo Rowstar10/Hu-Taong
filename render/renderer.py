@@ -49,8 +49,15 @@ TIPS = {
     "paddle_size_slider": "Paddle Size\nHow tall and wide the paddles are.",
     "randomise_all": "Randomise All\nRandom ball and paddle speeds and sizes.",
     "reset_ball_and_paddles": "Reset Ball & Paddles\nThe ball and paddle speeds and sizes back to their defaults.",
+    "toggle_speed_cap": "Speed Cap\nA paddle can only pass on so much of its speed to the ball, so charging into "
+                        "a slow ball can't make a shot nobody could reach.\n• The paddle gives way rather than "
+                        "catching its own ball again\n~ Classic physics never passes on a paddle's speed: no "
+                        "difference there",
     "open_powerups": "Choose Talismans\nSee what each talisman does, and choose which can appear.",
-    "open_ball_paddles": "Ball & Paddles\nThe ball's and paddles' sizes and speeds, and the game's pace.",
+    "toggle_hole_twins": "Black Hole Twins\nWhen a Black Hole collapses, the ball inside bursts out as Twin Balls.\n"
+                         "• Off: it comes out as one ball, heading for the goal it can score in\n"
+                         "• For the Black Hole talisman and the Black Hole mode alike",
+    "open_ball_paddles": "Ball & Paddles\nThe ball's and paddles' sizes and speeds, the game's pace, and the physics.",
     "toggle_powerups": "Power-Ups\nTalismans appear on the court during a match.\n• Touch one with your paddle, or a ball you hit last\n~ Hold Tab in a match to see every power-up in play",
     "toggle_lantern_night": "Lantern Night\nThe court is always dark, lit only by lanterns round the paddles and the ball's glow.\n~ Off by default",
     "open_match_settings": "Match Settings\nPoints to win, talismans, the ball and paddles, the AI and the rest of the rules.",
@@ -747,8 +754,9 @@ class Renderer:
                          "• Even with Power-Ups off: the ones switched on in Power-Ups are used",
         "black_hole": "Black Hole\nA black hole drifts about mid-court all match, pulling the ball in and flinging it out.\n"
                       "• It grows with each ball it swallows, and stays that big point after point\n"
-                      "• Grown twice, the next ball it swallows makes it collapse in on itself: the ball bursts out as\n"
-                      "  Twin Balls, and mini black holes come and go till the point ends; a new one opens at the next serve\n"
+                      "• Grown five times, the next ball it swallows makes it collapse in on itself: the ball bursts\n"
+                      "  out as Twin Balls (or alone, with Black Hole Twins off), and mini black holes come and go till the point\n"
+                      "  ends; a new one opens at the next serve\n"
                       "~ The Black Hole talisman doesn't turn up"}
 
     def modes_section(self, ui, s, font, m=None, columns=3):
@@ -1251,7 +1259,9 @@ class Renderer:
                                            [Button("open_powerups", "Choose Talismans", sm, (theme.ORANGE, theme.ORANGE_HOVER),
                                                    tip=TIPS["open_powerups"]),
                                             Cycle("cycle_at_once", lambda: at_once[g.talismans_at_once], sm, at_once,
-                                                  tip=at_once_tip)]],
+                                                  tip=at_once_tip)],
+                                           [self.toggle(sm, "toggle_hole_twins", "Black Hole Twins", lambda: g.hole_twins,
+                                                        tip=TIPS["toggle_hole_twins"])]],
                                           gap_x=int(BASE_W * 0.012 * s), gap_y=self.vgap(ui, s, 0.35)),
                                      Text(lambda: f"{sum(getattr(g, 'pu_' + k.key) for k in POWERUP_KINDS)} of "
                                                   f"{len(POWERUP_KINDS)} talismans switched on", ty, theme.PARCHMENT,
@@ -1261,11 +1271,15 @@ class Renderer:
                 return (f"Ball {int(g.ball_diameter)} px, speed {int(g.ball_speed)}   -   "
                         f"Paddles {int(g.paddle_height)} x {int(g.paddle_width)}, speed {int(g.paddle_speed)}   -   "
                         f"Pace {g.pace:.2f}x")
+            def physics():
+                return f"Physics: {g.PHYSICS[g.physics]}   -   Speed Cap {'on' if g.speed_cap else 'off'}"
             ball = self.section(ui, s, "Ball & Paddles",
                                 Button("open_ball_paddles", "Ball & Paddles", sm, (theme.GREEN, theme.GREEN_HOVER),
                                        tip=TIPS["open_ball_paddles"]),
                                 Text(sizes, ty, theme.PARCHMENT,
-                                     samples=["Ball 100 px, speed 800   -   Paddles 300 x 60, speed 2000   -   Pace 1.50x"]))
+                                     samples=["Ball 100 px, speed 800   -   Paddles 300 x 60, speed 2000   -   Pace 1.50x"]),
+                                Text(physics, ty, theme.PARCHMENT,
+                                     samples=[f"Physics: {p}   -   Speed Cap off" for p in g.PHYSICS]))
 
             wide = int(BASE_W * 0.05 * s)
             body = [Grid([[rules, ai, court]], gap_x=wide),
@@ -1277,8 +1291,16 @@ class Renderer:
 
         ui.screen_menu(state, screen, build, title="对局 Match", mark="战", reset="Reset to Default")
 
+    PHYSICS_NOTES = ("1.7's: a hit's speed comes from how hard the paddle drives into the ball, eased "
+                     "towards a top speed",
+                     "the angle comes from where the ball meets the paddle, every hit is a little faster "
+                     "up to the top speed, and paddle movement adds no speed",
+                     "Hu Taong 0.9's: drive into the ball to speed it up, a still paddle slows it, and "
+                     "there's no top speed")
+
     def draw_ball_paddles_menu(self, state, screen):
-        """Settings > Match > Ball & Paddles: their sizes and speeds, and the game's pace."""
+        """Settings > Match > Ball & Paddles: their sizes and speeds, the game's pace, and (1.8) the
+        physics and the Speed Cap."""
         ui = self.ui
         g = self.app.settings.match
 
@@ -1311,10 +1333,19 @@ class Renderer:
             rand = Button("randomise_all", "Randomise Ball & Paddles", sm, (G, theme.GREEN_HOVER), tip=TIPS["randomise_all"])
             unrand = Button("reset_ball_and_paddles", "Reset Ball & Paddles", sm, (theme.BLUE, theme.BLUE_HOVER),
                             tip=TIPS["reset_ball_and_paddles"])
-            return Grid([[ball_speed, paddle_speed],
-                         [ball_size, paddle_size],
-                         [pace, Stack([rand, unrand], gap=self.vgap(ui, s, 0.5))]],
-                        gap_x=int(BASE_W * 0.06 * s), gap_y=self.vgap(ui, s, 1.6))
+            names = [f"Physics: {p}" for p in g.PHYSICS]
+            physics_tip = lambda: options_tip("Physics", "How a ball comes off a paddle.",
+                                              list(zip(g.PHYSICS, self.PHYSICS_NOTES)), g.physics,
+                                              "Changes come in at the next serve")
+            physics = self.section(ui, s, "Physics", Stack([
+                Cycle("cycle_physics", lambda: names[g.physics], sm, names, tip=physics_tip),
+                self.toggle(sm, "toggle_speed_cap", "Speed Cap", lambda: g.speed_cap)],
+                vertical=False, gap=int(BASE_W * 0.02 * s)))
+            return Stack([Grid([[ball_speed, paddle_speed],
+                                [ball_size, paddle_size],
+                                [pace, Stack([rand, unrand], gap=self.vgap(ui, s, 0.5))]],
+                               gap_x=int(BASE_W * 0.06 * s), gap_y=self.vgap(ui, s, 1.6)),
+                          physics], gap=self.vgap(ui, s, 1.6))
 
         ui.screen_menu(state, screen, build, title="球拍 Ball & Paddles", mark="球", reset="Reset to Default")
 

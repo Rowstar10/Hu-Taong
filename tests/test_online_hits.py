@@ -36,6 +36,7 @@ from core.net import GuestSession, HostSession, pack_json     # noqa: E402
 from core.states.guest_state import GuestMatchState           # noqa: E402
 from game.hu_taong import Hu_Taong                            # noqa: E402
 from game.physics import Physics as netcode_physics           # noqa: E402  (the host's physics)
+from game import engines                                      # noqa: E402
 from game.powerups import PowerUps                            # noqa: E402
 
 
@@ -211,7 +212,20 @@ class HostChecks(HostedMatch):
     def test_friends_bounce_matches_the_hosts_exactly(self):
         """The friend's screen works out its returns as the host's physics plays them, so the host
         keeps theirs and the ball doesn't slip after the hit (it replaced about 4 in 10 before)."""
+        self.friends_bounce_matches(engines.CURRENT, False)
+
+    def test_under_every_physics(self):
+        """1.8: Classic and v0.9 physics, and the Speed Cap, as well (the host sends its choice)."""
+        for physics in (engines.CURRENT, engines.CLASSIC, engines.V09):
+            for cap in (False, True):
+                if (physics, cap) != (engines.CURRENT, False):
+                    with self.subTest(physics = physics, cap = cap):
+                        self.friends_bounce_matches(physics, cap)
+
+    def friends_bounce_matches(self, physics, cap):
         game, ball, g = self.game, self.game.ball, self.game.p2
+        game.settings.physics, game.settings.speed_cap = physics, cap
+        capped = cap and physics != engines.CLASSIC
         g.remote, self.game.p1.remote = True, False
         serve, r = ball.speed, ball.width / 2
         rng = random.Random(5)
@@ -242,8 +256,11 @@ class HostChecks(HostedMatch):
             g.x0, g.y0, g.x1, g.y1 = px, py, px + g.width, py + g.height
             g.speed = base * (PowerUps.SWIFT if power == "swift" else 1.0)
             top = g.speed / PowerUps.SWIFT if power == "swift" else math.inf
+            if capped:
+                top = min(top, engines.cap_drive(serve))
             gvx, gvy, gbx, gby = GuestMatchState.bounce_off(g, 2, normal, bx, by, r, bvx, bvy, pvx, pvy, serve = serve,
-                                                            fire = power == "fire", top = top)
+                                                            fire = power == "fire", top = top, physics = physics,
+                                                            hits = 1, capped = capped)
             t = 10.0 + i
             game.recorder.clock = t
             game.last_guest_hit = game.last_goal_clock = -1.0

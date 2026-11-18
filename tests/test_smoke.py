@@ -1,8 +1,7 @@
 """A smoke test: every screen draws a real frame, the ways in and out of a match work, and a long
 computer-v-computer match with every power-up runs without a hitch, (1.7) another with every
-game mode on at once, and (1.8) one with the Middle Wall down, where two paddles can squeeze the ball.
-Kept in the repo (1.6) so it outlives the scratch copies that kept getting cleared away; run it after
-any change to the screens.
+game mode on at once, and (1.8) more under each physics and the Speed Cap.  Kept in the repo (1.6) so it outlives the scratch copies that kept getting
+cleared away; run it after any change to the screens.
 """
 import unittest
 
@@ -158,10 +157,9 @@ class LongMatch(unittest.TestCase):
                 self.assertGreater(len(taken), 12, sorted(taken))
 
 
-class WallDown(unittest.TestCase):
-    """1.8: computer v computer with the Middle Wall down (two paddles can squeeze the ball between
-    them: test_paddle_sandwich), every talisman on, Chaotic, recorded and played back as it goes.
-    (Under each physics and with the Speed Cap too, until Rowan's fourth playtest rolled them back.)"""
+class EveryPhysics(unittest.TestCase):
+    """1.8: computer v computer under Classic and v0.9 physics, and with the Speed Cap, every
+    talisman on, Chaotic, the Middle Wall up and down, recorded and played back as it goes."""
 
     def setUp(self):
         self.g = g = app.settings.match
@@ -174,11 +172,11 @@ class WallDown(unittest.TestCase):
         self.g.reset()
         self.g.reset_powerups()
 
-    def test_with_every_talisman(self):
+    def test_each_physics_with_every_talisman(self):
         from game.replay import ReplayView
-        for wall in (False,):
-            with self.subTest(middle_wall = wall):
-                self.g.middle_wall = wall
+        for physics, cap, wall in ((1, False, True), (2, False, False), (0, True, False), (2, True, True)):
+            with self.subTest(physics = self.g.PHYSICS[physics], cap = cap, middle_wall = wall):
+                self.g.physics, self.g.speed_cap, self.g.middle_wall = physics, cap, wall
                 game = Hu_Taong(app)
                 game.start()
                 game.p1.ai_enabled = game.p2.ai_enabled = True

@@ -19,9 +19,10 @@ from core import net as netcode
 from core.states.base_state import State
 from core.states.jukebox import JukeboxControls
 from core.states.replay_state import play_event
+from game import engines
 from game.powerups import PowerUps
 from game.replay import Clip, Moment, ReplayView
-from objects.paddle import FLAT_ANGLE
+from objects.paddle import FLAT_ANGLE, PUSH_BELOW
 from render import theme
 
 WARP_IN = 0.4            # seconds after a serve over which the sliding clock eases in
@@ -579,6 +580,18 @@ class GuestMatchState(State):
         if self.pred is None or self.tau is None:
             return
         pvx, pvy = self.pred[2], self.pred[3]
+        # The host's physics (1.8): under Classic, or with the Speed Cap, a paddle can't knock its own
+        # ball again while it's going away (the host's paddles give way: see Paddle.keep_behind),
+        # unless it's well slower than a knock would send it (Rowan's fourth playtest: push it along)
+        physics = int(info.get("physics", engines.CURRENT) or 0)
+        capped = bool(info.get("cap")) and physics != engines.CLASSIC
+        if (physics == engines.CLASSIC or capped) and getattr(ball, "last_paddle", None) is paddle and \
+                ball.vx * (1 if side == 1 else -1) > 0:
+            serve = getattr(self, "serve_speed", 0)
+            knock = (engines.classic_speed(serve, getattr(ball, "rally_value", 0)) if physics == engines.CLASSIC
+                     else engines.cap_drive(serve))
+            if not serve or math.hypot(ball.vx, ball.vy) >= knock * PUSH_BELOW:
+                return
         met = None
         if last is not None and last[2] is not None:
             # Where the ball went against the paddle since last frame (both may have moved): the
@@ -610,9 +623,13 @@ class GuestMatchState(State):
         factor = PowerUps.SWIFT if "swift" in mine_fx else 1.0
         speed = getattr(self, "own_speed", 0)
         top = speed / factor if factor > 1 and speed else math.inf
+        if capped and serve:
+            top = min(top, engines.cap_drive(serve))
+        hits = getattr(ball, "rally_value", 0) + (getattr(ball, "last_paddle", None) is not paddle)      # Classic: this hit's number
         if serve:
             vx, vy, bx, by = self.bounce_off(at, side, normal, bx, by, r, ball.vx, ball.vy, pvx, pvy, serve = serve,
-                                             fire = "fire" in mine_fx, top = top)
+                                             fire = "fire" in mine_fx, top = top, physics = physics, hits = hits,
+                                             capped = capped)
         else:       # a host on an earlier 1.5 doesn't send its serve speed, and expects the simpler bounce
             vx, vy, bx, by = self.simple_bounce(at, side, normal, bx, by, r, ball.vx, ball.vy, pvx, pvy)
         net.claim_id += 1
@@ -688,14 +705,17 @@ class GuestMatchState(State):
 
     @staticmethod
     def bounce_off(paddle, side, normal, bx, by, r, bvx, bvy, pvx, pvy, serve = 0.0, fire = False,
-                   top = math.inf):
+                   top = math.inf, physics = engines.CURRENT, hits = 1, capped = False):
         """The ball off your paddle, as the host's game plays a hit (Physics.resolve_collision, then
         objects/paddle.py on_contact): the knock takes pace off a blocked ball (never below its
         serve speed), it's angled by where on the paddle it met, eased under the speed ceiling, and
-        off the face always leaves faster than the paddle chases it.  `top` is the paddle's normal
-        top speed when Swift Step has it going faster: its hits are played as if at that speed.
-        Answers (vx, vy, x, y), the ball just clear of the face it met.  It must match the host
-        exactly: tests/test_online_hits.py checks it does, against the host's own code."""
+        off the face always leaves faster than the paddle chases it.  `top` is the fastest the
+        paddle counts as moving into the ball (Swift Step's normal top speed, or the Speed Cap's).
+        `physics` is the host's (1.8): Classic plays the rally's `hits`-th hit, v0.9 0.9's bounce
+        (game/engines.py), and with the Speed Cap (`capped`) the paddle gives way instead of the
+        ball always leaving faster than it.  Answers (vx, vy, x, y), the ball just clear of the face
+        it met.  It must match the host exactly: tests/test_online_hits.py checks it does, against
+        the host's own code, under every physics."""
         from config import MAX_BALL_SPEEDUP
         from objects.paddle import SPEED_KNEE
         nx, ny = normal
@@ -716,26 +736,36 @@ class GuestMatchState(State):
             if crvn <= 0:
                 cimp = -(1 + res) * crvn / 1.05
                 kvx, kvy = bvx - cimp * nx, bvy - cimp * ny
-        speed = max(math.hypot(kvx, kvy), serve)
-        if ny:
-            speed = max(math.hypot(bvx, bvy), serve)          # off an end it keeps the speed it came in at
         cap = MAX_BALL_SPEEDUP * serve * math.sqrt(2)
-        knee = SPEED_KNEE * cap
-        if serve and speed > knee:
-            speed = knee + (cap - knee) * math.tanh((speed - knee) / (cap - knee))
+        v09 = physics == engines.V09
+        if physics == engines.CLASSIC and serve:
+            speed = engines.classic_speed(serve, hits)        # the rally's speed: the paddle adds nothing
+        elif v09:
+            speed = max(math.hypot(kvx, kvy), engines.v09_floor(serve))   # the knock's own speed, no ceiling
+        else:
+            speed = max(math.hypot(kvx, kvy), serve)
+            if ny:
+                speed = max(math.hypot(bvx, bvy), serve)      # off an end it keeps the speed it came in at
+            knee = SPEED_KNEE * cap
+            if serve and speed > knee:
+                speed = knee + (cap - knee) * math.tanh((speed - knee) / (cap - knee))
         cy = (paddle.y0 + paddle.y1) / 2
         forward = 1 if side == 1 else -1
         pinched = False
         if nx:
             offset = max(-1.0, min(1.0, (by - cy) / (paddle.height / 2)))
             angle = offset * MAX_BOUNCE_ANGLE
-            if abs(angle) < FLAT_ANGLE:
+            if abs(angle) < FLAT_ANGLE and not v09:
                 angle = math.copysign(1.5 * FLAT_ANGLE, angle or 1.0)
             vx, vy = -nx * speed * math.cos(angle), speed * math.sin(angle)
             bx = paddle.x1 + r if nx < 0 else paddle.x0 - r
         else:
-            vx = forward * speed * math.cos(MAX_BOUNCE_ANGLE)
-            vy = -ny * speed * math.sin(MAX_BOUNCE_ANGLE)
+            if v09:
+                vx, vy = engines.v09_off_the_end((bx - (paddle.x0 + paddle.x1) / 2) / (paddle.width / 2), ny,
+                                                 speed, forward)
+            else:
+                vx = forward * speed * math.cos(MAX_BOUNCE_ANGLE)
+                vy = -ny * speed * math.sin(MAX_BOUNCE_ANGLE)
             room = paddle.y0 if ny > 0 else BASE_H - paddle.y1
             if room < 2 * r + 6:                               # no room by the wall: out along it
                 pinched = True
@@ -746,7 +776,8 @@ class GuestMatchState(State):
         leaving = vx * out_x + vy * out_y
         need = chasing + 150
         want = max(need, min(min(chasing, top) * 1.3, cap if serve else math.inf))
-        if chasing > 0 and leaving < want and not pinched and ny == 0:
+        current = physics not in (engines.CLASSIC, engines.V09) or not serve
+        if chasing > 0 and leaving < want and not pinched and ny == 0 and current and not capped:
             total = math.hypot(vx, vy)
             share = leaving / total if total and leaving > 0 else 0.0
             limit = max(cap, need) if serve else math.inf
@@ -758,7 +789,7 @@ class GuestMatchState(State):
             keep = math.sqrt(max(0.0, new_speed * new_speed - normal_part * normal_part)) / side_len if side_len else 0.0
             vx, vy = out_x * normal_part + side_x * keep, out_y * normal_part + side_y * keep
         total = math.hypot(vx, vy)
-        if total and abs(vx) < total * 0.3:
+        if total and abs(vx) < total * 0.3 and not v09:
             vx = forward * total * 0.3
             vy = math.copysign(total * math.sqrt(1 - 0.09), vy or -1)
         if fire:                                               # Spirit Fire: every hit a blazing shot...

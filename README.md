@@ -2,7 +2,7 @@
 
 Pong, the Wangsheng Funeral Parlor way. Version 1.8, 18 November 2026.
 
-The Black Hole talisman and game mode, a review of the talismans, and a ball squeezed between two paddles rattles between them again.
+Three physics to choose from, a Speed Cap so a charge shot can always be reached, the Black Hole talisman and game mode, and a review of the talismans.
 
 ## Play it
 

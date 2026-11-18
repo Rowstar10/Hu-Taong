@@ -10,7 +10,8 @@ paddles' faces and slid out past their ends, within a second at 240 frames a sec
 so now it goes up and down with the paddles instead.  Let either paddle go and it comes free.  All of
 it counts as the one hit that caught it (no rally of thousands, no replay full of hits), and its
 sound and sparks come Ball.RATTLE_FX apart, not hundreds of times a second.  A paddle driving the ball
-into a stone still squirts it out (1.6: see test_powerup_fixes).
+into a stone still squirts it out (1.6: see test_powerup_fixes).  Under each of 1.8's physics, and
+with the Speed Cap (Rowan had the physics rolled back to 1.7's, then asked for 1.8's again).
 """
 import unittest
 from unittest import mock
@@ -79,6 +80,14 @@ class Sandwich(unittest.TestCase):
                 self.squeeze()
                 self.assertEqual(self.run_for(6.0, fps), 1.0, "it got out")
                 self.assertEqual((self.p1.score, self.p2.score), (0, 0))
+
+    def test_under_each_physics_and_with_the_speed_cap(self):
+        for physics in (0, 1, 2):
+            for cap in (False, True):
+                with self.subTest(physics = m.PHYSICS[physics], cap = cap):
+                    self.game.settings.physics, self.game.settings.speed_cap = physics, cap
+                    self.squeeze()
+                    self.assertEqual(self.run_for(3.0, 240), 1.0, "it got out")
 
     def test_it_goes_up_and_down_with_them(self):
         self.squeeze()

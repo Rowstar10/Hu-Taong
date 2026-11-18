@@ -173,7 +173,8 @@ KINDS = (
          "• Its heart pulses as it swallows the ball: no telling which way it will come out until it does\n"
          "• Each ball it swallows makes it bigger, and its pull stronger\n"
          "• Once it has grown five times, the next ball it swallows makes it collapse in on itself, and the\n"
-         "  ball bursts out as Twin Balls, each heading for the goal it can score in\n"
+         "  ball bursts out as Twin Balls, each heading for the goal it can score in (or, with Black Hole\n"
+         "  Twins off in Match settings, alone, heading for the goal it can score in)\n"
          "• You can hear it: a low hum while it's on the court, growing as it grows, and a roar as it collapses\n"
          "• Then mini black holes drift about until the point ends, each pulling the ball in and flinging\n"
          "  it on towards the side it was heading for\n"
@@ -1067,6 +1068,7 @@ class PowerUps:
                 speed = math.hypot(vx, vy)
                 vx, vy = gap_x / n * speed, gap_y / n * speed
                 x, y = thing["x"] + vx * dt, thing["y"] + vy * dt
+        x, y = clamp(x, lo, hi), clamp(y, top, bottom)     # (turning away mustn't take it out of its area)
         for o in self.game.objects:
             if not getattr(o, "is_obstacle", False):
                 continue
@@ -1499,11 +1501,12 @@ class PowerUps:
         bursts: a lone ball comes out as Twin Balls, red heading for Blue's goal and blue for Red's
         (where each can score), each at any angle (never straight up or down) and at half its
         speed, as Twin Balls split (never slower than half a serve).  With two balls in play
-        already, the ball comes out alone, heading for the goal it can score in.  The hole is gone
+        already, or with Black Hole Twins off (Match settings: Rowan's fourth playtest, to try it),
+        the ball comes out alone, heading for the goal it can score in.  The hole is gone
         in a flash, and mini black holes come and go till the point ends."""
         game = self.game
         app = game.app
-        if ball is game.ball and self.twin is None:
+        if ball is game.ball and self.twin is None and getattr(self.settings, "hole_twins", True):
             blue = self.new_blue(ball)
             each = max(speed * 0.5, ball.speed * math.sqrt(2) * 0.5)
             r = ball.width / 2

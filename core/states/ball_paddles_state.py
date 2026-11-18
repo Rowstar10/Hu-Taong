@@ -3,7 +3,8 @@ import pygame, random
 from core.states.base_state import State
 
 class BallPaddlesState(State):
-    """Settings > Match > Ball & Paddles: the ball's and paddles' sizes and speeds, and the pace."""
+    """Settings > Match > Ball & Paddles: the ball's and paddles' sizes and speeds, the pace, and
+    (1.8) the physics: how a ball comes off a paddle, and the Speed Cap."""
     NAME = "ball_paddles"
     is_menu = True
 
@@ -42,6 +43,7 @@ class BallPaddlesState(State):
         m = self.app.settings.match
         m.reset_ball_and_paddles()
         m.pace = 1.0
+        m.physics, m.speed_cap = 0, False
 
     def handle_event(self, event):
         super().handle_event(event)
@@ -65,6 +67,10 @@ class BallPaddlesState(State):
                 m.paddle_width = m.paddle_width_min + random.random() * m.paddle_width_range
             if key == "reset_ball_and_paddles":
                 m.reset_ball_and_paddles()
+            if key in ("cycle_physics_left", "cycle_physics_right"):
+                m.physics = (m.physics + (1 if key.endswith("right") else -1)) % len(m.PHYSICS)
+            if key == "toggle_speed_cap":
+                m.speed_cap = not m.speed_cap
 
             if key == "reset_ball_speed":
                 m.ball_speed = m.ball_speed_min + 0.5 * m.ball_speed_range

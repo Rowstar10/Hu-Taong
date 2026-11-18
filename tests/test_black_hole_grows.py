@@ -31,6 +31,9 @@ third (a Black Hole match's still clear of the serve; the talisman's no longer n
 Rowan's fourth playtest (same day): "I also want the mini black holes to spawn more frequently, and
 last for a bit longer.  Maybe one spawns randomly every 0.5 - 1.5 seconds, and they last randomly for
 5-10 seconds."  Up to six at once now (three would have held most of them back), 220 px apart.
+And "I would like to be able to see what it'd be like to play the game where black holes collapsing
+didn't spew out twin balls, but instead just one ball still": Black Hole Twins, a Match setting, on
+by default; off, the ball bursts out alone, heading for the goal it can score in.
 """
 import json
 import math
@@ -253,6 +256,29 @@ class Collapsing(Match):
         self.assertAlmostEqual(h["dying"], P.HOLE_IMPLODE * P.HOLE_BURST, msg = "gone in a flash")
         self.assertIsNone(self.pu.big_hole())
         self.assertTrue(self.pu.minis, "then the mini ones")
+
+    def test_with_black_hole_twins_off_it_bursts_out_alone(self):
+        h = self.grown()
+        self.game.settings.hole_twins = False
+        self.feed(1400.0)
+        self.play(P.COLLAPSE_TIME + 0.05, balls = [])
+        self.assertIsNone(self.pu.twin, "no Twin Balls")
+        self.assertEqual(len([o for o in self.game.objects if o.is_ball]), 1)
+        self.assertGreater(self.ball.vx, 0, "heading for Blue's goal, where it scores")
+        self.assertAlmostEqual(math.hypot(self.ball.vx, self.ball.vy), 1400.0, delta = 1, msg = "at its own speed")
+        self.assertIsNotNone(h["dying"], "the hole bursts all the same")
+        self.assertTrue(self.pu.minis, "and the mini ones come")
+
+    def test_black_hole_twins_is_a_match_setting_on_by_default(self):
+        m.reset()
+        self.assertTrue(m.hole_twins)
+        self.assertIn("hole_twins", save_data.collect(app)["gameplay"])
+        from tests.test_settings_menus import open_screen, click
+        screen = open_screen("match")
+        self.assertIn("toggle_hole_twins", screen.ui_hitboxes)
+        click(screen, "toggle_hole_twins")
+        self.assertFalse(m.hole_twins)
+        m.reset()
 
     def test_with_two_balls_in_play_the_ball_comes_out_alone(self):
         self.grown()
