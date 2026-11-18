@@ -12,7 +12,10 @@ portal too, shooting a ball out along its own circling arrow.  In a Portal Pair 
 open again at the next serve.
 
 Rowan's playtest (same day): "All black holes, I want to have a gravitational pull": Portal Pair's
-and the mini ones pull as the Black Hole does (see test_black_hole), the minis more weakly.
+and the mini ones pull as the Black Hole does (see test_black_hole), the minis more weakly.  Then
+"both black holes and mini black holes shouldn't have any arrows at all": the twins now head for
+the goals they can score in (red for Blue's, blue for Red's), and a mini flings a ball on towards
+the side it was heading for, each at any angle (never straight up or down), as the Black Hole does.
 """
 import math
 import random
@@ -28,6 +31,7 @@ from core.states.guest_state import GuestMatchState             # noqa: E402
 from game.hu_taong import Hu_Taong                              # noqa: E402
 from game.powerups import BY_KEY, PowerUps                      # noqa: E402
 from game.replay import ReplayView                              # noqa: E402
+from tests.test_black_hole import straight_lines               # noqa: E402
 from tests.test_warm_art import Counting                        # noqa: E402
 
 m = app.settings.match
@@ -124,10 +128,6 @@ class Collapsing(Match):
         hole = self.pu.holes[0]
         self.assertEqual(hole["kind"], P.HOLE_COLLAPSE)
         self.assertAlmostEqual(hole["x"], (a["x"] + b["x"]) / 2, delta = 20)    # (they drift a little meanwhile)
-        self.assertEqual(len(hole["arrows"]), 2)
-        for angle, door in zip(hole["arrows"], (a, b)):
-            dx, dy = P.portal_exit(door["angle"])
-            self.assertAlmostEqual(angle, math.atan2(dy, dx), delta = 0.1, msg = "the ways the portals pointed")
 
     def test_its_pull_grows_as_it_collapses_and_it_swallows_nothing_till_formed(self):
         self.full_size()
@@ -136,14 +136,11 @@ class Collapsing(Match):
         self.place(hole["x"] - 300, hole["y"], 0.0, 0.0)
         self.play(P.COLLAPSE_TIME * 0.4, balls = [])
         self.assertTrue(0.3 < hole["power"] < 0.5)
-        arrows = list(hole["arrows"])
         self.place(hole["x"] - 100, hole["y"], 900.0, 0.0)          # straight through its heart
         self.play(0.25)
         self.assertIsNone(self.ball.transit)
-        self.assertEqual(hole["arrows"], arrows, "they don't circle yet")
         self.play(P.COLLAPSE_TIME, balls = [])
         self.assertEqual(hole["power"], 1.0)
-        self.assertNotEqual(hole["arrows"], arrows, "now they slowly circle")
 
     def test_stays_until_it_swallows_a_ball(self):
         hole, _, _ = self.collapse()
@@ -152,10 +149,8 @@ class Collapsing(Match):
         self.assertIn(hole, self.pu.holes)
         self.assertIsNone(hole["dying"])
 
-    def test_a_lone_ball_comes_out_as_twin_balls_along_the_arrows(self):
+    def test_a_lone_ball_comes_out_as_twin_balls_each_heading_for_where_it_scores(self):
         hole, _, _ = self.collapse()
-        hole["turns"] = [0.0, 0.0]
-        red_way, blue_way = (math.atan2(*reversed(P.portal_exit(a))) for a in hole["arrows"])
         speed = 1400.0
         self.place(hole["x"] - 200, hole["y"], speed, 0.0)
         self.play(0.3, balls = [self.ball])
@@ -165,8 +160,10 @@ class Collapsing(Match):
         blue = self.pu.twin["ball"]
         self.assertEqual((self.ball.side, blue.side), ("red", "blue"))
         self.assertIn(blue, self.game.objects)
-        self.assertAlmostEqual(math.atan2(self.ball.vy, self.ball.vx), red_way, places = 4)
-        self.assertAlmostEqual(math.atan2(blue.vy, blue.vx), blue_way, places = 4)
+        self.assertGreater(self.ball.vx, 0, "red heads for Blue's goal (on the right)")
+        self.assertLess(blue.vx, 0, "blue for Red's")
+        for b in (self.ball, blue):
+            self.assertGreaterEqual(abs(b.vx) / math.hypot(b.vx, b.vy), P.PORTAL_STEEPEST - 1e-6)
         half = max(speed * 0.5, self.ball.speed * math.sqrt(2) * 0.5)
         for b in (self.ball, blue):
             self.assertAlmostEqual(math.hypot(b.vx, b.vy), half, delta = 1, msg = "as Twin Balls split")
@@ -175,7 +172,6 @@ class Collapsing(Match):
 
     def test_with_two_balls_in_play_the_ball_comes_out_alone(self):
         hole, _, _ = self.collapse()
-        hole["turns"] = [0.0, 0.0]
         self.pu.split_ball()
         blue = self.pu.twin["ball"]
         self.place(200, 150, 0.0, 0.0)
@@ -184,8 +180,7 @@ class Collapsing(Match):
         self.assertTrue(blue.transit)
         self.play(P.HOLE_HOLD + 0.05, balls = [])
         self.assertEqual(len([o for o in self.game.objects if o.is_ball]), 2, "no third ball")
-        blue_way = math.atan2(*reversed(P.portal_exit(hole["arrows"][1])))
-        self.assertAlmostEqual(math.atan2(blue.vy, blue.vx), blue_way, places = 4, msg = "along the blue arrow")
+        self.assertLess(blue.vx, 0, "heading for Red's goal, where it scores")
         self.assertAlmostEqual(math.hypot(blue.vx, blue.vy), 1000.0, delta = 1)
 
     def test_the_points_end(self):
@@ -293,13 +288,12 @@ class MiniHoles(Match):
         self.assertLess(P.MINI_REACH, P.HOLE_REACH / 1.5)
         self.assertLess(P.MINI_CORE, P.HOLE_CORE)
 
-    def test_a_mini_portal_out_along_its_arrow_a_little_slower(self):
+    def test_a_mini_portal_flings_it_on_a_little_slower(self):
         self.start()
         self.play(DT, balls = [])
         h = self.minis()[0]
         self.pu.minis["next"] = 999.0
         h["age"], h["left"], h["power"] = 2.0, 3.0, 1.0
-        h["turn"] = 0.4
         speed = 1500.0
         self.place(h["x"] - 150, h["y"], speed, 0.0)
         for _ in range(60):
@@ -307,14 +301,11 @@ class MiniHoles(Match):
             if self.ball.transit:
                 break
         self.assertTrue(self.ball.transit, "in")
-        arrow = h["arrows"][0]
-        self.assertGreater(h["flash"], 0.5, "its arrow flashes")
-        self.play(P.MINI_HOLD * 0.5, balls = [])
-        self.assertEqual(h["arrows"][0], arrow, "and holds still while the ball's inside")
-        self.play(P.MINI_HOLD, balls = [])
+        self.assertGreater(h["flash"], 0.5, "its heart pulses")
+        self.play(P.MINI_HOLD * 1.5, balls = [])
         self.assertIsNone(self.ball.transit)
-        dx, dy = P.portal_exit(arrow)
-        self.assertAlmostEqual(math.atan2(self.ball.vy, self.ball.vx), math.atan2(dy, dx), places = 4)
+        self.assertGreater(self.ball.vx, 0, "on towards the side it was heading for")
+        self.assertGreaterEqual(self.ball.vx / math.hypot(self.ball.vx, self.ball.vy), P.PORTAL_STEEPEST - 1e-6)
         self.assertAlmostEqual(math.hypot(self.ball.vx, self.ball.vy), speed * (1 - P.PORTAL_SLOW), delta = 1)
 
 
@@ -358,13 +349,22 @@ class FriendsScreenAndReplays(Match):
             view.show(n - 5 + i)
             seen = view.powerups.holes[0]
             self.assertAlmostEqual(seen["age"], age, places = 4)
-            self.assertEqual(len(seen["arrows"]), 2)
             for (dx, dy), door in zip(seen["doors"], hole["doors"]):
                 self.assertAlmostEqual(dx, door[0], places = 2)
             app.renderer.draw_world(app.virtual, view)
         view.show(n - 1)
         self.assertIn(P.HOLE_MINI, [h["kind"] for h in view.powerups.holes])
         app.renderer.draw_world(app.virtual, view)
+
+    def test_no_black_hole_has_an_arrow(self):
+        doors = [(-260.0, -60.0), (260.0, 60.0)]
+        holes = [{"x": 960, "y": 540, "kind": P.HOLE_COLLAPSE, "age": age, "power": 1.0, "spin": 1, "way": 0.2,
+                  "flash": flash, "dying": None, "doors": doors}
+                 for age in (0.3, 1.0, 1.8, 2.2, 3.0) for flash in (0.0, 0.8)]
+        holes += [{"x": 700, "y": 400, "kind": P.HOLE_MINI, "age": 1.0, "power": 1.0, "spin": 1, "way": 0.2,
+                   "flash": flash, "dying": None} for flash in (0.0, 0.8)]
+        app.dt = DT
+        self.assertEqual(straight_lines(lambda: app.renderer.draw_holes(app.virtual, SimpleNamespace(holes = holes), 0, 0)), 0)
 
     def test_its_art_is_built_ahead(self):
         doors = [(-260.0, -60.0), (260.0, 60.0)]
@@ -382,7 +382,7 @@ class FriendsScreenAndReplays(Match):
 
 
 class TheAI(Match):
-    def test_reads_a_ball_inside_a_mini_from_its_arrow(self):
+    def test_cant_read_which_way_a_ball_inside_a_mini_will_come_out(self):
         hole, _, _ = self.collapse()
         self.pu.holes.remove(hole)
         self.pu.minis = {"next": 0.0}
@@ -394,12 +394,10 @@ class TheAI(Match):
         self.place(h["x"] - 120, h["y"], 1500.0, 0.0)
         self.play(0.15, balls = [self.ball])
         self.assertTrue(self.ball.transit)
-        want = self.pu.transit_exit(self.ball)
         ai = self.game.p2.ai
         ai.reset()
-        _x, _y, vx, vy = ai.perceive(self.ball, 1 / 120, 0.0)
-        self.assertAlmostEqual(vx, want[2], delta = 1)
-        self.assertAlmostEqual(vy, want[3], delta = 1)
+        x, y, vx, vy = ai.perceive(self.ball, 1 / 120, 0.0)
+        self.assertEqual((round(x), round(y), vx, vy), (round(h["x"]), round(h["y"]), 0.0, 0.0), "where it went in, still")
 
     def test_a_forming_holes_heart_doesnt_stop_its_reckoning(self):
         self.full_size()

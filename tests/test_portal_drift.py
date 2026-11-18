@@ -353,10 +353,40 @@ class AlwaysOpen(unittest.TestCase):
 
 class BuiltAhead(unittest.TestCase):
     def test_every_size_they_grow_through(self):
-        for job in app.renderer.prewarm_jobs():
-            job()
-        for R in range(PowerUps.PORTAL_START, PowerUps.PORTAL_R + 1, PowerUps.PORTAL_GROW):
-            self.assertIn(("portal_ring", R), app.art.cache)
+        from tests.test_warm_art import Counting
+        app.dt = 1 / 60
+        portals = [{"x": 700, "y": 400, "angle": a, "r": float(R), "flash": f}
+                   for R in range(PowerUps.PORTAL_GROW, PowerUps.PORTAL_R + 1, PowerUps.PORTAL_GROW)
+                   for a in (0.0, 1.4, 3.0) for f in (0.0, 0.5, 1.0)]
+        with Counting() as c:
+            app.renderer.draw_portals(app.virtual, SimpleNamespace(portals = portals, closing = []), 0, 0)
+        self.assertEqual(c.built, [])
+
+
+class Ovals(unittest.TestCase):
+    """Rowan's playtest (2026-11-18): keeping track of the turning arrows was hard ("what about
+    having them slightly ellipse shaped, so the ball will fly out the widest side").  A portal is an
+    oval, wide across its face and shallow along its way out; the front (the way out) is rimmed
+    bright, and no arrows are drawn."""
+
+    def test_wide_across_and_shallow_along_the_way_out(self):
+        r = app.renderer
+        for angle in (0.0, 0.7, 2.6, -0.9):
+            facing = r.portal_facing({"angle": angle})
+            fx, fy = r.portal_point(0, 0, 100, facing, 0.0)
+            sx, sy = r.portal_point(0, 0, 100, facing, math.pi / 2)
+            self.assertAlmostEqual(math.hypot(fx, fy), 100 * r.PORTAL_SQUASH, places = 6)
+            self.assertAlmostEqual(math.hypot(sx, sy), 100, places = 6)
+            dx, dy = PowerUps.portal_exit(angle)
+            self.assertAlmostEqual(fx / math.hypot(fx, fy), dx, places = 6, msg = "its front faces the way out")
+
+    def test_no_arrows(self):
+        from tests.test_black_hole import straight_lines
+        app.dt = 1 / 60
+        portals = [{"x": 700, "y": 400, "angle": 0.5, "r": 120.0, "flash": 0.0},
+                   {"x": 1200, "y": 700, "angle": 2.0, "r": 120.0, "flash": 1.0}]
+        self.assertEqual(straight_lines(lambda: app.renderer.draw_portals(
+            app.virtual, SimpleNamespace(portals = portals, closing = []), 0, 0)), 0)
 
 
 if __name__ == "__main__":

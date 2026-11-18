@@ -37,6 +37,19 @@ m = app.settings.match
 DT = 1 / 120
 
 
+def straight_lines(draw):
+    """How many straight lines `draw()` draws (an arrow's chevrons are straight lines; nothing
+    else on a black hole is)."""
+    import pygame
+    lines, real = [], pygame.draw.line
+    pygame.draw.line = lambda *a, **k: (lines.append(a), real(*a, **k))[1]
+    try:
+        draw()
+    finally:
+        pygame.draw.line = real
+    return len(lines)
+
+
 class Match(unittest.TestCase):
     COURT = 0
 
@@ -379,18 +392,10 @@ class Described(unittest.TestCase):
         self.assertIn("hole", SHORT)
 
     def test_no_arrow_when_it_shoots_the_ball_out(self):
-        renderer = app.renderer
-        arrows, real = [], renderer.draw_hole_arrow
-        renderer.draw_hole_arrow = lambda *a, **k: arrows.append(a)
-        try:
-            hole = {"x": 960, "y": 540, "kind": PowerUps.HOLE_TALISMAN, "age": 5.0, "power": 1.0, "spin": 1,
-                    "way": 0.3, "flash": 1.0, "dying": None}
-            for flash in (1.0, 0.6, 0.2):
-                hole["flash"] = flash
-                renderer.draw_holes(app.virtual, SimpleNamespace(holes = [hole]), 0, 0)
-        finally:
-            renderer.draw_hole_arrow = real
-        self.assertEqual(arrows, [])
+        holes = [{"x": 960, "y": 540, "kind": PowerUps.HOLE_TALISMAN, "age": 5.0, "power": 1.0, "spin": 1,
+                  "way": 0.3, "flash": flash, "dying": None} for flash in (1.0, 0.6, 0.2, 0.0)]
+        app.dt = DT
+        self.assertEqual(straight_lines(lambda: app.renderer.draw_holes(app.virtual, SimpleNamespace(holes = holes), 0, 0)), 0)
 
     def test_its_art_is_built_ahead(self):
         powerups = SimpleNamespace(holes = [
