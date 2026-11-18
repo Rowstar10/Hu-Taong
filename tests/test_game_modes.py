@@ -106,9 +106,10 @@ class TalismanRush(ModeMatch):
             self.assertLessEqual(max(waits), hi / m.RUSH + 1e-9)
             self.assertGreaterEqual(min(waits), lo / m.RUSH - 1e-9)
 
-    def test_up_to_three_at_once(self):
+    def test_as_many_at_once_as_come(self):
+        """(1.8: Talismans at Once sets a limit, 1 to 3; Talisman Rush lifts it.)"""
         self.rules.powerup_rate = 0
-        self.assertEqual(self.pu.most(), 3)
+        self.assertEqual(self.rules.talisman_limit, float("inf"))
 
     def test_without_it_power_ups_off_means_none(self):
         self.rules.mode_talisman_rush = False

@@ -34,7 +34,8 @@ class MatchSettingsState(MatchControls, State):
             cycles = {"ai": ("ai_difficulty", m.ai_difficulties), "ai_style": ("ai_style", m.ai_styles),
                       "win_score": ("winning_score_index", m.winning_scores),
                       "countdown": ("countdown", m.countdown_options),
-                      "powerup_rate": ("powerup_rate", m.powerup_rate_options)}
+                      "powerup_rate": ("powerup_rate", m.powerup_rate_options),
+                      "at_once": ("talismans_at_once", m.at_once_options)}
             for name, (field, options) in cycles.items():
                 for suffix, step in (("_left", -1), ("_right", 1)):
                     if key == f"cycle_{name}{suffix}":

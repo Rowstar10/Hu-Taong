@@ -35,24 +35,24 @@ KINDS = (
          "• An unused save is lost when the point ends\n"
          "• You can hold one at a time"),
     Kind("giant", "Giant Paddle", "巨", "Boon", 10,
-         "Your paddle grows half as tall again for 10 seconds.",
+         "Your paddle grows half as tall again for 10 seconds of play.",
          "Your paddle grows half as tall again.\n"
-         "• Lasts 10 s"),
+         "• Lasts 10 s of play: what's left carries on into the next point"),
     Kind("swift", "Swift Step", "疾", "Boon", 10,
-         "Your paddle moves half as fast again for 10 seconds.",
+         "Your paddle moves half as fast again for 10 seconds of play.",
          "Your paddle moves half as fast again.\n"
          "• It doesn't make your hits any harder\n"
-         "• Lasts 10 s"),
+         "• Lasts 10 s of play: what's left carries on into the next point"),
     Kind("fire", "Spirit Fire", "火", "Boon", 10,
-         "For 10 seconds every hit you make is a blazing shot, 40% faster.",
+         "For 10 seconds of play every hit you make is a blazing shot, 40% faster.",
          "Every hit you make leaves as a blazing shot.\n"
          "• 40% faster, even a little past the usual top speed\n"
          "• Blazing shots chip stones: tombstones break in 2 hits, ferry gates in 3, walls in 4\n"
-         "• Lasts 10 s"),
+         "• Lasts 10 s of play: what's left carries on into the next point"),
     Kind("shrink", "Shrink Curse", "缩", "Curse", 10,
-         "Your opponent's paddle shrinks by a third for 10 seconds.",
+         "Your opponent's paddle shrinks by a third for 10 seconds of play.",
          "Your opponent's paddle shrinks by a third.\n"
-         "• Lasts 10 s"),
+         "• Lasts 10 s of play: what's left carries on into the next point"),
     Kind("ghost", "Ghost Ball", "鬼", "Wild", 10,
          "For 10 seconds the ball keeps vanishing and reappearing, at random.",
          "The ball turns into a ghost: it fades out of sight and back again at random moments.\n"
@@ -64,7 +64,7 @@ KINDS = (
          "Both paddles are coated in goo: catch the ball, then sling it where you like.",
          "Both paddles are coated in sticky goo: the ball sticks for a moment, then you sling it.\n"
          "• The way your paddle is moving as it peels off aims it (up slings it up)\n"
-         "• A quick flick of the paddle throws it faster\n"
+         "• It comes off a little slower than it came in, and a quick flick of the paddle throws it faster\n"
          "• An arrow on the ball shows where it will go\n"
          "• Lasts 10 s"),
     Kind("wall", "Open Court", "破", "Wild", 0,
@@ -78,6 +78,7 @@ KINDS = (
          "your opponent take over each other's paddle, and the goal it defends.\n"
          "• Your keys, your score and your colour stay yours\n"
          "• The paddles stay where they are\n"
+         "• When the point ends, you're back on your own paddles (in a Switch match, the switch goes on from there)\n"
          "• Doesn't turn up in a Switch match with mid-rally switches"),
     Kind("blink", "Blink Ball", "闪", "Wild", 10,
          "For 10 seconds the ball blinks to a nearby spot every so often, swerving a little each time.",
@@ -141,10 +142,11 @@ KINDS = (
          "• The ball shoots off at double speed at a new angle, away from whoever hit it last\n"
          "• The blast flattens any stone close by\n"
          "• If the point ends first, it goes out without a bang"),
-    Kind("lantern", "Lantern Night", "灯", "Wild", 0,
-         "Until the point ends the court goes dark, lit only by lanterns round the paddles and the ball's glow.",
-         "Night falls on the court until the point ends.\n"
+    Kind("lantern", "Lantern Night", "灯", "Wild", 20,
+         "For 20 seconds of play the court goes dark, lit only by lanterns round the paddles and the ball's glow.",
+         "Night falls on the court for 20 seconds of play.\n"
          "• Only lantern light round each paddle and the ball's own glow light it up\n"
+         "• It stays dark between points, until its time is up and dawn comes\n"
          "• Power-up talismans still glow in the dark\n"
          "• Doesn't turn up in a Lantern Night match"),
     Kind("portal", "Portal Pair", "门", "Wild", 0,
@@ -167,8 +169,7 @@ FAMILY_NOTES = {"Boon": "Boon: helps whoever takes it",
 
 class PowerUps:
     RADIUS = 56          # how close a paddle or ball must come to take one (and the talisman's size)
-    LIFETIME = 14.0      # seconds a talisman waits on the court
-    MOST = 2             # talismans on the court at once
+    LIFETIME = 20.0      # seconds of play a talisman waits on the court (it stays through points: 1.8)
     WAITS = ((14, 22), (8, 14), (4, 8), (1.5, 3))   # seconds between talismans: Rare, Normal, Frequent, Chaotic
 
     GIANT, SHRINK = 1.5, 0.65               # paddle height
@@ -178,7 +179,7 @@ class PowerUps:
     TELEPORT_WARNING = 0.12                 # seconds before the ball would be in
     TELEPORTS_HELD = 1                      # Safety Teleport charges a player can hold
     STICK_TIME = (0.6, 1.0)                 # seconds a gooey paddle holds the ball before slinging it
-    STICK_SPEED = 0.85                      # the share of its speed it keeps...
+    STICK_SPEED = 0.75                      # the share of its speed it keeps (0.85 until 1.8)...
     SLING_WHIP = 0.5                        # ...plus this share of the paddle's speed as it flicks
     BLINK_EVERY = (0.1, 0.5)                # seconds between Blink Ball hops
     BLINK_REACH = (45, 120)                 # how far a hop goes, in px
@@ -227,13 +228,14 @@ class PowerUps:
         self.wall_down = 0.0     # seconds Open Court keeps the Middle Wall down (UNTIL_POINT)
         self.snow = None         # Snowball: {"size": times the ball's own diameter}
         self.twin = None         # Twin Balls: {"left": seconds, "ball": the blue ball}; the main ball is red
-        self.switch_plus = False # Soul Swap: mid-rally switches until the point ends
+        self.switch_plus = False # Soul Swap: mid-rally switches until the point ends...
+        self.soul_swaps = 0      # ...and how many it has made, to undo at the point's end
         self.shape_shift = False # Shape Shift: sizes drift until the point ends
         self.curve_on = False    # Curveball until the point ends
         self.double = False      # Double or Nothing: the point being played is worth 2
         self.wind = None         # Wind Gust: {"left", "dir" (1 down, -1 up), "t"}
         self.cracker = None      # Firecracker: {"fuse": seconds to the bang, "taker": who took it}
-        self.lantern = None      # Lantern Night: {"age": seconds, "lifting": seconds left of the dawn, or None}
+        self.lantern = None      # Lantern Night: {"age", "left": seconds of play, "lifting": seconds left of the dawn, or None}
         self.blasts = []         # Firecracker explosions for the renderer: [x, y, age]
         self.portals = []        # Portal Pair: two {"x", "y", "angle", "r", "vx", "vy", "spin"}
         self.portal_trips = 0    # trips through them since a paddle last touched a ball
@@ -261,9 +263,29 @@ class PowerUps:
             return []
         return [kind for kind in KINDS if getattr(s, "pu_" + kind.key)]
 
-    def most(self):
-        """Talismans that may wait on the court at once: three on Chaotic or in Talisman Rush, two otherwise."""
-        return 3 if self.settings.powerup_rate >= 3 or self.settings.mode_talisman_rush else self.MOST
+    NOT_COUNTED = ("teleport", "double", "lantern", "wall")     # (Rowan's call: they don't crowd play)
+
+    def in_play(self):
+        """How many talismans are in play (Talismans at once, 1.8): each Boon or Curse on a player
+        and each talisman acting on the court.  Safety Teleport, Double or Nothing, Lantern Night
+        and Open Court don't count (NOT_COUNTED), nor do game modes."""
+        s, game = self.settings, self.game
+        n = 0
+        for paddle in (game.p1, game.p2):
+            n += sum(1 for key in paddle.effects if key != "sticky")
+        n += any("sticky" in paddle.effects for paddle in (game.p1, game.p2))     # one Goo coats both
+        n += sum(1 for on in (self.ghost, self.wind, self.blink, self.snow, self.cracker,
+                              self.switch_plus, self.shape_shift, self.curve_on) if on)
+        n += len(self.tombs)
+        n += bool(self.twin) and not s.mode_twin_ball
+        n += bool(self.portals) and not s.mode_portal_pair
+        return n
+
+    def room(self):
+        """Can another talisman turn up?  Only while those in play and those waiting on the court come
+        to fewer than Talismans at once allows (Talisman Rush lifts the limit)."""
+        waiting = sum(1 for item in self.pickups if item["kind"] not in self.NOT_COUNTED)
+        return self.in_play() + waiting < self.settings.talisman_limit
 
     def next_wait(self):
         """Seconds to the next talisman, at the Spawn rate; Talisman Rush cuts it to a third."""
@@ -512,7 +534,7 @@ class PowerUps:
         if self.cracker:
             items.append(("cracker", self.cracker["fuse"], "Firecracker: bangs when its fuse burns down"))
         if self.lantern:
-            items.append(("lantern", UNTIL_POINT, "Night: lanterns only, until the point ends"))
+            items.append(("lantern", max(0.0, self.lantern.get("left", 0.0)), "Night: lanterns only"))
         if self.portals:
             items.append(("portal", UNTIL_POINT, "Two linked portals"))
         return items
@@ -521,9 +543,13 @@ class PowerUps:
 
     def update(self, dt):
         game, ball = self.game, self.game.ball
+        # While a point is announced, what lasts between points waits: Boons and Curses, Lantern
+        # Night and the talismans on the court keep the time they have left for the next serve (1.8)
+        between = getattr(game, "message_timer", 0) > 0
         for paddle in (game.p1, game.p2):
             for key in list(paddle.effects):
-                paddle.effects[key] -= dt
+                if not between:
+                    paddle.effects[key] -= dt
                 if paddle.effects[key] <= 0:
                     del paddle.effects[key]
 
@@ -542,22 +568,27 @@ class PowerUps:
         self.update_cracker(dt)
         if self.lantern:
             self.lantern["age"] += dt
+            if not between and self.lantern["lifting"] is None:
+                self.lantern["left"] -= dt
+                if self.lantern["left"] <= 0:
+                    self.lantern["lifting"] = self.LANTERN_FADE[1]     # its time is up: dawn comes
         self.update_portals(dt)
         if self.update_snow(dt):
             return                          # a paddle was shoved into its goal: the point is over
 
         kinds = self.kinds()
         keys = {kind.key for kind in kinds}
-        if kinds:
+        if kinds and not between:
             self.wait -= dt
             if self.wait <= 0:
                 self.wait = self.next_wait()
                 waiting = {item["kind"] for item in self.pickups}    # never two of a kind on the court
                 choices = [kind for kind in kinds if self.spawnable(kind) and kind.key not in waiting]
-                if choices and len(self.pickups) < self.most():
+                if choices and self.room():
                     self.spawn(random.choice(choices).key)
         for item in self.pickups:
-            item["age"] += dt
+            if not between:
+                item["age"] += dt
         self.pickups = [item for item in self.pickups if item["age"] < self.LIFETIME and item["kind"] in keys]
 
         for item in list(self.pickups):
@@ -691,7 +722,7 @@ class PowerUps:
         elif key == "cracker":
             self.cracker = {"fuse": kind.seconds, "taker": owner}      # lit as it's taken
         elif key == "lantern":
-            self.lantern = {"age": 0.0, "lifting": None}
+            self.lantern = {"age": 0.0, "lifting": None, "left": kind.seconds}
         elif key == "portal":
             self.open_portals(self.PORTAL_START_TALISMAN)
 
@@ -1057,10 +1088,12 @@ class PowerUps:
         """A point ends whatever was riding on the ball, and clears the court: Open Court's wall
         goes back up, Tombstones sink away and the Snowball melts back into a ball.  What acts on
         both players (Sticky Goo, a Ghost Ball, the wind) ends too, so the next serve is a plain
-        one; each player's own Boons and Curses carry on.  The wait for the next talisman carries
-        on where it was (restarted at every point, quick points never got one)."""
+        one.  Each player's own Boons and Curses carry on with the time they had left, and so do
+        Lantern Night and the talismans waiting on the court (1.8).  Soul Swap ends, and whoever it
+        left on the other's paddle goes back to their own (unless it's a Switch match: the
+        switch goes on from where they are).  The wait for the next talisman carries on where it
+        was (restarted at every point, quick points never got one)."""
         from objects.obstacle import Obstacle
-        self.pickups.clear()
         self.ghost = None
         self.wind = None
         for paddle in (self.game.p1, self.game.p2):
@@ -1073,15 +1106,16 @@ class PowerUps:
         self.blink = None
         self.snow = None
         self.end_twin()
+        if self.switch_plus and self.soul_swaps % 2 and not self.settings.switching:
+            self.game.soul_undo = True              # (Hu_Taong.reset_round: back before the serve)
         self.switch_plus = False
+        self.soul_swaps = 0
         if self.shape_shift:
             self.shape_shift = False
             self.game.reset_drift()                 # sizes are back to normal for the serve
         self.curve_on = False
         self.double = False
         self.cracker = None
-        if self.lantern and self.lantern["lifting"] is None:
-            self.lantern["lifting"] = self.LANTERN_FADE[1]   # dawn comes while the point is announced
         # court stones broken or chipped during the point stand whole again for the next serve
         for stone in self.game.objects:
             if getattr(stone, "is_obstacle", False) and stone not in self.tombs and \

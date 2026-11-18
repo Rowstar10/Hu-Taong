@@ -1,4 +1,5 @@
 import copy
+import math
 import random
 from pathlib import Path
 
@@ -107,6 +108,7 @@ class MatchSettings:
 
         # Power-ups
         self.powerup_rate_options = ["Rare", "Normal", "Frequent", "Chaotic"]
+        self.at_once_options = [1, 2, 3]      # talismans in play at once (1.8)
 
         # Courts: the stones a match starts with (see game/courts.py); the last one is Random
         self.court_options = courts.NAMES
@@ -181,6 +183,12 @@ class MatchSettings:
         return self.mode_chaos and self.chaos_timing == 1
 
     @property
+    def talisman_limit(self):
+        """How many talismans may be in play at once, their effects and any waiting on the court
+        (Talisman Rush lifts the limit)."""
+        return math.inf if self.mode_talisman_rush else self.at_once_options[self.talismans_at_once]
+
+    @property
     def classic_physics(self):
         return self.physics == 1
 
@@ -213,6 +221,7 @@ class MatchSettings:
         """Power-ups on, at the normal rate, every one of them allowed."""
         self.powerups = True
         self.powerup_rate = 1
+        self.talismans_at_once = 0       # at_once_options[...]: 1
         for kind in POWERUP_KINDS:
             setattr(self, "pu_" + kind.key, True)
 

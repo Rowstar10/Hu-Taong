@@ -118,6 +118,7 @@ class LongMatch(unittest.TestCase):
         self.g = g = app.settings.match
         g.reset_powerups()
         g.powerup_rate = 3
+        g.talismans_at_once = len(g.at_once_options) - 1      # (1.8: as many at once as allowed, to see them all)
         g.winning_score_index = g.winning_scores.index("Endless Mode")
 
     def tearDown(self):
@@ -159,6 +160,7 @@ class EveryPhysics(unittest.TestCase):
         self.g = g = app.settings.match
         g.reset_powerups()
         g.powerup_rate = 3
+        g.talismans_at_once = len(g.at_once_options) - 1      # (1.8: as many at once as allowed, to see them all)
         g.winning_score_index = g.winning_scores.index("Endless Mode")
 
     def tearDown(self):

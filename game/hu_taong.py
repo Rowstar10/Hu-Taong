@@ -106,6 +106,7 @@ class Hu_Taong(GameBase):
 
         # Switch
         self.switch_after_point = False
+        self.soul_undo = False          # Soul Swap left the players on each other's paddles: undo at the serve
         self.next_switch = self.switch_gap()
         self.switch_warning = None      # seconds a mid-rally Switch has been armed, waiting for a hit
         self.switch_flash = 0.0         # time left on the "Switch!" banner
@@ -146,6 +147,7 @@ class Hu_Taong(GameBase):
             self.next_switch = self.switch_gap()
             if not self.settings.switch_mid_rally:
                 self.next_switch = random.uniform(4, 8)     # Soul Swap's: sooner, as it only lasts the point
+                self.powerups.soul_swaps += 1
             self.switch_sides(mid_rally = True)
 
     def on_bounce(self, ball, other):
@@ -530,6 +532,9 @@ class Hu_Taong(GameBase):
             self.powerups.twin_serve()          # Twin Ball: both balls, every point
         self.powerups.serve_portals()           # Portal Pair: open all match (and none left over otherwise)
 
+        if self.soul_undo:
+            self.soul_undo = False
+            self.switch_sides(mid_rally = True)     # Soul Swap is over: everyone back on their own paddle
         if self.switch_after_point:
             self.switch_after_point = False
             self.switch_sides()

@@ -498,7 +498,7 @@ class ViewStone(_Box):
 
 
 class ViewPowerUps:
-    LIFETIME, RADIUS = 14.0, 56
+    LIFETIME, RADIUS = 20.0, 56
 
     def __init__(self, game):
         self.game = game

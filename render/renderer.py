@@ -742,7 +742,7 @@ class Renderer:
                      "• Red scores only with the red ball, in Blue's goal; Blue only with the blue one, in Red's\n"
                      "• A ball that reaches its own colour's goal just bounces off\n"
                      "~ The Twin Balls talisman doesn't turn up",
-        "talisman_rush": "Talisman Rush\nTalismans turn up three times as often, up to three at once.\n"
+        "talisman_rush": "Talisman Rush\nTalismans turn up three times as often, as many at once as come.\n"
                          "• Even with Power-Ups off: the ones switched on in Power-Ups are used",
         "portal_pair": "Portal Pair\nTwo linked portals drift about the court all match: in one, out the other.\n"
                        "• They open small, grow a little each time a ball goes through, and stay that big point after point\n"
@@ -1233,14 +1233,24 @@ class Renderer:
             rates = [f"Spawn: {r}" for r in g.powerup_rate_options]
             rate_tip = lambda: options_tip("Spawn Rate", "How often a new talisman appears.",
                                            [("Rare", "every 14-22 s"), ("Normal", "every 8-14 s"),
-                                            ("Frequent", "every 4-8 s"), ("Chaotic", "every 1.5-3 s, up to three at once")],
+                                            ("Frequent", "every 4-8 s"), ("Chaotic", "every 1.5-3 s")],
                                            g.powerup_rate, "Talisman Rush makes any of these three times as often")
+            at_once = [f"At Once: {n}" for n in g.at_once_options]
+            at_once_tip = lambda: options_tip(
+                "Talismans at Once", "How many talismans can be in play at once: their effects, and any waiting "
+                "on the court.  A new one only turns up while there's room.",
+                [(str(n), None) for n in g.at_once_options], g.talismans_at_once,
+                "Safety Teleport, Double or Nothing, Lantern Night and Open Court don't count, nor do game "
+                "modes.  Talisman Rush lifts the limit")
             talismans = self.section(ui, s, "Talismans",
                                      Stack([self.toggle(sm, "toggle_powerups", "Power-Ups", lambda: g.powerups),
                                             Cycle("cycle_powerup_rate", lambda: rates[g.powerup_rate], sm, rates, tip=rate_tip)],
                                            vertical=False, gap=int(BASE_W * 0.012 * s)),
-                                     Button("open_powerups", "Choose Talismans", sm, (theme.ORANGE, theme.ORANGE_HOVER),
-                                            tip=TIPS["open_powerups"]),
+                                     Stack([Cycle("cycle_at_once", lambda: at_once[g.talismans_at_once], sm, at_once,
+                                                  tip=at_once_tip),
+                                            Button("open_powerups", "Choose Talismans", sm, (theme.ORANGE, theme.ORANGE_HOVER),
+                                                   tip=TIPS["open_powerups"])],
+                                           vertical=False, gap=int(BASE_W * 0.012 * s)),
                                      Text(lambda: f"{sum(getattr(g, 'pu_' + k.key) for k in POWERUP_KINDS)} of "
                                                   f"{len(POWERUP_KINDS)} talismans switched on", ty, theme.PARCHMENT,
                                           samples=[f"{len(POWERUP_KINDS)} of {len(POWERUP_KINDS)} talismans switched on"]))
@@ -1373,7 +1383,7 @@ class Renderer:
                                 tip=lambda: options_tip("Spawn Rate", "How often a new talisman appears.",
                                                         [("Rare", "every 14-22 s"), ("Normal", "every 8-14 s"),
                                                          ("Frequent", "every 4-8 s"),
-                                                         ("Chaotic", "every 1.5-3 s, up to three at once")],
+                                                         ("Chaotic", "every 1.5-3 s")],
                                                         g.powerup_rate)),
                           Button("all_pu_on", "All On", sm, (theme.GREEN, theme.GREEN_HOVER),
                                  tip="All On\nSwitch every power-up on."),
