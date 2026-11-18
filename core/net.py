@@ -632,6 +632,7 @@ class HostSession:
                 "events": [[first + i, *e[1:]] for i, e in enumerate(events)],
                 "speed": [game.p1.speed, game.p2.speed], "serve": game.ball.speed,
                 "physics": game.settings.physics, "cap": 1 if game.settings.speed_cap else 0,
+                "snow": round(game.powerups.snow["size"], 3) if game.powerups.snow else 0,
                 "guest": 1 if getattr(game.p1, "remote", False) else 2,
                 "over": self.over, "rematch": self.rematch_asked,
                 "acks": [[k, v] for k, v in list(self.acks.items())[-8:]],

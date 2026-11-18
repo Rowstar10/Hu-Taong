@@ -230,7 +230,10 @@ class Recorder:
         for item in pu.pickups:
             values += [KIND_KEYS.index(item["kind"]), item["x"], item["y"], item["age"], item["phase"]]
         for s in stones:
-            values += [s.x0, s.y0, s.width, s.height, s.visibility(), STYLES.index(s.style), s.speed]
+            # (its style: 10 more for a Tombstone talisman's stone, which every hit wears down, 1.8;
+            # readers before that wrap it round to the same style)
+            values += [s.x0, s.y0, s.width, s.height, s.visibility(),
+                       STYLES.index(s.style) + (10 if getattr(s, "worn", False) else 0), s.speed]
         for items in (fx1, fx2):
             for key, left, charges in items:
                 values += [KIND_KEYS.index(key), -1 if left is None else left, charges]
@@ -257,6 +260,11 @@ class Recorder:
         for blast in blasts:
             values += blast
         values += [getattr(st, "hp", 1) / max(1, getattr(st, "max_hp", 1)) for st in stones]
+        # then (1.8) a big Snowball ploughing through Tombstones
+        ploughs = getattr(pu, "ploughs", [])
+        values.append(len(ploughs))
+        for plough in ploughs:
+            values += plough
         return array("f", values).tobytes()
 
     def track_pass(self):
@@ -491,6 +499,7 @@ class ViewStone(_Box):
     def __init__(self):
         super().__init__()
         self.k, self.style, self.speed = 1.0, "tomb", 0.0
+        self.worn = False            # a Tombstone talisman's stone (1.8)
         self.strength = 1.0          # how whole it is (Spirit Fire and the Snowball chip stones)
 
     def visibility(self):
@@ -509,6 +518,7 @@ class ViewPowerUps:
         self.alpha = 1.0
         self.wind, self.night, self.cracker, self.portals = 0.0, 0.0, 0.0, []
         self.blasts = []
+        self.ploughs = []
 
     def effect_list(self, paddle):
         return self.fx[0 if paddle.is_left else 1]
@@ -647,7 +657,9 @@ class ReplayView:
         del self.stones[n_stone:]
         for stone in self.stones:
             stone.place(a[pos], a[pos + 1], a[pos + 2], a[pos + 3])
-            stone.k, stone.style, stone.speed = a[pos + 4], STYLES[int(a[pos + 5]) % len(STYLES)], a[pos + 6]
+            style = int(a[pos + 5])
+            stone.k, stone.style, stone.speed = a[pos + 4], STYLES[style % 10 % len(STYLES)], a[pos + 6]
+            stone.worn = style >= 10
             pos += 7
         fx = ([], [])
         for which, count in ((0, n_fx1), (1, n_fx2)):
@@ -713,6 +725,14 @@ class ReplayView:
                 if pos < len(a):
                     stone.strength = a[pos]
                 pos += 1
+        pu.ploughs = []
+        if pos < len(a):
+            n_ploughs = int(a[pos])
+            pos += 1
+            for _ in range(n_ploughs):
+                if pos + 3 <= len(a):
+                    pu.ploughs.append([a[pos], a[pos + 1], a[pos + 2]])
+                pos += 3
         self.objects = [*self.stones, self.p1, self.p2, ball, *self.extra_balls]
 
 

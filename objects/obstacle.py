@@ -29,7 +29,10 @@ class Obstacle(GameObject):
         # gate, or a long wall (Spirit Fire shots and the Snowball chip at them; a Firecracker's
         # blast flattens them at once)
         self.kind = "tomb" if style == "tomb" else ("gate" if speed else ("wall" if h >= 300 else "gate"))
-        self.max_hp = self.TOUGHNESS[self.kind]
+        # A Tombstone talisman's stone (1.8): every hit wears it down, so it counts in thirds of
+        # its toughness (see on_contact).  The court's own stones are as they were.
+        self.worn = life is not None and self.kind == "tomb"
+        self.max_hp = self.TOUGHNESS[self.kind] * (3 if self.worn else 1)
         self.hp = self.max_hp
         self.broken = False
 
@@ -83,8 +86,16 @@ class Obstacle(GameObject):
             self.game.app.fx.spark(cx, cy, 10, (196, 186, 160), speed = 320, life = .45)
             # A blazing Spirit Fire shot, or the Snowball, knocks a chunk off it
             powerups = getattr(self.game, "powerups", None)
-            snow = powerups and powerups.snowball() and other is self.game.ball
-            if getattr(other, "blazing", False) or snow:
+            snow = bool(powerups and powerups.snowball() and other is self.game.ball)
+            blazing = getattr(other, "blazing", False)
+            if self.worn:
+                # A Tombstone talisman's (1.8): every hit wears it down, and three break it; a
+                # blazing shot takes half (two break it, as ever); the Snowball smashes it at once,
+                # and a big one ploughs straight on through
+                if snow and powerups.plough(other, self, data):
+                    return
+                self.damage(self.max_hp if snow else 3 if blazing else 2)
+            elif blazing or snow:
                 self.damage()
 
     def damage(self, amount=1):

@@ -2538,6 +2538,7 @@ class Renderer:
                 self.draw_pickups(screen, powerups, ox, oy)
             self.draw_cracker_count(screen, game, powerups, ox, oy)
             self.draw_blasts(screen, powerups, ox, oy)
+            self.draw_ploughs(screen, powerups, ox, oy)
             self.draw_popups(screen, powerups)
 
         if getattr(game, "switch_warning", None) is not None:
@@ -2642,6 +2643,36 @@ class Renderer:
             pygame.draw.lines(surf, (30, 24, 22, 230), False, points, 3)
             pygame.draw.lines(surf, (210, 196, 170, 90), False, [(px + 1, py + 1) for px, py in points], 1)
         return surf
+
+    def draw_ploughs(self, screen, powerups, ox, oy):
+        """A big Snowball ploughs through a Tombstone (1.8): a flash of snow, a ring of frost racing
+        out, and chunks of stone and snow flung away and falling.  (Each burst is drawn the same
+        way every time, from where it was, so replays and the friend's screen match.)"""
+        ploughs = getattr(powerups, "ploughs", [])
+        total = PowerUps.PLOUGH_TIME
+        for x, y, age in ploughs:
+            k = min(1.0, age / total)
+            fade = 1 - k
+            cx, cy = int(x + ox), int(y + oy)
+            if k < 0.35:
+                flash = self.art.glow(int(240 * (1 - k)) // 4 * 4 + 40, scaled((210, 235, 255), 1 - k / 0.35))
+                screen.blit(flash, flash.get_rect(center=(cx, cy)), special_flags=ADD)
+            for reach, width, tint in ((230, 9, (235, 246, 255)), (150, 5, (170, 210, 255))):
+                r = int(18 + reach * (1 - (1 - k) ** 2))
+                if r > 4 and fade > 0.05:
+                    ring = pygame.Surface((r * 2 + 20, r * 2 + 20), pygame.SRCALPHA)
+                    pygame.draw.circle(ring, (*tint, int(210 * fade)), (r + 10, r + 10), r, max(2, int(width * fade)))
+                    screen.blit(ring, ring.get_rect(center=(cx, cy)))
+            rng = random.Random(int(x) * 7919 + int(y) * 104729)
+            for _ in range(14):
+                a, speed, size = rng.uniform(0, math.tau), rng.uniform(240, 640), rng.uniform(5, 13) * (0.4 + 0.6 * fade)
+                spin = rng.uniform(-9, 9) * age
+                px = cx + math.cos(a) * speed * age
+                py = cy + math.sin(a) * speed * age + 700 * age * age
+                tint = (236, 246, 255) if rng.random() < 0.4 else (172, 156, 128)
+                ca, sa = math.cos(spin) * size, math.sin(spin) * size
+                pygame.draw.polygon(screen, tint, [(px + ca, py + sa), (px - sa * 0.7, py + ca * 0.7),
+                                                   (px - ca, py - sa), (px + sa * 0.7, py - ca * 0.7)])
 
     def draw_blasts(self, screen, powerups, ox, oy):
         """Firecracker: a flash, a shockwave ring racing out, and a second, slower one."""

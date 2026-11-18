@@ -248,6 +248,7 @@ class GuestMatchState(State):
         frozen = a[20] >= 0 or a[22] != 0 or info.get("paused")    # countdown, a goal, or paused
         self.own_box = (auth[0], auth[1], w, h)
         self.own_speed = info.get("speed", [1500, 1500])[side - 1]
+        self.snow_size = float(info.get("snow", 0) or 0)       # (a big Snowball ploughs through Tombstones)
         if side != getattr(self, "pred_side", side):
             self.pred = None                       # a Switch: your paddle is the other one now
         self.pred_side = side
@@ -454,7 +455,9 @@ class GuestMatchState(State):
         t = max(0.0, min(0.5, seconds)) * float(view.settings.pace or 1.0)
         if t <= 0:
             return cx, cy, vx, vy
-        stones = [(s.x0, s.y0, s.x1, s.y1) for s in view.stones if getattr(s, "k", 1) > 0.5]
+        plough = getattr(self, "snow_size", 0) >= PowerUps.PLOUGH_SIZE      # (1.8: straight through a Tombstone)
+        stones = [(s.x0, s.y0, s.x1, s.y1) for s in view.stones
+                  if getattr(s, "k", 1) > 0.5 and not (plough and getattr(s, "worn", False))]
         if view.powerups.alpha < 0.99 or view.powerups.ghostly():
             stones = []                                # a Ghost Ball goes through them
         steps = int(t * 240) + 1

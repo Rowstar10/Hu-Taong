@@ -91,6 +91,7 @@ KINDS = (
          "A tombstone rises on the court until the point ends; up to two at once.",
          "A tombstone rises somewhere on the court and the ball bounces off it.\n"
          "• Some stand still, some drift up and down\n"
+         "• Every hit wears it down: 3 hits break it, or 2 blazing ones, or 1 from the Snowball\n"
          "• Paddles pass through it\n"
          "• Lasts until the point ends; up to two can stand at once"),
     Kind("snowball", "Snowball", "雪", "Wild", 0,
@@ -100,7 +101,8 @@ KINDS = (
          "• Every hit shoves the paddle back towards its own goal, even one driving into it\n"
          "• Meet it well out from your goal, so there's room to be shoved\n"
          "• A paddle shoved into its own goal gives away the point (touching it yourself doesn't count)\n"
-         "• It smashes stones: tombstones break in 2 hits, ferry gates in 3, walls in 4"),
+         "• It smashes a Tombstone at once, and once it's grown big it ploughs straight through\n"
+         "• It chips the court's stones: its own tombstones break in 2 hits, ferry gates in 3, walls in 4"),
     Kind("twin", "Twin Balls", "双", "Wild", 0,
          "Until the point ends there are two balls, Red's and Blue's; each only scores in the other's goal.",
          "The ball splits in two until the point ends: a red ball and a blue ball.\n"
@@ -208,6 +210,9 @@ class PowerUps:
     LANTERN_LIGHT = 300                     # px of lantern light round each paddle
     BLAST_R = 280                           # Firecracker: how far its blast flattens stones
     BLAST_TIME = 0.7                        # seconds its shockwave takes to spread and fade
+    PLOUGH_SIZE = 1.8                       # a Snowball this many times its own size ploughs through a Tombstone...
+    PLOUGH_KEEP = 0.9                       # ...keeping this share of its speed...
+    PLOUGH_TIME = 0.8                       # ...in a burst of snow and stone this long (1.8)
     SNOW_GROW = 1 / 9000                    # Snowball: size gained per px it rolls...
     SNOW_MOST = 2.4                         # ...up to this many times its own diameter (200 px at most)
     SNOW_SHOVE = 0.12                       # share of its speed that shoves a paddle back, times size squared
@@ -237,6 +242,7 @@ class PowerUps:
         self.cracker = None      # Firecracker: {"fuse": seconds to the bang, "taker": who took it}
         self.lantern = None      # Lantern Night: {"age", "left": seconds of play, "lifting": seconds left of the dawn, or None}
         self.blasts = []         # Firecracker explosions for the renderer: [x, y, age]
+        self.ploughs = []        # a big Snowball ploughing through a Tombstone, for the renderer: [x, y, age]
         self.portals = []        # Portal Pair: two {"x", "y", "angle", "r", "vx", "vy", "spin"}
         self.portal_trips = 0    # trips through them since a paddle last touched a ball
         self.portal_grown = 0.0  # Portal Pair match: how big they'd grown when a loop shut them
@@ -645,6 +651,9 @@ class PowerUps:
         for blast in self.blasts:
             blast[2] += dt
         self.blasts = [b for b in self.blasts if b[2] < self.BLAST_TIME]
+        for plough in self.ploughs:
+            plough[2] += dt
+        self.ploughs = [p for p in self.ploughs if p[2] < self.PLOUGH_TIME]
         # Tombstones sink away after a point, while the "scored" message shows
         game = self.game
         if game.paused or game.countdown is not None:
@@ -1032,6 +1041,25 @@ class PowerUps:
         game = self.game
         cx, cy = (paddle.x0 + paddle.x1) / 2, (paddle.y0 + paddle.y1) / 2
         game.app.fx.spark(cx, cy, int(8 + 10 * size), (226, 240, 255), speed = 200 + 120 * size, life = .5)
+
+    def plough(self, ball, stone, data):
+        """A big Snowball meeting a Tombstone's stone (1.8): it ploughs straight on through, losing
+        a little speed, and the stone bursts apart.  Answers True if it did (False: it isn't big
+        enough yet, and smashes the stone with a bounce)."""
+        if not self.snow or self.snow["size"] < self.PLOUGH_SIZE:
+            return False
+        vx, vy = data.get("before", {}).get(ball, (ball.vx, ball.vy))
+        ball.vx, ball.vy = vx * self.PLOUGH_KEEP, vy * self.PLOUGH_KEEP
+        stone.crumble()
+        cx, cy = (stone.x0 + stone.x1) / 2, (stone.y0 + stone.y1) / 2
+        self.ploughs.append([cx, cy, 0.0])
+        app = self.game.app
+        app.fx.spark(cx, cy, 36, (236, 246, 255), speed = 640, life = .9)
+        app.fx.spark(cx, cy, 20, (176, 160, 130), speed = 460, life = 1.0)
+        renderer = getattr(app, "renderer", None)
+        if renderer is not None:
+            renderer.shake(12, 0.3)
+        return True
 
     def update_snow(self, dt):
         """The snowball grows as it rolls, and a paddle shoved back into its own goal concedes.
