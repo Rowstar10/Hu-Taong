@@ -153,6 +153,9 @@ jobs:
           VERSION: ${{ needs.plan.outputs.version }}
           P4A_STORAGE: /home/runner/p4a
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          # Maven Central sometimes answers "too many requests" when several builds run at once:
+          # Gradle tries again, waiting longer each time
+          GRADLE_OPTS: -Dorg.gradle.internal.repository.max.retries=8 -Dorg.gradle.internal.repository.initial.backoff=2000
 
       - name: Forget the signing key
         if: always()
