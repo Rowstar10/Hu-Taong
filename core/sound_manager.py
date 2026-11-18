@@ -16,6 +16,7 @@ MENU_SOUNDS = {"click.wav", "cancel.wav", "enter_state.wav", "exit_state.wav",
 TARGET_LOUDNESS = -19.0
 AMBIENCE = (("Ambience Fire.wav", 1.0), ("Ambience Crickets.wav", 0.55))
 MUSIC_CHANNELS = 2          # reserved for the jukebox: one fades out while the other fades in
+HUM_CHANNEL = MUSIC_CHANNELS    # and one for the black holes' hum (1.8), so busy effects can't crowd it out
 
 
 def set_balance(channel, pan):
@@ -42,6 +43,8 @@ class SoundManager:
         self.multiplier = 1          # temporary music ducking (e.g. pause menu)
         self.track_gain = 1.0        # Even Out Volume's share for the current track
         self.ambience = []           # (channel, sound, level) while the ambience is playing
+        from core.hole_sounds import HoleSounds
+        self.holes = HoleSounds(self)    # black holes' hum and roar (1.8)
         self.reset()
 
         # Jukebox.  Tracks are decoded into memory on a worker thread and played on a channel of
@@ -57,7 +60,7 @@ class SoundManager:
 
         if pygame.mixer.get_init():
             pygame.mixer.set_num_channels(16)
-            pygame.mixer.set_reserved(MUSIC_CHANNELS)
+            pygame.mixer.set_reserved(MUSIC_CHANNELS + 1)
         self.preload_sounds()
 
     def reset(self):
@@ -289,6 +292,7 @@ class SoundManager:
         if not pygame.mixer.get_init():
             return
         self.update_ambience()
+        self.holes.tick()
         if self.loading:
             music, job = self.loading
             if job.done():

@@ -51,6 +51,8 @@ class GameState(State):
         super().update(dt)
         if self.game:
             self.game.update(dt)
+            if not self.game.paused:
+                self.app.sound_manager.holes.hear(self.game.powerups.holes)     # (1.8)
             self.app.stats.track(self.game, dt)
             recorder = self.game.recorder
             recorder.capture(dt)

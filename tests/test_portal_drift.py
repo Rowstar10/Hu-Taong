@@ -27,7 +27,12 @@ faint, bright as one is about to.  And "the portals seemed to flip every now and
 rotate": a portal turned right round, and as its way out passed too steep it jumped from steeply up
 to steeply down.  Now one faces each way, and each sweeps up and down on its own side, turning back
 before it would send a ball out too steeply.
+
+Rowan's third playtest (same day): "they are... unpredictable. I want the pause that happens when a
+ball enters a portal to be longer before it exits": half a second, the way out lit all the while.  And
+they keep to the middle third of the court, away from the goals.
 """
+import unittest.mock
 import math
 import random
 import unittest
@@ -204,9 +209,11 @@ class Portals(unittest.TestCase):
         self.assertFalse(ball.can_collide_with(self.game.p1))
         inside = 0
         while ball.transit:
+            self.assertEqual(out["flash"], 1.0, "the way out lit all the while it's inside")
             self.pu.update_portals(DT)
             inside += 1
         self.assertAlmostEqual(inside * DT, PowerUps.PORTAL_TRANSIT, delta = 2 * DT)
+        self.assertGreaterEqual(PowerUps.PORTAL_TRANSIT, 0.5, "longer (Rowan's third playtest)")
         self.assertLess(math.hypot((ball.x0 + ball.x1) / 2 - out["x"], (ball.y0 + ball.y1) / 2 - out["y"]),
                         out["r"] + ball.width, "out of the other")
         self.assertEqual(self.pu.ball_alpha(), 1.0)
@@ -223,6 +230,14 @@ class Portals(unittest.TestCase):
 
     def test_the_talismans_size(self):
         self.assertEqual(PowerUps.PORTAL_R, 72)
+
+    def test_in_the_middle_third(self):
+        self.assertEqual(PowerUps.PORTAL_AREA[:2], (1 / 3, 2 / 3))
+        for _ in range(40):
+            self.pu.portals = []
+            self.pu.open_portals()
+            for door in self.pu.portals:
+                self.assertTrue(BASE_W / 3 <= door["x"] <= BASE_W * 2 / 3)
 
 
 class NoPortalPairMode(unittest.TestCase):
@@ -251,7 +266,24 @@ class NoPortalPairMode(unittest.TestCase):
 
 class FriendsScreen(unittest.TestCase):
     """The friend's screen flies the ball through the portals as the host's game does: by each
-    one's size, and out no steeper than the host lets it."""
+    one's size, and out no steeper than the host lets it.  (It looks half a second ahead at most, so
+    the ball's way out is checked with a shorter wait inside: 0.2 s, as before the third playtest.)"""
+
+    def setUp(self):
+        patch = unittest.mock.patch.object(PowerUps, "PORTAL_TRANSIT", 0.2)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def test_held_inside_as_long_as_the_hosts_game_holds_it(self):
+        guest = GuestMatchState.__new__(GuestMatchState)
+        guest.view = SimpleNamespace(
+            stones = [], settings = SimpleNamespace(pace = 1.0), ball = SimpleNamespace(curve = 0.0),
+            powerups = SimpleNamespace(alpha = 1.0, ghostly = lambda: False, wind = 0.0,
+                                       portals = [{"x": 700.0, "y": 540.0, "angle": 0.0, "r": 72.0},
+                                                  {"x": 1300.0, "y": 300.0, "angle": 0.0, "r": 72.0}]))
+        with unittest.mock.patch.object(PowerUps, "PORTAL_TRANSIT", 0.5):        # (as it is now)
+            x, y, vx, vy = guest.fly(700.0, 540.0, 1000.0, 0.0, 20.0, 0.5)
+        self.assertEqual((vx, vy), (0.0, 0.0), "still inside after half a second")
 
     def flown(self, at_y, r = 48.0, out_angle = 0.0):
         guest = GuestMatchState.__new__(GuestMatchState)

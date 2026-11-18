@@ -1248,15 +1248,15 @@ class Renderer:
                 [(str(n), None) for n in g.at_once_options], g.talismans_at_once,
                 "Safety Teleport, Double or Nothing, Lantern Night and Open Court don't count, nor do game "
                 "modes.  Talisman Rush lifts the limit")
+            # (Choose Talismans under Power-Ups, Rowan's playtest: the switch and what it switches on together)
             talismans = self.section(ui, s, "Talismans",
-                                     Stack([self.toggle(sm, "toggle_powerups", "Power-Ups", lambda: g.powerups),
+                                     Grid([[self.toggle(sm, "toggle_powerups", "Power-Ups", lambda: g.powerups),
                                             Cycle("cycle_powerup_rate", lambda: rates[g.powerup_rate], sm, rates, tip=rate_tip)],
-                                           vertical=False, gap=int(BASE_W * 0.012 * s)),
-                                     Stack([Cycle("cycle_at_once", lambda: at_once[g.talismans_at_once], sm, at_once,
-                                                  tip=at_once_tip),
-                                            Button("open_powerups", "Choose Talismans", sm, (theme.ORANGE, theme.ORANGE_HOVER),
-                                                   tip=TIPS["open_powerups"])],
-                                           vertical=False, gap=int(BASE_W * 0.012 * s)),
+                                           [Button("open_powerups", "Choose Talismans", sm, (theme.ORANGE, theme.ORANGE_HOVER),
+                                                   tip=TIPS["open_powerups"]),
+                                            Cycle("cycle_at_once", lambda: at_once[g.talismans_at_once], sm, at_once,
+                                                  tip=at_once_tip)]],
+                                          gap_x=int(BASE_W * 0.012 * s), gap_y=self.vgap(ui, s, 0.35)),
                                      Text(lambda: f"{sum(getattr(g, 'pu_' + k.key) for k in POWERUP_KINDS)} of "
                                                   f"{len(POWERUP_KINDS)} talismans switched on", ty, theme.PARCHMENT,
                                           samples=[f"{len(POWERUP_KINDS)} of {len(POWERUP_KINDS)} talismans switched on"]))
@@ -1377,21 +1377,14 @@ class Renderer:
 
     def draw_powerups_menu(self, state, screen):
         """Every power-up as a tile (its picture and its switch), four to a row, and a panel below
-        that describes whichever one the mouse is on, in full."""
+        that describes whichever one the mouse is on, in full.  (Power-Ups on or off and the spawn
+        rate are on the Match screen only, since Rowan's playtest: not here as well.)"""
         ui = self.ui
         g = self.app.settings.match
 
         def build(s):
             sm, ty = ui.fnt(0.025, s), ui.fnt(0.023, s)
-            rates = [f"Spawn: {r}" for r in g.powerup_rate_options]
-            head = Stack([self.toggle(sm, "toggle_powerups", "Power-Ups", lambda: g.powerups),
-                          Cycle("cycle_powerup_rate", lambda: rates[g.powerup_rate], sm, rates,
-                                tip=lambda: options_tip("Spawn Rate", "How often a new talisman appears.",
-                                                        [("Rare", "every 14-22 s"), ("Normal", "every 8-14 s"),
-                                                         ("Frequent", "every 4-8 s"),
-                                                         ("Chaotic", "every 1.5-3 s")],
-                                                        g.powerup_rate)),
-                          Button("all_pu_on", "All On", sm, (theme.GREEN, theme.GREEN_HOVER),
+            head = Stack([Button("all_pu_on", "All On", sm, (theme.GREEN, theme.GREEN_HOVER),
                                  tip="All On\nSwitch every power-up on."),
                           Button("all_pu_off", "All Off", sm, (theme.WHITE, theme.WHITE_HOVER),
                                  tip="All Off\nSwitch every power-up off (Power-Ups stays on, so you can pick a few).")],
@@ -2419,7 +2412,7 @@ class Renderer:
         return max(step, int(round(door.get("r", PowerUps.PORTAL_R) / step)) * step)
 
     HOLE_TINT = (150, 70, 255)
-    HOLE_LEVELS = 12            # sizes of a black hole's disc: 8 as it opens, then up to 12 as it grows
+    HOLE_LEVELS = 16            # sizes of a black hole's disc: 8 as it opens, then up to 16 as it grows
     HOLE_MOTES = [(_r.uniform(0, math.tau), _r.random(), _r.uniform(0.22, 0.38))
                   for _r in [random.Random(1808)] for _ in range(40)]    # dust round a black hole: where, when, how fast
 

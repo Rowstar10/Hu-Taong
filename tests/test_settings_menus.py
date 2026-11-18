@@ -7,6 +7,9 @@ setting that changes the match is left on a personal screen.
 
 Rowan's playtest of 1.7 (same day): on Match, the line saying how many talismans are on, and the
 one giving the ball's and paddles' sizes, go under their buttons.
+
+Rowan's third 1.8 playtest (2026-11-18): Choose Talismans goes under the Power-Ups switch, and the
+Choose Talismans screen no longer has the switch or the spawn rate (they're on Match).
 """
 import unittest
 
@@ -85,6 +88,20 @@ class WhatGoesWhere(unittest.TestCase):
                     "toggle_win_by_two", "toggle_middle_wall", "cycle_countdown_left", "cycle_ai_left",
                     "cycle_ai_style_left", "toggle_adaptive_ai", "cycle_court_left", "toggle_powerups",
                     "cycle_powerup_rate_left", "open_powerups", "open_ball_paddles"):
+            self.assertIn(key, keys)
+
+    def test_choose_talismans_under_power_ups(self):
+        keys = open_screen("match").ui_hitboxes
+        on, choose = keys["toggle_powerups"], keys["open_powerups"]
+        self.assertGreater(choose.top, on.bottom - 1, "below it")
+        self.assertLess(abs(choose.centerx - on.centerx), 4, "in line with it")
+        self.assertLess(keys["cycle_powerup_rate_left"].bottom, keys["cycle_at_once_left"].top + 1)
+
+    def test_choose_talismans_has_no_switch_or_spawn_rate(self):
+        keys = open_screen("powerups").ui_hitboxes
+        self.assertNotIn("toggle_powerups", keys)
+        self.assertFalse([k for k in keys if k.startswith("cycle_powerup_rate")])
+        for key in ("all_pu_on", "all_pu_off", "toggle_pu_hole"):
             self.assertIn(key, keys)
 
     def test_ball_and_paddles(self):

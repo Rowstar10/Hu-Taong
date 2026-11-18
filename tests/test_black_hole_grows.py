@@ -20,6 +20,13 @@ it all, and still load 1.8's earlier rows.
 
 (The collapse came first to Portal Pair, earlier the same day: its portals grew, then collapsed into a
 black hole.  The mini black holes' rules, and no arrows on any black hole, are as they were then.)
+
+Rowan's third playtest (same day): "Make the black holes be able to grow bigger, and also make them
+drift across the court more, and make them collapse after more balls... more like 5 or even more."
+So it grows five times (to twice its size, its reach half as much again), and the sixth ball makes
+it collapse; it drifts faster.  And "black holes [shouldn't] spawn or drift too close to the goals,
+something like the middle third of the court": the Black Hole and the mini ones keep to the middle
+third (a Black Hole match's still clear of the serve; the talisman's no longer needs to be).
 """
 import json
 import math
@@ -177,11 +184,37 @@ class Growing(Match):
             seen.append((h["x"], h["y"]))
         path = sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(seen, seen[1:]))
         self.assertGreater(path, P.HOLE_DRIFT[0] * 40 * 0.9, "it drifts")
+        self.assertGreaterEqual(P.HOLE_DRIFT[0], 45, "drifting more (Rowan's third playtest)")
         for a, b in zip(seen, seen[1:]):
-            self.assertLessEqual(math.hypot(b[0] - a[0], b[1] - a[1]), P.HOLE_DRIFT[1] / 60 + 1e-6, "slowly")
+            self.assertLessEqual(math.hypot(b[0] - a[0], b[1] - a[1]), P.HOLE_DRIFT[1] / 60 + 1e-6)
         for x, y in seen:
-            self.assertTrue(BASE_W * 0.32 - 1 <= x <= BASE_W * 0.68 + 1 and 229 <= y <= BASE_H - 229)
-            self.assertGreater(math.hypot(x - BASE_W / 2, y - BASE_H / 2), 200, "on top of the serve")
+            self.assertTrue(BASE_W / 3 - 1 <= x <= BASE_W * 2 / 3 + 1, "in the middle third")
+            self.assertTrue(P.HOLE_AREA[2] - 1 <= y <= BASE_H - P.HOLE_AREA[2] + 1)
+
+    def test_it_opens_in_the_middle_third(self):
+        for _ in range(40):
+            self.pu.holes = []
+            self.place(random.uniform(100, BASE_W - 100), random.uniform(100, BASE_H - 100), 0.0, 0.0)
+            self.pu.open_hole()
+            x = self.pu.holes[0]["x"]
+            self.assertTrue(BASE_W / 3 <= x <= BASE_W * 2 / 3)
+
+    def test_the_sixth_ball_it_swallows_makes_it_collapse(self):
+        h = self.hole
+        for n in range(1, 6):
+            self.feed()
+            self.out()
+            self.assertIsNone(h["collapse"], f"collapsed at ball {n}")
+        self.feed()
+        self.assertIsNotNone(h["collapse"], "not at the sixth")
+
+    def test_it_grows_to_twice_its_size(self):
+        self.assertAlmostEqual(FULL, 2.0)
+        h = dict(self.hole, size = FULL)
+        reach, pull, core = P.hole_style(h)
+        self.assertAlmostEqual(core, P.HOLE_CORE * 2)
+        self.assertAlmostEqual(pull, P.HOLE_PULL * 2)
+        self.assertAlmostEqual(reach, P.HOLE_REACH * 1.5, msg = "its reach half as much again, off the goals")
 
 
 class Collapsing(Match):
@@ -263,6 +296,13 @@ class InABlackHoleMatch(Match):
         g.on_score(g.ball, {"normal": (1, 0)})
         g.message_timer = 0.001
         g.update(0.01)
+
+    def test_it_drifts_clear_of_the_serve(self):
+        h = self.hole
+        self.park()
+        for _ in range(60 * 30):
+            self.play(1 / 60, dt = 1 / 60, balls = [])
+            self.assertGreater(math.hypot(h["x"] - BASE_W / 2, h["y"] - BASE_H / 2), P.HOLE_SERVE_GAP - 5)
 
     def test_open_from_the_first_serve(self):
         self.assertIsNotNone(self.hole)
@@ -361,7 +401,7 @@ class MiniHoles(Match):
             live = self.minis()
             most = max(most, len(live))
             for h in live:
-                self.assertTrue(P.MINI_GOAL_GAP - 1 <= h["x"] <= BASE_W - P.MINI_GOAL_GAP + 1)
+                self.assertTrue(BASE_W / 3 - 1 <= h["x"] <= BASE_W * 2 / 3 + 1, "in the middle third")
         self.assertLessEqual(most, P.MINI_MOST)
         self.assertGreater(len(opened), 5, "new ones keep coming")
         self.pu.on_point()
@@ -452,7 +492,7 @@ class FriendsScreenAndReplays(Match):
         rec = self.game.recorder
         h = self.hole
         app.dt = DT
-        stages = [dict(size = 1.0), dict(size = 1.25, eaten = 1), dict(size = FULL, eaten = 2, collapse = 0.9)]
+        stages = [dict(size = 1.0), dict(size = 1.4, eaten = 2), dict(size = FULL, eaten = P.HOLE_GROWTHS, collapse = 0.9)]
         for stage in stages:
             h.update(stage)
             rec.capture(1 / 60)
@@ -509,7 +549,7 @@ class FriendsScreenAndReplays(Match):
         self.assertEqual(straight_lines(lambda: app.renderer.draw_holes(app.virtual, SimpleNamespace(holes = holes), 0, 0)), 0)
 
     def test_its_art_is_built_ahead(self):
-        sizes = [1.0, 1.1, 1.2, 1.25, 1.3, 1.4, 1.5]
+        sizes = [1.0, 1.1, 1.2, 1.25, 1.3, 1.4, 1.5, 1.6, 1.75, 1.8, 1.9, 2.0]
         holes = [dict(self.hole, size = size, age = age, flash = flash, collapse = None, dying = None)
                  for size in sizes for age in (0.1, 0.3, 0.6, 5.0) for flash in (0.0, 0.5, 1.0)]
         holes += [dict(self.hole, size = FULL, collapse = i * 0.05, dying = None) for i in range(32)]

@@ -176,6 +176,7 @@ class GuestMatchState(State):
             popup[3] += dt
         self.view.powerups.popups = [p for p in popups if p[3] < 1.4]
         if self.show(dt):
+            self.app.sound_manager.holes.hear(self.view.powerups.holes)        # (1.8)
             self.play_due_events(side)
             self.watch_for_teleport(side)
             self.watch_for_save(side, info)

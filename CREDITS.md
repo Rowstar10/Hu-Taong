@@ -112,6 +112,10 @@ seam crossfaded; CC0 allows this without credit, but credit is given anyway.
 `Resources/Sounds/firecracker_bang.wav` (the Firecracker power-up's explosion) was synthesised for Hu Taong
 from noise and a falling tone by a short script; it isn't taken from anywhere, so it needs no credit or licence.
 
+So were the Black Hole's sounds (1.8), from tones and filtered noise: `black_hole_hum.wav` (its hum, a
+seamless loop), `black_hole_swallow.wav` (as it swallows a ball) and `black_hole_collapse.wav` (its
+collapse and burst).
+
 ## Background images
 
 bg13-bg37 are anime fan art and official Genshin Impact art of Hu Tao. Unlike the music, these images

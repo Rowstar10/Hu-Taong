@@ -159,19 +159,21 @@ KINDS = (
          "• A dotted line from each portal shows the way a ball will come out of it, and lights up just\n"
          "  before one does\n"
          "• Each slowly sweeps up and down, turning back before it would send the ball out too steeply\n"
+         "• They keep to the middle third of the court, well away from the goals\n"
          "• Paddles pass straight through them\n"
          "• Lasts until the point ends"),
     Kind("hole", "Black Hole", "渊", "Wild", 0,
          "A black hole drifts mid-court until the point ends: it pulls the ball in, grows, and collapses.",
-         "A black hole opens in the middle of the court and drifts slowly about.\n"
+         "A black hole opens in the middle of the court and drifts about the middle third, away from the goals.\n"
          "• Its gravity pulls the ball in, harder the closer it comes: the ball speeds up as it falls\n"
          "  towards it and spirals in, and a near miss is whipped round it; paddles feel nothing\n"
          "• A ball that falls in is flung out a moment later, as fast as it went in, still heading for the same\n"
          "  side but at any angle (never straight up or down)\n"
          "• Its heart pulses as it swallows the ball: no telling which way it will come out until it does\n"
          "• Each ball it swallows makes it bigger, and its pull stronger\n"
-         "• Grown twice, the next ball it swallows makes it collapse in on itself, and the ball bursts out\n"
-         "  as Twin Balls, each heading for the goal it can score in\n"
+         "• Once it has grown five times, the next ball it swallows makes it collapse in on itself, and the\n"
+         "  ball bursts out as Twin Balls, each heading for the goal it can score in\n"
+         "• You can hear it: a low hum while it's on the court, growing as it grows, and a roar as it collapses\n"
          "• Then mini black holes drift about until the point ends, each pulling the ball in and flinging\n"
          "  it on towards the side it was heading for\n"
          "• Lasts until the point ends, then it implodes\n"
@@ -216,14 +218,16 @@ class PowerUps:
                                             #    from 72 to 120 and collapsed, until Rowan's second playtest)
     PORTAL_DRIFT = (35.0, 60.0)             # px/s a portal drifts about the court...
     PORTAL_TURN = (0.25, 0.45)              # ...and at most radians/s it turns, sweeping up and down on its side
-    PORTAL_AREA = (0.24, 0.76, 170)         # where they keep to: this share of the court's width, and px from top and bottom
+    PORTAL_AREA = (1 / 3, 2 / 3, 170)       # where they keep to: the middle third of the court's width (from 0.24-0.76
+                                            #    at Rowan's playtest: they were too close to the goals), and px from top and bottom
     PORTAL_APART = 420                      # centres closer than this and the two drift apart
     PORTAL_STEEPEST = 0.45                  # a ball never leaves steeper than this (the cosine of its angle)...
     PORTAL_SWEEP = math.acos(PORTAL_STEEPEST)    # ...so a portal sweeps no further than this from straight across
     PORTAL_COOL = 0.35                      # seconds before a ball can go through a portal again
     PORTAL_TRIPS = 3                        # trips with no paddle touch before they close (a loop)
     PORTAL_SLOW = 0.08                      # each trip through takes this share off the ball's speed (1.8)...
-    PORTAL_TRANSIT = 0.2                    # ...after this long inside, while the way out flashes
+    PORTAL_TRANSIT = 0.5                    # ...after this long inside, while the way out flashes (0.2 till Rowan's
+                                            #    second playtest: too quick to follow)
     PORTAL_FLASH = 0.35                     # seconds the way out's flash takes to fade
     PORTAL_SHUT = 0.4                       # seconds closing portals take to shrink away (1.8)
     WIND_DIES = 1.5                         # Wind Gust: seconds it takes to die down at the end (0.8 until 1.8)
@@ -235,10 +239,15 @@ class PowerUps:
     HOLE_SWIRL = 3.0                        # ...how fast a ball's sideways speed bleeds away near it, so it spirals in...
     HOLE_FASTEST = 2.0                      # ...and at most this many times as fast as it came in
     HOLE_CORE = 36                          # ...the radius of its black heart: a ball touching it falls in...
-    HOLE_GROW = 0.25                        # ...each ball it swallows makes it this much bigger (reach, pull and heart)...
-    HOLE_GROWTHS = 2                        # ...this many times; then the next ball it swallows makes it collapse
+    HOLE_GROW = 0.2                         # ...each ball it swallows makes it this much bigger (its pull and heart)...
+    HOLE_GROWTHS = 5                        # ...this many times; then the next ball it swallows makes it collapse
+                                            #    (twice, until Rowan's third playtest asked for more)
+    HOLE_REACH_GROW = 0.5                   # ...its reach growing only this share as fast (to keep it off the goals)...
     HOLE_GROW_TIME = 0.6                    # ...taking this long to grow each time
-    HOLE_DRIFT = (25.0, 45.0)               # px/s a black hole drifts about, and a mini one (1.8 playtest)
+    HOLE_DRIFT = (45.0, 75.0)               # px/s a black hole drifts about, and a mini one (25-45 till Rowan's
+                                            #    third playtest asked for more)
+    HOLE_AREA = (1 / 3, 2 / 3, 200)         # where they keep to: the middle third of the court's width, and px
+                                            #    from top and bottom (a mini one 150)
     HOLE_HOLD = 0.35                        # ...seconds the ball is held inside while the way out flares...
     HOLE_COOL = 0.6                         # ...and seconds after it's flung out before the pull takes it again
     HOLE_OPEN = 0.8                         # seconds a black hole takes to open...
@@ -247,7 +256,7 @@ class PowerUps:
     HOLE_FLARE = HOLE_HOLD + HOLE_COOL      # seconds the way out flares for, from when a ball falls in
     HOLE_TRAP = 2.5                         # seconds a ball can circle in its pull before it's drawn in
     HOLE_CLEAR = 240                        # px it opens clear of stones, portals and the ball...
-    HOLE_SERVE_GAP = 240                    # ...and of where the ball is served from, as it drifts too (1.8 playtest)
+    HOLE_SERVE_GAP = 200                    # ...and a Black Hole match's of where the ball is served from, drifting too
     HOLE_TALISMAN, HOLE_MINI = 1, 3         # kinds of black hole, in replay rows too: the Black Hole (the talisman's
                                             #    or a Black Hole match's), and a mini one (2 was Portal Pair's collapse)
     COLLAPSE_TIME = 1.5                     # seconds a full-grown Black Hole takes to collapse in on itself, holding a ball
@@ -257,7 +266,7 @@ class PowerUps:
     MINI_EVERY = (1.5, 3.0)                 # ...a new one every so often...
     MINI_FIRST = 0.6                        # ...the first this soon after the Twin Balls come out...
     MINI_MOST = 3                           # ...up to this many at once...
-    MINI_GOAL_GAP = 350                     # ...this far from either goal...
+    MINI_EDGE = 150                         # ...in the middle third, this far from the top and bottom...
     MINI_HOLD = 0.2                         # ...holding a ball this long (no black hole shows an arrow: Rowan's playtest)
     LANTERN_FADE = (0.6, 0.9)               # Lantern Night: seconds for night to fall, and to lift
     LANTERN_LIGHT = 300                     # px of lantern light round each paddle
@@ -951,7 +960,7 @@ class PowerUps:
         # second's could leave nowhere far enough from it on a court with stones, and no portals
         spots = []
         for _ in range(400):
-            x = random.uniform(BASE_W * 0.27, BASE_W * 0.73)
+            x = random.uniform(BASE_W * self.PORTAL_AREA[0], BASE_W * self.PORTAL_AREA[1])
             y = random.uniform(190, BASE_H - 190)
             if math.hypot(x - bx, y - by) < 220:
                 continue
@@ -1093,6 +1102,10 @@ class PowerUps:
             if door.get("flash"):
                 door["flash"] = max(0.0, door["flash"] - dt / self.PORTAL_FLASH)
         for b in self.balls():
+            transit = getattr(b, "transit", None)
+            if transit and "angle" not in transit:
+                transit["out"]["flash"] = 1.0       # (the way out stays lit all the while it's inside)
+        for b in self.balls():
             b.portal_cool = max(0.0, getattr(b, "portal_cool", 0.0) - dt)
             if b.stuck or b.portal_cool > 0 or getattr(b, "transit", None):
                 continue
@@ -1191,7 +1204,8 @@ class PowerUps:
         kind, size = (hole["kind"], hole.get("size", 1.0)) if isinstance(hole, dict) else (hole, 1.0)
         if kind == cls.HOLE_MINI:
             return cls.MINI_REACH, cls.MINI_PULL, cls.MINI_CORE
-        return cls.HOLE_REACH * size, cls.HOLE_PULL * size, cls.HOLE_CORE * size
+        reach = cls.HOLE_REACH * (1 + cls.HOLE_REACH_GROW * (size - 1))
+        return reach, cls.HOLE_PULL * size, cls.HOLE_CORE * size
 
     @classmethod
     def swallows(cls, hole):
@@ -1296,10 +1310,12 @@ class PowerUps:
         stones = [o for o in game.objects if getattr(o, "is_obstacle", False)]
         best, best_room = None, -math.inf
         for _ in range(300):
-            x = random.uniform(BASE_W * 0.32, BASE_W * 0.68)
-            y = random.uniform(230, BASE_H - 230)
+            lo, hi, edge = self.HOLE_AREA
+            x = random.uniform(BASE_W * lo, BASE_W * hi)
+            y = random.uniform(edge, BASE_H - edge)
             room = math.hypot(x - bx, y - by) - 120
-            room = min(room, math.hypot(x - BASE_W / 2, y - BASE_H / 2) - self.HOLE_SERVE_GAP + self.HOLE_CLEAR)
+            if mode:
+                room = min(room, math.hypot(x - BASE_W / 2, y - BASE_H / 2) - self.HOLE_SERVE_GAP + self.HOLE_CLEAR)
             for o in stones:
                 room = min(room, math.hypot(x - clamp(x, o.x0, o.x1), y - clamp(y, o.y0, o.y1)))
             for door in self.portals:
@@ -1376,15 +1392,13 @@ class PowerUps:
             b.vx, b.vy = vx, vy
 
     def drift_hole(self, hole, dt):
-        """A black hole drifts slowly about (1.8 playtest): the Black Hole mid-court, keeping clear of
-        where the ball is served from; a mini one anywhere well out from the goals.  Both keep
-        clear of the stones, the portals and each other."""
-        if hole["kind"] == self.HOLE_MINI:
-            area = (self.MINI_GOAL_GAP, BASE_W - self.MINI_GOAL_GAP, 150, BASE_H - 150)
-            keep = []
-        else:
-            area = (BASE_W * 0.32, BASE_W * 0.68, 230, BASE_H - 230)
-            keep = [(BASE_W / 2, BASE_H / 2, self.HOLE_SERVE_GAP)]
+        """A black hole drifts about the middle third of the court (1.8 playtest), clear of the stones,
+        the portals and each other; a Black Hole match's keeps clear of where the ball is served
+        from, too."""
+        lo, hi, edge = self.HOLE_AREA
+        area = (BASE_W * lo, BASE_W * hi, self.MINI_EDGE if hole["kind"] == self.HOLE_MINI else edge,
+                BASE_H - (self.MINI_EDGE if hole["kind"] == self.HOLE_MINI else edge))
+        keep = [(BASE_W / 2, BASE_H / 2, self.HOLE_SERVE_GAP)] if hole.get("mode") else []
         core = self.hole_style(hole)[2]
         keep += [(door["x"], door["y"], door.get("r", self.PORTAL_R) + core + 90) for door in self.portals]
         keep += [(h["x"], h["y"], 300) for h in self.holes if h is not hole and h["dying"] is None]
@@ -1440,7 +1454,6 @@ class PowerUps:
         b.hole_time = 0.0
         hole["way"], hole["flash"] = angle, 1.0
         app.fx.spark(hole["x"], hole["y"], 26, (190, 130, 255), speed = 240, life = .4)
-        app.sound_manager.play("countdown_tick.wav", multiplier = 0.6)
 
     def hole_path(self, x, y, vx, vy, r, line_x, judged = 1.0, field = 0.0, most = 3.0):
         """Where a ball flying from (x, y) at (vx, vy) reaches x = line_x, pulled by the black holes
@@ -1533,15 +1546,15 @@ class PowerUps:
             self.open_mini()
 
     def open_mini(self):
-        """A mini black hole fades in, well out from both goals, clear of the stones, the balls and
-        the other holes (or as clear as it can find), and drifts slowly about (1.8 playtest)."""
+        """A mini black hole fades in, in the middle third of the court, clear of the stones, the
+        balls and the other holes (or as clear as it can find), and drifts about (1.8 playtest)."""
         game = self.game
         stones = [o for o in game.objects if getattr(o, "is_obstacle", False)]
         balls = [((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2) for b in self.balls()]
         best, best_room = None, -math.inf
         for _ in range(80):
-            x = random.uniform(self.MINI_GOAL_GAP, BASE_W - self.MINI_GOAL_GAP)
-            y = random.uniform(150, BASE_H - 150)
+            x = random.uniform(BASE_W * self.HOLE_AREA[0], BASE_W * self.HOLE_AREA[1])
+            y = random.uniform(self.MINI_EDGE, BASE_H - self.MINI_EDGE)
             room = min([math.hypot(x - bx, y - by) - 200 for bx, by in balls] +
                        [math.hypot(x - clamp(x, o.x0, o.x1), y - clamp(y, o.y0, o.y1)) - 70 for o in stones] +
                        [math.hypot(x - h["x"], y - h["y"]) - 300 for h in self.holes] + [math.inf])

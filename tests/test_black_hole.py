@@ -118,7 +118,7 @@ class Opening(Match):
             self.pu.collect({"kind": "hole", "x": 900, "y": 500}, self.game.p1)
             hole = self.pu.holes[0]
             with self.subTest(i = i):
-                self.assertTrue(BASE_W * 0.32 <= hole["x"] <= BASE_W * 0.68)
+                self.assertTrue(BASE_W / 3 <= hole["x"] <= BASE_W * 2 / 3)          # (the middle third: 1.8 playtest)
                 bx, by = self.centre()
                 self.assertGreater(math.hypot(hole["x"] - bx, hole["y"] - by), 300)
                 for o in stones:
@@ -143,6 +143,8 @@ class Opening(Match):
     def test_portals_keep_clear_of_it(self):
         self.pu.open_portals()
         door = self.pu.portals[0]
+        door["x"], door["y"] = 760.0, 540.0                     # (clear of the stones: they're at the middle
+        self.pu.portals[1].update(x = 1100.0, y = 880.0)        #  third's edges, and push it about too)
         hole = self.hole_at(door["x"] + 260, door["y"])
         door["vx"], door["vy"] = 50.0, 0.0                      # drifting straight at it
         for _ in range(60):

@@ -139,6 +139,7 @@ class ReplayState(State):
         before = self.position
         self.position = min(self.end, self.position + dt * RATE * self.rate())
         self.play_events(before, self.position)
+        self.app.sound_manager.holes.hear(self.view.powerups.holes)            # (1.8)
         for popup in self.view.powerups.popups:
             popup[3] += dt * self.rate()
         self.view.powerups.popups = [p for p in self.view.powerups.popups if p[3] < 1.4]

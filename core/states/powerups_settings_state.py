@@ -19,15 +19,8 @@ class PowerUpsSettingsState(State):
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             key = self.hit_test(self.app.window_to_base(event.pos))
-            count = len(settings.powerup_rate_options)
 
-            if key == "toggle_powerups":
-                settings.powerups = not settings.powerups
-            if key == "cycle_powerup_rate_left":
-                settings.powerup_rate = (settings.powerup_rate - 1) % count
-            if key == "cycle_powerup_rate_right":
-                settings.powerup_rate = (settings.powerup_rate + 1) % count
-
+            # (Power-Ups on or off and the spawn rate are on the Match screen only: Rowan's playtest)
             if key in ("all_pu_on", "all_pu_off"):
                 for name in [attr for attr in vars(settings) if attr.startswith("pu_")]:
                     setattr(settings, name, key == "all_pu_on")
