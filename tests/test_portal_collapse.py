@@ -10,6 +10,9 @@ own.  Then the hole implodes, and mini black holes come and go until the point i
 every 1.5-3 s, up to three, each 3-5 s with fades, standing still, weaker and smaller, and each a
 portal too, shooting a ball out along its own circling arrow.  In a Portal Pair match, small portals
 open again at the next serve.
+
+Rowan's playtest (same day): "All black holes, I want to have a gravitational pull": Portal Pair's
+and the mini ones pull as the Black Hole does (see test_black_hole), the minis more weakly.
 """
 import math
 import random
@@ -201,6 +204,16 @@ class Collapsing(Match):
         self.assertFalse(self.pu.spawnable(BY_KEY["portal"]))
         self.assertIn("portal", [key for key, _, _ in self.pu.court_list()])
 
+    def test_its_black_hole_has_gravity(self):
+        hole, _, _ = self.collapse()
+        serve = self.ball.speed * math.sqrt(2)
+        self.place(hole["x"] - 400, hole["y"] + 150, serve, 0.0)
+        fell = False
+        for _ in range(240):
+            self.play(DT, balls = [self.ball])
+            fell = fell or bool(self.ball.transit)
+        self.assertTrue(fell, "drawn in from 150 px off")
+
     def test_said_so(self):
         self.assertIn("collapsing into a black hole", BY_KEY["portal"].about)
         self.assertIn("mini black holes", BY_KEY["portal"].about)
@@ -260,6 +273,20 @@ class MiniHoles(Match):
         self.assertEqual((h["x"], h["y"]), (x, y), "standing still")
         self.assertTrue(any(0.2 < p < 0.8 for p in powers[:20]), "fading in")
         self.assertTrue(any(0.2 < p < 0.8 for p in powers[-20:]), "fading out")
+
+    def test_they_have_gravity_too(self):
+        self.start()
+        self.play(DT, balls = [])
+        h = self.minis()[0]
+        self.pu.minis["next"] = 999.0
+        h["age"], h["left"], h["power"] = 2.0, 4.0, 1.0
+        serve = self.ball.speed * math.sqrt(2)
+        self.place(h["x"] - 240, h["y"] + 70, serve, 0.0)
+        fell = False
+        for _ in range(180):
+            self.play(DT, balls = [self.ball])
+            fell = fell or bool(self.ball.transit)
+        self.assertTrue(fell, "drawn in from 70 px off")
 
     def test_weaker_and_smaller(self):
         self.assertLess(P.MINI_PULL, P.HOLE_PULL / 2)

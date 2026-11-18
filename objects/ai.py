@@ -178,8 +178,14 @@ class PaddleAI:
             # stuck to a paddle is read as leaving the way it will once it peels off: as the
             # holding paddle's movement aims it (Sticky Goo's arrow), not on its old return
             stuck = getattr(ball, "stuck", None)
-            if getattr(ball, "transit", None) and powerups:
+            transit = getattr(ball, "transit", None)
+            if transit and powerups and "angle" in transit and transit["out"]["kind"] == powerups.HOLE_TALISMAN:
+                # inside the Black Hole: nothing shows which way it will come out, so it's seen
+                # where it went in, still, until it does
+                self.seen.append((self.clock, transit["out"]["x"], transit["out"]["y"], 0.0, 0.0))
+            elif transit and powerups:
                 # inside a portal: read, as a person would from the flash, as coming out of the other
+                # (or out of a black hole along its arrow)
                 x, y, vx, vy = powerups.transit_exit(ball)
                 self.seen.append((self.clock, x, y, vx, vy))
             else:

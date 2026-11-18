@@ -471,6 +471,7 @@ class GuestMatchState(State):
         holes = [hole for hole in getattr(view.powerups, "holes", [])
                  if hole.get("power", 0) > 0 and hole.get("dying") is None and hole.get("flash", 0) <= 0]
         serve = getattr(self, "serve_speed", 0)
+        entry = math.hypot(vx, vy)                         # (taken as the speed it came into any pull at)
         cool, inside, coming = 0.0, 0.0, None
         for _ in range(steps):
             if inside > 0:                                 # inside a portal for a moment (1.8)
@@ -483,14 +484,14 @@ class GuestMatchState(State):
                 vy = max(-2600.0, min(2600.0, vy + (curve + wind) * h))
                 curve *= math.exp(-1.3 * h)
             if holes:
-                pace = PowerUps.pace_of(vx, vy, serve)
-                ax = ay = 0.0
                 for hole in holes:
                     if PowerUps.swallows(hole) and PowerUps.falls_in(hole, cx, cy, vx, vy, h, r):
                         return hole["x"], hole["y"], 0.0, 0.0     # in: where it comes out is the host's call
-                    px, py = PowerUps.hole_pull(hole, cx, cy, pace)
-                    ax, ay = ax + px, ay + py
-                vx, vy = PowerUps.bend(vx, vy, ax, ay, h)
+                vx, vy, pulled = PowerUps.gravity(holes, cx, cy, vx, vy, h, entry, serve)
+                if not pulled:                                    # out of the pull: back to its own speed
+                    speed = math.hypot(vx, vy)
+                    if speed and abs(speed - entry) > 1:
+                        vx, vy = vx * entry / speed, vy * entry / speed
             cool = max(0.0, cool - h)
             if portals and cool <= 0:
                 for i, door in enumerate(portals):

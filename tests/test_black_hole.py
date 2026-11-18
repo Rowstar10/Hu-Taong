@@ -1,12 +1,19 @@
 """Black Hole, a new talisman, 1.8 (Rowan's 1.8 plan, phase 2, 2026-11-18).
 
-A black hole opens mid-court until the point ends.  It pulls the balls (never the paddles), harder
-the closer they come and the faster they go, bending their paths but keeping their speed.  A ball
-that touches its black heart falls in: it's held there, out of sight, while an arrow flares the way
-it will come out, then it's flung out that way as fast as it went in (never slower than a serve,
-never steeper than a portal sends a ball), on towards the side it was heading for, at any angle.
-(Any way at all, computer v computer points ran past two minutes: it soaked up attacking shots.)  A ball circling in its pull too long is drawn in.  At
-the point's end it implodes.  The AI judges its pull, the friend's screen online flies the ball
+A black hole opens mid-court until the point ends.  Its gravity pulls the balls (never the
+paddles), harder the closer they come and the faster they go.  A ball that touches its black heart
+falls in: it's held there, out of sight, for a moment, then it's flung out as fast as it went in (never slower than a serve, never steeper than a portal
+sends a ball), on towards the side it was heading for, at any angle.  (Any way at all, computer v
+computer points ran past two minutes: it soaked up attacking shots.)  A ball circling in its pull
+too long is drawn in.  At the point's end it implodes.
+
+Rowan's playtest (same day): "the black holes are basically not black holes... I want [them] to
+have a gravitational pull" -- the pull only bent a ball's path, keeping its speed, and drew in
+only a ball aimed at it.  Now it's gravity: a ball speeds up as it falls in, its sideways speed
+bleeds away near the heart so it spirals in, and a slow ball is drawn in from well off-centre; a
+ball that gets away leaves as fast as it came.  All black holes, Portal Pair's and the mini ones
+too.  And "the black holes also have an arrow appear when it shoots the ball out. I don't think I
+want that": the talisman's heart just pulses now, and the AI can't read the way out either.  The AI judges its pull, the friend's screen online flies the ball
 through it as the host's game does, and replays show it.
 """
 import math
@@ -127,12 +134,27 @@ class Opening(Match):
 
 
 class Pull(Match):
-    def test_bends_the_path_and_keeps_the_speed(self):
+    def test_a_slow_ball_is_drawn_in_from_well_off_centre(self):
         self.hole_at(960, 540)
-        self.place(560, 700, 900.0, 0.0)                         # passing below it
-        seen = self.fly(0.5)
-        self.assertLess(self.ball.vy, -50, "pulled up towards it")
-        self.assertTrue(all(abs(speed - 900) < 1 for inside, speed, _ in seen if not inside))
+        self.place(520, 740, self.ball.speed * math.sqrt(2), 0.0)     # a serve's speed, 200 px off
+        seen = self.fly(2.0)
+        self.assertTrue(any(inside for inside, _, _ in seen), "drawn in")
+
+    def test_it_speeds_up_as_it_falls_in(self):
+        self.hole_at(960, 540)
+        serve = self.ball.speed * math.sqrt(2)
+        self.place(560, 640, serve, 0.0)
+        seen = self.fly(1.5)
+        self.assertGreater(max(speed for inside, speed, _ in seen if not inside), serve * 1.3)
+        self.assertTrue(any(inside for inside, _, _ in seen), "and falls in")
+
+    def test_a_near_miss_is_whipped_round_and_leaves_as_fast_as_it_came(self):
+        self.hole_at(960, 540)
+        self.place(520, 740, 1500.0, 0.0)                        # quick, 200 px off
+        self.fly(1.0)
+        self.assertIsNone(self.ball.transit)
+        self.assertLess(math.degrees(math.atan2(self.ball.vy, self.ball.vx)), -15, "bent well round")
+        self.assertAlmostEqual(math.hypot(self.ball.vx, self.ball.vy), 1500.0, delta = 1)
 
     def test_harder_closer_in_and_on_faster_balls(self):
         hole = self.hole_at(960, 540)
@@ -165,7 +187,7 @@ class Pull(Match):
 
 
 class Swallowed(Match):
-    def test_falls_in_and_is_flung_out_the_way_the_arrow_flares(self):
+    def test_falls_in_and_is_flung_out(self):
         hole = self.hole_at(960, 540)
         self.place(600, 540, 1200.0, 0.0)
         seen = self.fly(0.25)
@@ -255,7 +277,7 @@ class TheAI(Match):
 
     def test_reads_the_bent_path(self):
         hole = self.hole_at(1100, 540)
-        straight_y = 540 + 170
+        straight_y = 540 + 260
         _line, y = self.target(straight_y)
         ai = self.game.p2.ai
         contact_x = _line - (self.game.p2.width / 2 + self.ball.width / 2)
@@ -279,17 +301,15 @@ class TheAI(Match):
         _line, y = ai.meet(300.0, 300.0, 60.0, 0.0, self.ball.width / 2, ai.params())
         self.assertNotEqual(y, BASE_H / 2, "not waiting in the middle")
 
-    def test_reads_a_swallowed_ball_from_the_flare(self):
+    def test_cant_read_which_way_a_swallowed_ball_will_come_out(self):
         self.hole_at(960, 540)
         self.place(600, 540, 1200.0, 0.0)
         self.fly(0.35)
         self.assertTrue(self.ball.transit)
-        want = self.pu.transit_exit(self.ball)
         ai = self.game.p2.ai
         ai.reset()
         x, y, vx, vy = ai.perceive(self.ball, 1 / 120, 0.0)
-        self.assertAlmostEqual(vx, want[2], delta = 1)
-        self.assertAlmostEqual(vy, want[3], delta = 1)
+        self.assertEqual((round(x), round(y), vx, vy), (960, 540, 0.0, 0.0), "where it went in, still")
 
 
 class FriendsScreen(Match):
@@ -357,6 +377,20 @@ class Described(unittest.TestCase):
         self.assertIn("pulls the ball", kind.blurb)
         self.assertIn("flung out", kind.about)
         self.assertIn("hole", SHORT)
+
+    def test_no_arrow_when_it_shoots_the_ball_out(self):
+        renderer = app.renderer
+        arrows, real = [], renderer.draw_hole_arrow
+        renderer.draw_hole_arrow = lambda *a, **k: arrows.append(a)
+        try:
+            hole = {"x": 960, "y": 540, "kind": PowerUps.HOLE_TALISMAN, "age": 5.0, "power": 1.0, "spin": 1,
+                    "way": 0.3, "flash": 1.0, "dying": None}
+            for flash in (1.0, 0.6, 0.2):
+                hole["flash"] = flash
+                renderer.draw_holes(app.virtual, SimpleNamespace(holes = [hole]), 0, 0)
+        finally:
+            renderer.draw_hole_arrow = real
+        self.assertEqual(arrows, [])
 
     def test_its_art_is_built_ahead(self):
         powerups = SimpleNamespace(holes = [

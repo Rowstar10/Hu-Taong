@@ -111,6 +111,11 @@ class Screens(unittest.TestCase):
         self.assert_drawn("win")
 
 
+# Seconds a computer v computer point may run before it counts as one that never ends.  (90 until
+# the 1.8 playtest's stronger Black Hole: about one point in 250 with it then ran just past 90 s,
+# longest 93 s in 32 four-minute matches, against 76 s without it.)
+LONGEST = 120
+
 class LongMatch(unittest.TestCase):
     """Computer v computer for four minutes of game time, every power-up on, Chaotic."""
 
@@ -148,7 +153,7 @@ class LongMatch(unittest.TestCase):
                         longest, t_point = max(longest, t_point), 0.0
                 game.stop()
                 self.assertGreater(points, 4)
-                self.assertLess(longest, 90, "a point that never ends")
+                self.assertLess(longest, LONGEST, "a point that never ends")
                 self.assertGreater(len(taken), 12, sorted(taken))
 
 
@@ -194,7 +199,7 @@ class EveryPhysics(unittest.TestCase):
                         longest, t_point = max(longest, t_point), 0.0
                 game.stop()
                 self.assertGreater(points, 0)                   # (Classic's rallies between computers run long:
-                self.assertLess(max(longest, t_point), 90, "a point that never ends")    # 25-60 s a point)
+                self.assertLess(max(longest, t_point), LONGEST, "a point that never ends")    # 25-60 s a point)
                 self.assertGreater(len(taken), 5, sorted(taken))      # (2 minutes, a few at a time)
                 view = ReplayView(game.recorder.clip(), app)
                 view.show(len(view.clip.frames) - 1)
@@ -238,7 +243,7 @@ class EveryMode(unittest.TestCase):
                         longest, t_point = max(longest, t_point), 0.0
                 game.stop()
                 self.assertGreater(points, 3)
-                self.assertLess(longest, 90, "a point that never ends")
+                self.assertLess(longest, LONGEST, "a point that never ends")
                 self.assertGreater(game.switches, 2, "no switches")
                 view = ReplayView(game.recorder.clip(), app)
                 view.show(len(view.clip.frames) - 1)

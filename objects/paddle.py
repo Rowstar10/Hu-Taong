@@ -6,6 +6,7 @@ from game.engines import CLASSIC, V09
 FLAT_ANGLE = math.radians(3)    # returns flatter than this get a little spin
 SPEED_KNEE = 0.85               # hard hits only start easing off at this share of the speed ceiling
 HOLD_GAP = 150                  # px/s: after an end hit, the paddle trails the ball by at least this
+GIVE_GAP = 30                   # px: a paddle that mustn't catch its own ball is held back only this close to it
 from objects.ai import PaddleAI
 from objects.game_object import GameObject
 
@@ -119,8 +120,12 @@ class Paddle(GameObject):
     def keep_behind(self, just_hit=False):
         """Classic physics, or the Speed Cap (1.8): a paddle that has hit the ball off its face
         can't run on into it and knock it again, which would hand on its speed after all.  While
-        the ball is in front of its face, until someone else plays it, the paddle moves forward no
-        faster than the ball moves away (as hold_back does after an end hit)."""
+        the ball is going away just in front of its face, until someone else plays it, the paddle
+        moves forward no faster than the ball moves away (as hold_back does after an end hit).
+
+        Only just in front (1.8 playtest): held back whenever its shot was anywhere ahead, a paddle
+        charging forward after a slow or steep shot crawled across the court, for no reason the
+        player could see."""
         trail = self.trail
         if trail is None:
             return
@@ -136,6 +141,11 @@ class Paddle(GameObject):
         ahead = ball.x0 - self.x1 if out_x > 0 else self.x0 - ball.x1
         if ahead < -2 or not (ball.y1 > self.y0 and ball.y0 < self.y1):
             return                           # not in front of the face just now
+        if ball.vx * out_x <= 0:
+            return                           # coming back: it's there to be played
+        closing = (self.vx - ball.vx) * out_x
+        if ahead > GIVE_GAP + max(0.0, closing) / 30:
+            return                           # not about to catch it (a frame of up to 1/30 s ahead)
         limit = max(0.0, ball.vx * out_x - HOLD_GAP)
         if self.vx * out_x > limit:
             self.vx = out_x * limit

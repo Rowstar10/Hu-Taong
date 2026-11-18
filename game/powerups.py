@@ -169,10 +169,11 @@ KINDS = (
     Kind("hole", "Black Hole", "渊", "Wild", 0,
          "A black hole opens mid-court until the point ends: it pulls the ball in and flings it out.",
          "A black hole opens in the middle of the court.\n"
-         "• It pulls the ball towards it, harder the closer the ball comes; paddles feel nothing\n"
+         "• Its gravity pulls the ball in, harder the closer it comes: the ball speeds up as it falls\n"
+         "  towards it and spirals in, and a near miss is whipped round it; paddles feel nothing\n"
          "• A ball that falls in is flung out a moment later, as fast as it went in, still heading for the same\n"
          "  side but at any angle (never straight up or down)\n"
-         "• An arrow flares the way it will come out\n"
+         "• Its heart pulses as it swallows the ball: no telling which way it will come out until it does\n"
          "• Lasts until the point ends, then it implodes"),
 )
 BY_KEY = {kind.key: kind for kind in KINDS}
@@ -226,9 +227,12 @@ class PowerUps:
     PORTAL_FLASH = 0.35                     # seconds the way out's flash takes to fade
     PORTAL_SHUT = 0.4                       # seconds closing portals take to shrink away (1.8)
     WIND_DIES = 1.5                         # Wind Gust: seconds it takes to die down at the end (0.8 until 1.8)
-    HOLE_REACH = 450                        # Black Hole (1.8): px its pull reaches...
-    HOLE_PULL = 2000                        # ...px/s^2 it pulls a serve-speed ball at, HOLE_NEAR px out (more
-    HOLE_NEAR = 100                         #    closer in, easing off to nothing at its reach; faster balls more)...
+    HOLE_REACH = 450                        # Black Hole (1.8): px its gravity reaches...
+    HOLE_PULL = 6000                        # ...px/s^2 it pulls a serve-speed ball at, HOLE_NEAR px out (more
+    HOLE_NEAR = 100                         #    closer in, easing off to nothing at its reach; faster balls more:
+                                            #    2000 before the playtest, which only bent paths and kept speeds)...
+    HOLE_SWIRL = 3.0                        # ...how fast a ball's sideways speed bleeds away near it, so it spirals in...
+    HOLE_FASTEST = 2.0                      # ...and at most this many times as fast as it came in
     HOLE_CORE = 36                          # ...the radius of its black heart: a ball touching it falls in...
     HOLE_HOLD = 0.35                        # ...seconds the ball is held inside while the way out flares...
     HOLE_COOL = 0.6                         # ...and seconds after it's flung out before the pull takes it again
@@ -241,7 +245,7 @@ class PowerUps:
     COLLAPSE_TIME = 2.5                     # Portal Pair (1.8): seconds full-size portals take to collapse into a black hole:
     COLLAPSE_FLARE, COLLAPSE_SPIRAL = 0.6, 2.0   # flaring till 0.6 s, spiralling in round each other till 2.0, then merging
     COLLAPSE_TURN = 0.3                     # radians/s its two arrows slowly circle at, once it's formed
-    MINI_REACH, MINI_PULL, MINI_CORE = 220, HOLE_PULL / 3, 22    # its mini black holes: a weaker pull, not so far...
+    MINI_REACH, MINI_PULL, MINI_CORE = 260, HOLE_PULL * 0.4, 22  # its mini black holes: a weaker pull, not so far...
     MINI_LIFE = (3.0, 5.0)                  # ...each there this long...
     MINI_FADE = 0.5                         # ...fading in and out over this...
     MINI_EVERY = (1.5, 3.0)                 # ...a new one every so often...
@@ -824,6 +828,7 @@ class PowerUps:
         """A paddle touched the ball (called after the paddle has shaped the return)."""
         main = ball is self.game.ball          # Twin Balls' blue ball carries no goo, snow or firecracker
         self.portal_trips = 0                  # a ball looping through the portals has been played
+        ball.hole_speed = None                 # (a black hole's pull counts from the speed of this hit)
 
         # Spirit Fire: every hit while it lasts is a blazing shot, 20% faster, but never past the
         # usual top speed (nor slower than the hit would have been without it)
@@ -904,6 +909,7 @@ class PowerUps:
         last = getattr(ball, "last_paddle", None) or cracker.get("taker")
         way = (1 if last.is_left else -1) if last is not None else random.choice((-1, 1))
         ball.vx, ball.vy = way * speed * math.cos(angle), speed * math.sin(angle)
+        ball.hole_speed = None
         ball.blazing = True
         cx, cy = (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2
         app = self.game.app
@@ -1104,7 +1110,7 @@ class PowerUps:
         """Where a ball inside a portal will come out, and how: (x, y, vx, vy)."""
         transit = ball.transit
         out, r = transit["out"], ball.width / 2
-        if "angle" in transit:                      # out of a black hole, the way its arrow flares (1.8)
+        if "angle" in transit:                      # out of a black hole, the way it was flung (1.8)
             dx, dy = math.cos(transit["angle"]), math.sin(transit["angle"])
             reach = self.HOLE_CORE + r + 6
         else:
@@ -1124,6 +1130,7 @@ class PowerUps:
         ball.x0, ball.y0, ball.x1, ball.y1 = x - r, y - r, x + r, y + r
         ball.vx, ball.vy = vx, vy
         ball.portal_cool = self.PORTAL_COOL
+        ball.hole_speed = None
         if hole:
             ball.hole_cool, ball.hole_time = self.HOLE_COOL, 0.0
             self.game.app.fx.spark(x, y, 30, (255, 196, 120), speed = 520, life = .55)
@@ -1197,6 +1204,37 @@ class PowerUps:
             return 0.0, 0.0
         k = (1 - d / reach) ** 2 * cls.HOLE_NEAR / max(d, core) * pull * hole.get("power", 1.0) * max(0.25, pace)
         return dx / d * k, dy / d * k
+
+    @classmethod
+    def gravity(cls, holes, x, y, vx, vy, dt, entry, serve):
+        """One step of the black holes' gravity on a ball centred at (x, y) that came into their
+        pull at `entry` px/s (1.8 playtest: a pull that only bent its path didn't feel like gravity).
+        It's pulled towards each heart, speeding up as it falls in; near a heart its sideways speed
+        bleeds away, so it spirals in rather than sweeping past; and it's never more than
+        HOLE_FASTEST times as fast as it came in (nor past the usual top speed, unless it came in
+        faster).  Answers the new (vx, vy), and whether any pull reached it.  (The friend's screen
+        and the AI work it out by this too.)"""
+        pace = entry / (serve * math.sqrt(2)) if serve else 1.0
+        pulled = False
+        for hole in holes:
+            ax, ay = cls.hole_pull(hole, x, y, pace)
+            if not (ax or ay):
+                continue
+            pulled = True
+            reach = cls.hole_style(hole["kind"])[0]
+            d = math.hypot(hole["x"] - x, hole["y"] - y)
+            ux, uy = (hole["x"] - x) / d, (hole["y"] - y) / d
+            vx, vy = vx + ax * dt, vy + ay * dt
+            near = (1 - d / reach) ** 2 * hole.get("power", 1.0)
+            bleed = (vy * ux - vx * uy) * (math.exp(-cls.HOLE_SWIRL * near * dt) - 1)
+            vx, vy = vx - uy * bleed, vy + ux * bleed
+        if pulled:
+            top = MAX_BALL_SPEEDUP * serve * math.sqrt(2) if serve else math.inf
+            fastest = max(entry, min(entry * cls.HOLE_FASTEST, top))
+            speed = math.hypot(vx, vy)
+            if speed > fastest:
+                vx, vy = vx * fastest / speed, vy * fastest / speed
+        return vx, vy, pulled
 
     @staticmethod
     def pace_of(vx, vy, serve):
@@ -1300,20 +1338,28 @@ class PowerUps:
             if into:
                 self.swallow(b, into)
                 continue
-            pace = self.pace_of(b.vx, b.vy, getattr(b, "speed", 0))
-            ax = ay = 0.0
-            for hole in pulling:
-                px, py = self.hole_pull(hole, cx, cy, pace)
-                ax, ay = ax + px, ay + py
-            if not (ax or ay):
-                b.hole_time = 0.0
+            entry = getattr(b, "hole_speed", None) or math.hypot(b.vx, b.vy)
+            vx, vy, pulled = self.gravity(pulling, cx, cy, b.vx, b.vy, dt, entry, getattr(b, "speed", 0))
+            if not pulled:
+                self.leave_pull(b)
                 continue
+            b.hole_speed = entry
             b.hole_time = getattr(b, "hole_time", 0.0) + dt
             ready = [h for h in pulling if self.swallows(h)]
             if b.hole_time > self.HOLE_TRAP and ready:
                 self.swallow(b, min(ready, key = lambda h: math.hypot(cx - h["x"], cy - h["y"])))
                 continue
-            b.vx, b.vy = self.bend(b.vx, b.vy, ax, ay, dt)
+            b.vx, b.vy = vx, vy
+
+    @staticmethod
+    def leave_pull(b):
+        """Out of every pull: as fast as it came in again (gravity sped it up falling in, and slowed
+        it climbing out; this squares it), and its clocks reset."""
+        entry = getattr(b, "hole_speed", None)
+        speed = math.hypot(b.vx, b.vy)
+        if entry and speed:
+            b.vx, b.vy = b.vx * entry / speed, b.vy * entry / speed
+        b.hole_speed, b.hole_time = None, 0.0
 
     def fling_angle(self, hole, way):
         """The way a black hole flings out what it swallowed: on towards the same side (`way`, 1 for
@@ -1325,10 +1371,11 @@ class PowerUps:
         return angle if way > 0 else math.pi - angle
 
     def swallow(self, b, hole):
-        """A ball falls into a black hole: held at its heart, out of sight, while an arrow flares
-        the way it will come out; then flung out that way as fast as it went in (never slower than
-        a serve)."""
-        coming, serve = math.hypot(b.vx, b.vy), getattr(b, "speed", 0) * math.sqrt(2)
+        """A ball falls into a black hole: held at its heart, out of sight, for a moment (the heart
+        pulses; the talisman's showed an arrow the way out until Rowan's playtest); then flung out
+        as fast as it came into the pull (never slower than a serve)."""
+        coming = getattr(b, "hole_speed", None) or math.hypot(b.vx, b.vy)     # (before it fell)
+        serve = getattr(b, "speed", 0) * math.sqrt(2)
         speed, hold = max(coming, serve), self.HOLE_HOLD
         if hole["kind"] == self.HOLE_MINI:
             # a mini black hole is a portal too: out along its circling arrow, a little slower, as
@@ -1345,6 +1392,7 @@ class PowerUps:
         angle = math.atan2(dy, dx)
         hole["held"] = hold
         b.transit = {"out": hole, "left": hold, "speed": speed, "angle": angle}
+        b.hole_speed = None
         r = b.width / 2
         b.x0, b.y0, b.x1, b.y1 = hole["x"] - r, hole["y"] - r, hole["x"] + r, hole["y"] + r
         b.vx = b.vy = 0.0
@@ -1359,20 +1407,24 @@ class PowerUps:
         (each taken as `judged` times as strong as it is) and pushed by `field` (the wind):
         (seconds, y, False), or (seconds, None, True) if it falls into a hole first, or None if it
         doesn't get there within `most` seconds.  For the AI."""
-        holes = self.pulling()
+        holes = [dict(hole, power = hole["power"] * judged) for hole in self.pulling()]
         step = 1 / 60
         way = 1 if line_x > x else -1
         swallows = [self.swallows(hole) for hole in holes]
-        pace = self.pace_of(vx, vy, getattr(self.game.ball, "speed", 0))
+        serve = getattr(self.game.ball, "speed", 0)
+        entry = math.hypot(vx, vy)
         t = 0.0
         for _ in range(int(most / step)):
-            ax, ay = 0.0, field
             for hole, can in zip(holes, swallows):
                 if can and self.falls_in(hole, x, y, vx, vy, step, r):
                     return t, None, True
-                px, py = self.hole_pull(hole, x, y, pace)
-                ax, ay = ax + px * judged, ay + py * judged
-            vx, vy = self.bend(vx, vy, ax, ay, step)
+            vx, vy, pulled = self.gravity(holes, x, y, vx, vy, step, entry, serve)
+            if not pulled:
+                speed = math.hypot(vx, vy)
+                if speed:
+                    vx, vy = vx * entry / speed, vy * entry / speed
+            if field:
+                vx, vy = self.bend(vx, vy, 0.0, field, step)
             x, y = x + vx * step, y + vy * step
             if y < r:
                 y, vy = 2 * r - y, abs(vy)
@@ -1615,6 +1667,7 @@ class PowerUps:
                 hole["power"] = 0.0
         for b in self.balls():
             b.hole_cool = b.hole_time = 0.0
+            b.hole_speed = None
         self.collapse_due = False
         self.minis = None                           # (no more mini black holes)
         for b in self.balls():

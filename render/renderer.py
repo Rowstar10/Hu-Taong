@@ -567,7 +567,6 @@ class Renderer:
         jobs.append(lambda: [self.collapse_flare(level) for level in range(1, 5)])
         jobs.append(lambda: [art.glow(level * 18 + 24, scaled((240, 230, 255), level / 8)) for level in range(1, 9)])
         jobs.append(lambda: [self.arrow_glow(tint) for tint in self.ARROW_TINTS + (self.MINI_TINT,)])
-        jobs.append(lambda: [self.hole_flare_glow(level) for level in range(1, 5)])
         jobs.append(lambda: [art.glow(level * 14 + 16, scaled((255, 236, 210), level / 8)) for level in range(1, 9)])
         jobs.append(lambda: art.glow(5, (150, 104, 230)))
         for mark in "三二一":
@@ -2376,9 +2375,6 @@ class Renderer:
         glow = art.glow((int(150 * level / 8) // 4) * 4 + 8, scaled(self.HOLE_TINT, .55))
         return disc, glow
 
-    def hole_flare_glow(self, level):
-        return self.art.glow(40, scaled((255, 200, 140), level / 4))
-
     @staticmethod
     def _hole_disc(level):
         """A disc of swirling light round a black hole: hot gold close in, violet at its rim."""
@@ -2452,8 +2448,9 @@ class Renderer:
                     self.draw_hole_arrow(screen, x, y, core + 6, angle, tint, 0.6 + 0.4 * flash, t)
                 if flash > 0:
                     self.draw_swallowing(screen, x, y, core, spin, flash, t)
-            elif flash > 0 and way is not None:
-                self.draw_hole_flare(screen, x, y, core, way, flash, t)
+            elif flash > 0:
+                # (no arrow the way out: Rowan's playtest; the heart pulses as it swallows the ball)
+                self.draw_swallowing(screen, x, y, core, spin, flash, t)
 
     @staticmethod
     def draw_hole_swirl(screen, x, y, core, spin, t, s, inward = 0.0):
@@ -2468,21 +2465,6 @@ class Renderer:
                 aj = a - spin * j * 0.13
                 pygame.draw.circle(screen, scaled(tint, 1 - j * 0.3),
                                    (int(x + math.cos(aj) * rr), int(y + math.sin(aj) * rr)), max(1, 3 - j))
-
-    def draw_hole_flare(self, screen, x, y, core, way, flash, t):
-        """The way out of a black hole: three hot chevrons racing out from the heart, on a glow."""
-        dx, dy = math.cos(way), math.sin(way)
-        px, py = -dy, dx
-        level = max(1, round(flash * 4))
-        glow = self.hole_flare_glow(level)
-        screen.blit(glow, glow.get_rect(center=(x + dx * (core + 60), y + dy * (core + 60))), special_flags=ADD)
-        for n in range(3):
-            d = core + 8 + n * 26 + (t * 90) % 26
-            cx, cy = x + dx * d, y + dy * d
-            tip = (cx + dx * 16, cy + dy * 16)
-            for colour, width in (((70, 30, 10), 9), (scaled((255, 220, 160), 0.4 + 0.6 * flash), 5)):
-                pygame.draw.line(screen, colour, (cx - px * 17, cy - py * 17), tip, width)
-                pygame.draw.line(screen, colour, (cx + px * 17, cy + py * 17), tip, width)
 
     ARROW_TINTS = ((255, 120, 100), (110, 170, 255))          # Portal Pair's black hole: red's arrow, blue's
     MINI_TINT = (120, 230, 255)                               # a mini black hole's arrow
@@ -2510,8 +2492,8 @@ class Renderer:
                 pygame.draw.line(screen, colour, (cx + px * 16, cy + py * 16), tip, width)
 
     def draw_swallowing(self, screen, x, y, core, spin, flash, t):
-        """Portal Pair's black hole has a ball: it's drawn out into a streak spiralling into the
-        heart, and the heart pulses."""
+        """A black hole has a ball: it's drawn out into a streak spiralling into the heart, and the
+        heart pulses."""
         held = PowerUps.HOLE_HOLD / PowerUps.HOLE_FLARE
         k = (1 - flash) / held                                # 0 as it falls in, 1 as it comes out
         if k < 1:
