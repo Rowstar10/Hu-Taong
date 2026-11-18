@@ -2,9 +2,9 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
-## 1.8 — 2026-11-17
+## 1.8 — 2026-11-18
 
-Three physics to choose from, and a Speed Cap so a charge shot can always be reached.
+Three physics to choose from, a Speed Cap so a charge shot can always be reached, the Black Hole talisman, portals that collapse into black holes, and a review of the talismans.
 
 ### Added
 - Physics, in Match settings under Ball & Paddles (online, the host's choice counts). Changes come in at the next serve:
@@ -13,9 +13,22 @@ Three physics to choose from, and a Speed Cap so a charge shot can always be rea
   - v0.9: Hu Taong 0.9's. Drive into the ball to speed it up, a still paddle slows it, off an end the ball goes mostly up or down, and there's no top speed. Only two things are added, so a point can't freeze: it never slows below a quarter of the serve's speed, and never goes quite straight up and down.
 - Speed Cap, in the same place: a paddle hands on its speed to the ball only up to a limit (a little under the usual paddle speed), and gives way rather than catching its own ball again. Tapping the ball softly, running after it and hitting it again by the Middle Wall no longer makes a shot nobody could reach. Classic physics never hands on a paddle's speed, so it makes no difference there.
 - Match settings shows the physics and the Speed Cap under Ball & Paddles.
+- Black Hole, a new Wild talisman. A black hole opens mid-court until the point ends and pulls the ball towards it, harder the closer and faster the ball, without changing its speed. The paddles feel nothing. A ball that touches its black heart falls in, and a moment later it's flung out as fast as it went in, still heading for the same side but at a new angle. An arrow flares the way it will come out. At the point's end it implodes.
+- Portal Pair, the talisman and the game mode: once the portals are full size, the next ball through sets them collapsing. Over two and a half seconds they flare, spiral in round each other and merge into a black hole with two arrows, one red and one blue. A ball it swallows comes out as Twin Balls, one along each arrow, and the hole implodes. (With two balls in play already, the ball comes out alone along its own arrow.) Then mini black holes come and go until the point ends, each pulling the ball in and shooting it out along its own circling arrow. In a Portal Pair match, small portals open again at the next serve.
+- Talismans at Once, in Match settings beside Spawn: how many talismans can be in play at once, counting those waiting on the court. It can be 1, 2 or 3, and starts at 1. Safety Teleport, Double or Nothing, Lantern Night and Open Court don't count, and Talisman Rush lifts the limit. Before, up to two could wait on the court, or three on Chaotic.
 
 ### Changed
 - The Trickster AI doesn't try its pounce (that same charge shot) under Classic physics or with the Speed Cap, where it can't work.
+- Talismans waiting on the court stay for 20 seconds of play, through points. They went after 14 seconds, and at every point.
+- Lantern Night lasts 20 seconds of play and stays dark between points until dawn comes. It used to end with the point.
+- Soul Swap ends with the point: everyone is back on their own paddle for the next serve. In a Switch match, the switching carries on from where it left you.
+- Tombstone: every hit wears it down. Three hits break it, two blazing ones or one from the Snowball. Once the Snowball has grown big, it ploughs straight through one in a burst of frost and stone, keeping most of its speed. The court's own stones are unchanged.
+- Portal Pair: the portals grow bigger. A ball spends a moment inside while the way out flashes, and comes out a little slower each time, though never slower than a serve.
+- Spirit Fire: blazing shots are 20% faster, not 40%, and never go past the usual top speed.
+- Shrink Curse: the paddle shrinks by a fifth, not a third.
+- Sticky Goo: the ball comes off a little slower. Its aim locks half a second before it's slung, so a last-moment fake no longer changes where it goes, and the arrow holds steady once it's locked.
+- Talismans with a big effect on the court fade out when they end, instead of cutting straight back to normal: night lifts into dawn, the wind dies down, a Ghost Ball fades back into sight, portals shrink away, Shape Shift's sizes ease back, Sticky Goo's coat fades off and Open Court's wall fades back in.
+- Talisman Rush brings as many talismans at once as come (it was up to three).
 - Online play needs both players on 1.8: it won't connect to 1.7 or earlier.
 
 ## 1.7 — 2026-11-17

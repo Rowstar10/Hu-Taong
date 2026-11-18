@@ -1,8 +1,8 @@
 # Hu Taong 1.8
 
-Pong, the Wangsheng Funeral Parlor way. Version 1.8, 17 November 2026.
+Pong, the Wangsheng Funeral Parlor way. Version 1.8, 18 November 2026.
 
-Three physics to choose from, and a Speed Cap so a charge shot can always be reached.
+Three physics to choose from, a Speed Cap so a charge shot can always be reached, the Black Hole talisman, portals that collapse into black holes, and a review of the talismans.
 
 ## Play it
 
