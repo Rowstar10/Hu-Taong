@@ -249,7 +249,8 @@ class Recorder:
             values += [b.x0, b.y0, b.width, b.vx, b.vy, 2 if getattr(b, "side", None) == "blue" else 1,
                        1 if getattr(b, "blazing", False) else 0, pu.ball_alpha(b)]
         # then the ball's spin, the wind, the night, the firecracker and the portals
-        portals = getattr(pu, "portals", [])
+        # (closing portals ride along with the open ones, their flash below 0: how far shut, 1.8)
+        portals = getattr(pu, "portals", []) + [dict(p, flash = -p["shut"]) for p in getattr(pu, "closing", [])]
         values += [getattr(ball, "curve", 0.0), pu.wind_force() if hasattr(pu, "wind_force") else 0.0,
                    pu.lantern_level() if hasattr(pu, "lantern_level") else 0.0,
                    pu.cracker_fuse(ball) if hasattr(pu, "cracker_fuse") else 0, len(portals)]
@@ -521,6 +522,7 @@ class ViewPowerUps:
         self.wind, self.night, self.cracker, self.portals = 0.0, 0.0, 0.0, []
         self.blasts = []
         self.ploughs = []
+        self.closing = []
 
     def effect_list(self, paddle):
         return self.fx[0 if paddle.is_left else 1]
@@ -705,7 +707,7 @@ class ReplayView:
             pos += width
         # the ball's spin, the wind, the night, the firecracker's fuse in seconds (before 1.6's
         # playtest, its hits left) and the portals (newer frames only)
-        ball.curve, pu.wind, pu.night, pu.cracker, pu.portals = 0.0, 0.0, 0.0, 0.0, []
+        ball.curve, pu.wind, pu.night, pu.cracker, pu.portals, pu.closing = 0.0, 0.0, 0.0, 0.0, [], []
         if pos + 5 <= len(a):
             ball.curve, pu.wind, pu.night, pu.cracker = a[pos], a[pos + 1], a[pos + 2], max(0.0, a[pos + 3])
             n_portals = int(a[pos + 4])
@@ -716,7 +718,11 @@ class ReplayView:
                     door = {"x": a[pos], "y": a[pos + 1], "angle": a[pos + 2]}
                     door["r"] = a[pos + 3] if fields >= 4 else 80.0       # (1.6's portals were always 80)
                     door["flash"] = a[pos + 4] if fields >= 5 else 0.0
-                    pu.portals.append(door)
+                    if door["flash"] < 0:
+                        door["shut"], door["flash"] = -door["flash"], 0.0
+                        pu.closing.append(door)
+                    else:
+                        pu.portals.append(door)
                 pos += fields
         pu.blasts = []
         for stone in self.stones:

@@ -100,6 +100,7 @@ class Drifting(Match):
         self.pu.collect({"kind": "shape", "x": 900, "y": 500}, self.p1)
         self.drift(5.0)
         self.pu.on_point()
+        self.game.reset_round()             # the serve (1.8: they ease back while the point is announced)
         self.game.apply_gameplay_settings()
         self.assertEqual((self.p1.height, self.p2.height), (self.s.paddle_height, self.s.paddle_height))
         self.assertEqual(self.ball.diameter, self.s.ball_diameter)

@@ -2041,13 +2041,27 @@ class Renderer:
         ring = art.faint_sigil(420, 44)
         screen.blit(ring, ring.get_rect(center=(W // 2 + ox, H // 2 + oy)))
 
-        if cord:
+        shown = self.fade_toward("cord", cord, 0.5)            # (1.8: Open Court's wall fades back)
+        if shown > 0:
             line = art.cord(H, faint=not wall)
+            if shown < 1:
+                level = max(1, round(shown * 10))
+                line = art.get(("cord_fade", H, not wall, level), self._faded, line, level / 10)
             screen.blit(line, line.get_rect(midtop=(W // 2 + ox, oy)))
 
         rail = art.rail(W, flowers=False)
         screen.blit(rail, rail.get_rect(midtop=(W // 2 + ox, oy - 4)))
         screen.blit(rail, rail.get_rect(midbottom=(W // 2 + ox, H + oy + 4)))
+
+    def fade_toward(self, key, on, seconds):
+        """A fade kept here, for what comes and goes on the court: eases up to 1 while `on`, and
+        back down to 0 over `seconds` when not (so it never cuts straight back to normal)."""
+        fades = self.__dict__.setdefault("_fades", {})
+        now = fades.get(key, 1.0 if on else 0.0)
+        step = min(self.app.dt, 1 / 20) / seconds
+        now = min(1.0, now + step) if on else max(0.0, now - step)
+        fades[key] = now
+        return now
 
     def track_paddle(self, paddle, rect):
         """Note where this side's paddle is drawn this frame (for Swift Step's streaks and the
@@ -2123,8 +2137,12 @@ class Renderer:
                 screen.blit(halo, halo.get_rect(center=rect.center), special_flags=ADD)
                 halo.set_alpha(255, pygame.RLEACCEL)
                 break
-        if powerups.has(paddle, "sticky"):
+        coat = self.fade_toward(("goo", paddle.is_left), powerups.has(paddle, "sticky"), 0.4)    # (1.8: it fades off)
+        if coat > 0:
             goo = art.get(("goo_coat", rect.w, rect.h), self._goo_coat, rect.w, rect.h)
+            if coat < 1:
+                level = max(1, round(coat * 10))
+                goo = art.get(("goo_fade", rect.w, rect.h, level), self._faded, goo, level / 10)
             screen.blit(goo, goo.get_rect(midtop=rect.midtop))
         if any(key == "teleport" and charges for key, _, charges in powerups.effect_list(paddle)):
             # a Safety Teleport save is waiting: a gold glow and its glyph on the paddle
@@ -2276,13 +2294,18 @@ class Renderer:
         return self.art.gilded(str(n), self.art.ui(56), top=(255, 170, 150), bottom=(226, 34, 30), glow=None)
 
     def draw_portals(self, screen, powerups, ox, oy):
-        """Portal Pair: two swirling rings, linked, each with arrows showing the way a ball leaves it."""
+        """Portal Pair: two swirling rings, linked, each with arrows showing the way a ball leaves it.
+        Closing ones shrink away (1.8)."""
         portals = getattr(powerups, "portals", [])
-        if not portals:
+        closing = getattr(powerups, "closing", [])
+        if not portals and not closing:
             return
         t = self.app.fx.time
-        for i, door in enumerate(portals):
+        for i, door in enumerate(portals + closing):
+            shut = door.get("shut", 1.0) if door in closing else 1.0
             R = self.portal_size(door)
+            if shut < 1.0:
+                R = max(PowerUps.PORTAL_GROW, int(R * shut / PowerUps.PORTAL_GROW) * PowerUps.PORTAL_GROW)
             x, y = door["x"] + ox, door["y"] + oy
             glow = self.art.glow(int(R * 2.2) // 4 * 4, scaled((150, 100, 255), .7))
             screen.blit(glow, glow.get_rect(center=(x, y)), special_flags=ADD)

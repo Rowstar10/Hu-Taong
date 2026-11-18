@@ -105,6 +105,7 @@ class Hu_Taong(GameBase):
         self.reset_drift()
 
         # Switch
+        self.settling = 0.0             # Shape Shift is over: seconds left for sizes to ease back to normal
         self.switch_after_point = False
         self.soul_undo = False          # Soul Swap left the players on each other's paddles: undo at the serve
         self.next_switch = self.switch_gap()
@@ -532,6 +533,10 @@ class Hu_Taong(GameBase):
             self.powerups.twin_serve()          # Twin Ball: both balls, every point
         self.powerups.serve_portals()           # Portal Pair: open all match (and none left over otherwise)
 
+        if self.settling:
+            self.settling = 0.0
+            self.reset_drift()
+            self.apply_gameplay_settings()
         if self.soul_undo:
             self.soul_undo = False
             self.switch_sides(mid_rally = True)     # Soul Swap is over: everyone back on their own paddle
@@ -600,6 +605,8 @@ class Hu_Taong(GameBase):
             self.powerups.update(play_dt)
         if self.running:
             self.powerups.update_popups(dt)
+            if self.settling > 0:
+                self.settle_sizes(min(dt, self.MAX_STEP))
 
         if self.switch_flash > 0:
             self.switch_flash -= dt
@@ -691,8 +698,25 @@ class Hu_Taong(GameBase):
         for obj in (self.p1, self.p2, self.ball):
             obj.drift = {"size": self.drift_track(obj)}
 
+    SETTLE = 0.8        # seconds Shape Shift's sizes take to ease back to normal after the point (1.8)
+
+    def settle_sizes(self, dt):
+        """Shape Shift is over: the paddles and the ball ease back to their own sizes while the
+        point is announced (the game is paused then), rather than snapping back."""
+        self.settling -= dt
+        k = 1 - math.exp(-dt / 0.2)
+        for obj in (self.p1, self.p2, self.ball):
+            home, track = self.drift_track(obj)[0], obj.drift["size"]
+            track[0] += (home - track[0]) * k
+        if self.settling <= 0:
+            self.settling = 0.0
+            self.reset_drift()
+        self.apply_gameplay_settings()
+
     def update_drift(self, dt):
         powerups = getattr(self, "powerups", None)
+        if self.settling > 0:
+            return
         if not (powerups.sizes_drifting() if powerups else self.settings.chaos_drift):
             return
         ease = 1 - math.exp(-dt / 1.1)
@@ -719,7 +743,7 @@ class Hu_Taong(GameBase):
         powerups = getattr(self, "powerups", None)
         # Chaos (Constant drift) and Shape Shift: both paddles drift to one size, the ball on its own.
         # Speeds never drift (Chaos every point picks new ones between points, in reset_round).
-        sizes = powerups.sizes_drifting() if powerups else s.chaos_drift
+        sizes = (powerups.sizes_drifting() if powerups else s.chaos_drift) or getattr(self, "settling", 0) > 0
 
         for obj in self.objects:
             if obj.is_paddle:

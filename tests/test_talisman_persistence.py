@@ -2,7 +2,8 @@
 
 Rowan's decisions:
 - Giant Paddle, Swift Step, Spirit Fire and Shrink Curse persist between points with the time they
-  had left (their clocks used to run on through the point's announcement).
+  had left (as they already did: the game is paused while a point is announced, and its talisman
+  clocks with it; this holds them still even if the pause menu is closed in that moment).
 - Lantern Night lasts 20 s of play, and stays between points; dawn comes when its time is up.
 - Talismans waiting on the court last 20 s of play (14 s before) and stay through points.
 - Soul Swap ends with the point, and puts the players back on their own paddles for the next

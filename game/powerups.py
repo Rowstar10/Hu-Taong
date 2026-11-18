@@ -211,6 +211,8 @@ class PowerUps:
     PORTAL_SLOW = 0.08                      # each trip through takes this share off the ball's speed (1.8)...
     PORTAL_TRANSIT = 0.2                    # ...after this long inside, while the way out flashes
     PORTAL_FLASH = 0.35                     # seconds the way out's flash takes to fade
+    PORTAL_SHUT = 0.4                       # seconds closing portals take to shrink away (1.8)
+    WIND_DIES = 1.5                         # Wind Gust: seconds it takes to die down at the end (0.8 until 1.8)
     LANTERN_FADE = (0.6, 0.9)               # Lantern Night: seconds for night to fall, and to lift
     LANTERN_LIGHT = 300                     # px of lantern light round each paddle
     BLAST_R = 280                           # Firecracker: how far its blast flattens stones
@@ -249,6 +251,7 @@ class PowerUps:
         self.blasts = []         # Firecracker explosions for the renderer: [x, y, age]
         self.ploughs = []        # a big Snowball ploughing through a Tombstone, for the renderer: [x, y, age]
         self.portals = []        # Portal Pair: two {"x", "y", "angle", "r", "vx", "vy", "spin"}
+        self.closing = []        # portals shrinking away as they close: the same, with "shut" going 1 to 0 (1.8)
         self.portal_trips = 0    # trips through them since a paddle last touched a ball
         self.portal_grown = 0.0  # Portal Pair match: how big they'd grown when a loop shut them
         self.ball_v = (game.ball.vx, game.ball.vy)   # the ball's velocity last frame, before any hit
@@ -349,7 +352,7 @@ class PowerUps:
         if not self.wind:
             return 0.0
         w = self.wind
-        ease = min(1.0, (BY_KEY["wind"].seconds - w["left"]) / 0.8, w["left"] / 0.8)
+        ease = min(1.0, (BY_KEY["wind"].seconds - w["left"]) / 0.8, w["left"] / self.WIND_DIES)
         return w["dir"] * self.WIND * ease * (0.65 + 0.35 * math.sin(w["t"] * 2.3))
 
     def ball_accel(self):
@@ -521,7 +524,7 @@ class PowerUps:
         if getattr(ball, "blazing", False):
             items.append(("fire", None, "Blazing shot"))
         if self.ghost:
-            items.append(("ghost", self.ghost["left"], "Vanishes and reappears at random"))
+            items.append(("ghost", max(0.0, self.ghost["left"]), "Vanishes and reappears at random"))
         if self.blink:
             items.append(("blink", self.blink["left"], "Blinking about"))
         if getattr(ball, "stuck", None):
@@ -618,7 +621,10 @@ class PowerUps:
         ghost = self.ghost
         ghost["left"] -= dt
         if ghost["left"] <= 0:
-            self.ghost = None
+            # its time is up: it fades back into sight, then it's a plain ball again (1.8)
+            ghost["alpha"] = min(1.0, ghost["alpha"] + dt / self.GHOST_FADE)
+            if ghost["alpha"] >= 1.0:
+                self.ghost = None
             return
         ghost["next"] -= dt
         if ghost["next"] <= 0:
@@ -661,6 +667,9 @@ class PowerUps:
         for plough in self.ploughs:
             plough[2] += dt
         self.ploughs = [p for p in self.ploughs if p[2] < self.PLOUGH_TIME]
+        for door in self.closing:
+            door["shut"] -= dt / self.PORTAL_SHUT
+        self.closing = [door for door in self.closing if door["shut"] > 0]
         # Tombstones sink away after a point, while the "scored" message shows
         game = self.game
         if game.paused or game.countdown is not None:
@@ -1046,8 +1055,13 @@ class PowerUps:
         for p in self.portals:
             self.game.app.fx.spark(p["x"], p["y"], 24, (170, 120, 255), speed = 300, life = .6)
             self.portal_grown = max(self.portal_grown, p.get("r", 0.0))
+        self.shut(self.portals)
         self.portals = []
         self.portal_trips = 0
+
+    def shut(self, portals):
+        """These portals shrink away rather than vanish (1.8)."""
+        self.closing += [dict(p, shut = 1.0, flash = 0.0) for p in portals]
 
     def serve_portals(self):
         """At each serve: a Portal Pair match has its portals (opened at the first serve, and again
@@ -1177,7 +1191,7 @@ class PowerUps:
         self.soul_swaps = 0
         if self.shape_shift:
             self.shape_shift = False
-            self.game.reset_drift()                 # sizes are back to normal for the serve
+            self.game.settling = self.game.SETTLE   # sizes ease back to normal for the serve (1.8)
         self.curve_on = False
         self.double = False
         self.cracker = None
@@ -1187,6 +1201,7 @@ class PowerUps:
                     (stone.broken or stone.hp < stone.max_hp):
                 stone.restore()
         if not self.settings.mode_portal_pair:
+            self.shut(self.portals)
             self.portals = []                       # the talisman's last the point; the mode's, the match
         self.portal_trips = 0
         for b in self.balls():
