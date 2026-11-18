@@ -11,9 +11,11 @@ Computer players that go back round a ball that's got past them, a harder Hard a
 - Hard and Insane read the ball better, react quicker, hesitate less and place their returns a little more. Their shots are no harder.
 - Three game modes have new names: Chaos is Shape Shift, Switch is Soul Swap, and Talisman Rush is CHAOS. Your settings carry over. In a Soul Swap match the banner says "Swap!".
 - CHAOS brings a new talisman every 1.5 to 3 seconds, whatever the spawn rate is set to. As Talisman Rush, it made the set rate three times as often.
+- Music: ten new spooky, playful tracks by Kevin MacLeod: six play in matches (Sneaky Snitch, Investigations, Moonlight Hall, Netherworld Shanty, Professor and the Plant, Marty Gots a Plan), two in the menus (Thinking Music, Brittle Rille), one when you win (Comic Hero) and one when you lose (Laconic Granny). "Chinese Game" and "Halloween Playful" join the match music too.
 
 ### Removed
 - Chaotic from the spawn rate: it's CHAOS's own now. If you had it set, you have Frequent.
+- Waltz of the Carnies, the circus-sounding match track.
 
 ## 1.8 — 2026-11-18
 

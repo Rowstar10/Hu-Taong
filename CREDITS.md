@@ -54,7 +54,6 @@ Both are under the SIL Open Font License 1.1. The licence texts are in `Resource
 | Senbazuru.mp3 | menu | Senbazuru | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | One-eyed Maestro.mp3 | game | One-eyed Maestro | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Monster Promenade.mp3 | game | Monster Promenade | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
-| Waltz of the Carnies.mp3 | game | Waltz of the Carnies | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Malicious.mp3 | game | Malicious | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Monkeys Spinning Monkeys.mp3 | win | Monkeys Spinning Monkeys | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Heroic Age.mp3 | win | Heroic Age | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
@@ -64,6 +63,18 @@ Both are under the SIL Open Font License 1.1. The licence texts are in `Resource
 | Million Elephants.ogg | menu | Kingdom of a Million Elephants under a White Parasol | Spring Spring | CC0 | https://opengameart.org/content/kingdom-of-a-million-elephants-under-a-white-parasol |
 | Chinese Tales.mp3 | game | Chinese Tales (PSG version) | Snabisch | CC-BY 3.0 | https://opengameart.org/content/chinese-tales-psg-version |
 | Drums of Dawn.mp3 | game | Drums of Dawn | Magnesus | CC-BY 3.0 | https://opengameart.org/content/drums-of-dawn |
+| Sneaky Snitch.mp3 | game | Sneaky Snitch | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Investigations.mp3 | game | Investigations | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Moonlight Hall.mp3 | game | Moonlight Hall | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Netherworld Shanty.mp3 | game | Netherworld Shanty | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Professor and the Plant.mp3 | game | Professor and the Plant | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Marty Gots a Plan.mp3 | game | Marty Gots a Plan | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Thinking Music.mp3 | menu | Thinking Music | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Brittle Rille.mp3 | menu | Brittle Rille | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Comic Hero.mp3 | win | Comic Hero | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Laconic Granny.mp3 | lose | Laconic Granny | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Chinese Game.mp3 | game | Chinese Game | Muzaproduction | Pixabay Content License (no credit required) | https://pixabay.com/music/ |
+| Halloween Playful.mp3 | game | Halloween Playful | The_Mountain | Pixabay Content License (no credit required) | https://pixabay.com/music/ |
 
 Kevin MacLeod credit line, as his licence asks for it:
 
@@ -89,10 +100,19 @@ Kevin MacLeod credit line, as his licence asks for it:
 - "Senbazuru" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "One-eyed Maestro" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Monster Promenade" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
-- "Waltz of the Carnies" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Malicious" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Monkeys Spinning Monkeys" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Heroic Age" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Sneaky Snitch" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Investigations" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Moonlight Hall" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Netherworld Shanty" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Professor and the Plant" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Marty Gots a Plan" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Thinking Music" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Brittle Rille" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Comic Hero" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
+- "Laconic Granny" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Super Friendly" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Funeral March for Brass" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Decline" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/

@@ -184,7 +184,12 @@ class SoundManager:
 
     @property
     def pool(self):
-        return self.app.settings.audio.pools[self.mood]
+        """The current mood's tracks: those in the music folder (a track listed but not there yet,
+        such as one waiting to be downloaded, is skipped)."""
+        if not hasattr(self, "music_here"):
+            self.music_here = {p.name for p in MUSIC_DIR.iterdir()} if MUSIC_DIR.is_dir() else set()
+        tracks = self.app.settings.audio.pools[self.mood]
+        return [t for t in tracks if t in self.music_here] or tracks
 
     @property
     def display_track(self):

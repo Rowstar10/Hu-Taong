@@ -383,7 +383,9 @@ class AudioSettings:
                         "Eastern Thought.mp3",
                         "Tea Roots.mp3",
                         "Senbazuru.mp3",
-                        "Million Elephants.ogg"],
+                        "Million Elephants.ogg",
+                        "Thinking Music.mp3",           # (1.9: quirky, a little spooky)
+                        "Brittle Rille.mp3"],
 
             "game":    ["Hillichurl REMIX.mp3",
                         "Epic Conquest.mp3",
@@ -399,10 +401,19 @@ class AudioSettings:
                         "Taiko Drums.ogg",
                         "One-eyed Maestro.mp3",
                         "Monster Promenade.mp3",
-                        "Waltz of the Carnies.mp3",
                         "Malicious.mp3",
                         "Chinese Tales.mp3",
-                        "Drums of Dawn.mp3"],
+                        "Drums of Dawn.mp3",
+                        # 1.9: spooky and playful (Waltz of the Carnies, the circus one, is gone),
+                        # and Rowan's two picks (played once their files are in the folder)
+                        "Sneaky Snitch.mp3",
+                        "Investigations.mp3",
+                        "Moonlight Hall.mp3",
+                        "Netherworld Shanty.mp3",
+                        "Professor and the Plant.mp3",
+                        "Marty Gots a Plan.mp3",
+                        "Chinese Game.mp3",
+                        "Halloween Playful.mp3"],
 
             "victory": ["Triumphant Win.mp3",
                         "Epic Win.mp3",
@@ -411,7 +422,8 @@ class AudioSettings:
                         "Ten Fanfares.ogg",
                         "Monkeys Spinning Monkeys.mp3",
                         "Heroic Age.mp3",
-                        "Super Friendly.mp3"],
+                        "Super Friendly.mp3",
+                        "Comic Hero.mp3"],
 
             "defeat":  ["Grand Defeat.mp3",
                         "Sweet Melancholy.mp3",
@@ -422,7 +434,8 @@ class AudioSettings:
                         "Asian Duet.mp3",
                         "Death of a Ninja.mp3",
                         "Funeral March for Brass.mp3",
-                        "Decline.mp3"],
+                        "Decline.mp3",
+                        "Laconic Granny.mp3"],
         }
 
         # How long a track takes to fade out and the next to fade in
