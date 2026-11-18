@@ -1,19 +1,31 @@
 name: Android
 
-# Builds Hu Taong's Android APK, plays it on an Android emulator, and, for a tag like
-# v1.5-android, publishes it as that tag's release (which Toki Hub installs from).
+# Builds Hu Taong's Android APK, plays it on an Android emulator, and for a version's tag (v1.7)
+# publishes it on that tag's release, which Toki Hub installs from. Every new version tag does
+# this by itself.
+#
+# To publish a version that's already tagged, run this workflow by hand (Actions > Android > Run
+# workflow) with the tag, and optionally the commit to build if that version's Android-ready code
+# isn't the tag itself (1.5's is its hit-fix update, 0e742ec). It never makes tags.
 on:
   push:
     branches: [main]
-    tags: ["v*-android"]
+    tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to publish the APK on, like v1.6"
+        required: true
+      ref:
+        description: "Commit to build (leave empty to build the tag)"
+        required: false
 
 permissions:
   contents: write
 
-# A newer push to the same branch replaces a build still running
+# A newer push to the same branch (or for the same tag) replaces a build still running
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ inputs.tag || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -21,13 +33,59 @@ env:
   NDK_VERSION: "28.2.13676358"
 
 jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      ref: ${{ steps.plan.outputs.ref }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: What to build
+        id: plan
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          tag=""; ref="$GITHUB_SHA"
+          if [[ -n "$INPUT_TAG" ]]; then
+            tag="$INPUT_TAG"; ref="${INPUT_REF:-$INPUT_TAG}"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="$GITHUB_REF_NAME"
+          fi
+          if [[ -n "$tag" ]]; then
+            git rev-parse -q --verify "refs/tags/$tag" > /dev/null || { echo "::error::There is no tag $tag"; exit 1; }
+            [[ "$tag" =~ ^v[0-9][0-9.]*(-android)?$ ]] || { echo "::error::$tag isn't a version tag like v1.7"; exit 1; }
+            version="${tag#v}"; version="${version%-android}"
+          fi
+          sha="$(git rev-parse "$ref^{commit}")"
+          if [[ -z "$tag" ]]; then
+            version="$(git show "$sha:CHANGELOG.md" | sed -n 's/^## \([0-9][0-9.]*\).*/\1/p' | head -1)"
+          fi
+          git cat-file -e "$sha:core/platform.py" 2>/dev/null || { echo "::error::$ref has no Android version of the game (it's older than 1.5's Android update)"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "ref=$sha" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Hu Taong $version from ${sha:0:10}${tag:+, for the release on $tag}"
+
   build:
+    needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     outputs:
       signed: ${{ steps.key.outputs.signed }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+          fetch-depth: 0
+
+      # The game as it was at that version, built with today's Android tools
+      - name: Android tools from this workflow's commit
+        run: git checkout "$GITHUB_SHA" -- android
 
       - uses: actions/setup-python@v5
         with:
@@ -65,17 +123,6 @@ jobs:
           SDL_VIDEODRIVER: dummy
           SDL_AUDIODRIVER: dummy
 
-      - name: Version
-        id: version
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v*-android ]]; then
-            v="${GITHUB_REF_NAME#v}"; v="${v%-android}"
-          else
-            v="$(sed -n 's/^## \([0-9][0-9.]*\).*/\1/p' CHANGELOG.md | head -1)"
-          fi
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-          echo "Hu Taong $v"
-
       # python-for-android's downloads (its finished build can't be kept: it points into build
       # folders that are far too big to cache)
       - uses: actions/cache@v4
@@ -103,7 +150,7 @@ jobs:
       - name: Build the APK
         run: android/build.sh
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.plan.outputs.version }}
           P4A_STORAGE: /home/runner/p4a
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
 
@@ -118,11 +165,28 @@ jobs:
           if-no-files-found: error
 
   emulator:
-    needs: build
+    needs: [plan, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Android tools from this workflow's commit
+        run: git checkout "$GITHUB_SHA" -- android
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Where this version's buttons are, from the game itself
+      - name: Where the buttons are
+        run: |
+          pip install -q pygame==2.6.1
+          mkdir -p build
+          python android/ui_positions.py build/positions.json
 
       - uses: actions/download-artifact@v4
         with:
@@ -144,7 +208,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-boot-anim -camera-back none
-          script: android/smoke-test.sh "$(ls dist/*.apk | head -1)" build/android-test
+          script: android/smoke-test.sh "$(ls dist/*.apk | head -1)" build/positions.json build/android-test
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -153,12 +217,10 @@ jobs:
           path: build/android-test
 
   release:
-    needs: [build, emulator]
-    if: startsWith(github.ref, 'refs/tags/v') && endsWith(github.ref, '-android')
+    needs: [plan, build, emulator]
+    if: needs.plan.outputs.tag != ''
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-
       - name: A release needs your signing key
         env:
           SIGNED: ${{ needs.build.outputs.signed }}
@@ -176,12 +238,18 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          REF: ${{ needs.plan.outputs.ref }}
+          VERSION: ${{ needs.plan.outputs.version }}
         run: |
-          tag="$GITHUB_REF_NAME"
-          v="${tag#v}"; v="${v%-android}"
-          notes="Hu Taong $v for Android phones and tablets (Android 7 or later). Install it from Toki Hub, or open the APK on your phone. It plays online with Hu Taong $v on a PC."
-          if gh release view "$tag" > /dev/null 2>&1; then
-            gh release upload "$tag" dist/*.apk --clobber
+          repo="$GITHUB_REPOSITORY"
+          tagged="$(gh api "repos/$repo/commits/$TAG" --jq .sha)"
+          notes="Hu Taong $VERSION for Android phones and tablets (Android 7 or later): install it from Toki Hub, or download the APK below and open it on your phone. It plays online with Hu Taong $VERSION on a PC."
+          if [[ "$tagged" != "$REF" ]]; then
+            notes="$notes"$'\n\n'"Built from ${REF:0:10}, $VERSION's Android-ready update."
+          fi
+          if gh release view "$TAG" --repo "$repo" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.apk --repo "$repo" --clobber
           else
-            gh release create "$tag" dist/*.apk --title "Hu Taong $v for Android" --notes "$notes" --latest=false
+            gh release create "$TAG" dist/*.apk --repo "$repo" --verify-tag --title "Hu Taong $VERSION" --notes "$notes"
           fi

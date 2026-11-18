@@ -27,12 +27,14 @@ The .exe appears in `dist`.
 ## Android
 
 Hu Taong also plays on Android phones and tablets, with touch controls: Toki Hub for Android
-installs it, or get the APK from a `v1.5-android` style release. It plays online with the PC
-version of the same number. The phone version is 1.5 for now: 1.6 and 1.7 have no APK yet, so a
-phone can't play a PC on 1.6 or 1.7 online.
+installs it, or get the APK from the version's release (`Hu-Taong-1.7-android.apk` on `v1.7`). It
+plays online with the PC version of the same number.
 
-The APK is built by GitHub (`.github/workflows/android.yml`), with `android/build.sh`
-(python-for-android). The phone's controls live in `core/touch.py`.
+GitHub builds the APK (`.github/workflows/android.yml`, with `android/build.sh` and
+python-for-android), plays it on an emulated phone, and publishes it on the release of every
+version tag: pushing `v1.8` is all a new version needs. A version tagged before that can be
+published by running the Android workflow by hand with its tag. The phone's controls live in
+`core/touch.py`.
 
 ## Tests
 
