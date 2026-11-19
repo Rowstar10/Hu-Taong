@@ -8,6 +8,7 @@ Three ways in:
 """
 import pygame
 
+from core import match_sounds
 from core.states.base_state import State
 from game import replay
 from game.replay import RATE, Clip, ReplayView
@@ -325,12 +326,13 @@ def play_event(app, view, kind, v):
                 ball = view.ball
                 view.powerups.popups.append([k.name, (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2, 0.0,
                                              FAMILY_COLOURS[k.family]])
-                sound.play("countdown_go.wav")
+                match_sounds.talisman(app, key)
         elif kind in ("teleport", "swap"):
             sound.play("hmyoop!.wav")
         elif kind in ("wall", "stone"):
             fx.spark(v[0], v[1], 8, (255, 186, 96), speed = 300, life = .45)
-        elif kind == "blink":
-            sound.play("countdown_tick.wav", multiplier = 0.35)
+            match_sounds.play(app, kind, v)
+        else:
+            match_sounds.play(app, kind, v)     # (1.9: each talisman's moment, a stone breaking...)
     except (IndexError, TypeError, ValueError):
         pass                  # a damaged or unknown event is skipped

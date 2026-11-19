@@ -3,6 +3,7 @@ import random
 import time
 
 from config import BASE_W, BASE_H, DYNAMIC
+from core import match_sounds
 from helpers import clamp, lerp
 from render import theme
 from objects.game_object import GameObject
@@ -141,6 +142,7 @@ class Ball(GameObject):
                 # Twin Balls: its own colour's goal just turns it back, at no less than serve speed
                 self.vx = nx * max(abs(self.vx), self.speed)
                 fx.spark(cx, cy, 14, theme.EMBER if self.side == "red" else theme.SPIRIT_BLUE, speed = 360, life = .5)
+                match_sounds.happen(self.game, "wall", cx, cy, match_sounds.GOAL, match_sounds.force(self))
                 self.squeeze_out(nx)
                 return
             self.game.on_score(self, data)

@@ -8,6 +8,7 @@ from game.game_base import GameBase
 from game.physics import Physics
 from game import courts
 from game.powerups import PowerUps
+from core import match_sounds
 from game.replay import Recorder
 from objects.wall import Wall
 from objects.ball import Ball
@@ -152,10 +153,11 @@ class Hu_Taong(GameBase):
             self.switch_sides(mid_rally = True)
 
     def on_bounce(self, ball, other):
-        self.recorder.on_bounce(ball, other)
+        self.hear(self.recorder.on_bounce(ball, other))
 
     def on_powerup(self, kind, owner):
         self.recorder.on_powerup(kind, owner)
+        match_sounds.talisman(self.app, kind.key)
 
     def on_teleport(self, paddle):
         self.recorder.on_teleport(paddle)
@@ -165,10 +167,19 @@ class Hu_Taong(GameBase):
             Physics.resolve_collision(paddle, self.ball, {"t": 0.0, "normal": (side, 0)})
 
     def on_stick(self, paddle):
-        self.recorder.on_stick(paddle)
+        self.hear(self.recorder.on_stick(paddle))
 
     def on_blink(self, x0, y0, x1, y1):
-        self.recorder.on_blink(x0, y0, x1, y1)
+        self.hear(self.recorder.on_blink(x0, y0, x1, y1))
+
+    def moment(self, kind, *values):
+        """Something worth hearing (core/match_sounds.py): recorded, for replays and the friend's
+        screen online, and heard here."""
+        return self.hear(self.recorder.event(kind, *values))
+
+    def hear(self, event):
+        """Play a recorded event's sound, as replays and the friend online will (1.9)."""
+        return match_sounds.play(self.app, event[1], event[2:])
 
     @property
     def wall_up(self):
@@ -673,7 +684,7 @@ class Hu_Taong(GameBase):
         next hit, once SWITCH_GRACE has passed, sets it off (see on_hit)."""
         if self.switch_warning is None:
             self.switch_warning = 0.0
-            self.app.sound_manager.play("countdown_tick.wav")
+            self.moment("armed")
 
     def update_switch(self, dt):
         if self.switch_warning is not None:

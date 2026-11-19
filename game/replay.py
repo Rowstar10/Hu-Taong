@@ -21,6 +21,7 @@ from array import array
 from pathlib import Path
 
 from config import BASE_W, BASE_H
+from core import match_sounds
 from game.powerups import BY_KEY, KINDS, PowerUps
 
 RATE = 60                    # frames a second
@@ -300,7 +301,10 @@ class Recorder:
     # ---------------- Events ----------------
 
     def event(self, kind, *values):
-        self.events.append((self.now, kind, *[round(v, 1) if isinstance(v, float) else v for v in values]))
+        """Note something that happened (and answer the note, as replays and the friend online get it)."""
+        event = (self.now, kind, *[round(v, 1) if isinstance(v, float) else v for v in values])
+        self.events.append(event)
+        return event
 
     def on_hit(self, ball, paddle, data):
         p = self.point
@@ -327,28 +331,32 @@ class Recorder:
                 p["saves"].append((self.now, side, "end" if ny else "edge", p["hits"], incoming))
 
     def on_bounce(self, ball, other):
+        """Off a wall or a stone.  The event says what it was (match_sounds.surface: since 1.9, as a
+        third value) and how hard the ball was going (a fourth), for its sound."""
         self.point["bounces"] += 1
+        x, y = (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2
+        what, hard = match_sounds.surface(other), match_sounds.force(ball)
         if getattr(other, "is_obstacle", False):
             self.point["stone"] = True
-            self.event("stone", (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2)
-        else:
-            self.event("wall", (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2)
+            return self.event("stone", x, y, what, hard)
+        return self.event("wall", x, y, what, hard)
 
     def on_powerup(self, kind, owner):
-        self.event("pickup", KIND_KEYS.index(kind.key), 1 if owner.is_left else 2)
+        event = self.event("pickup", KIND_KEYS.index(kind.key), 1 if owner.is_left else 2)
         if kind.key == "ghost":
             self.point["ghost"] = True
+        return event
 
     def on_teleport(self, paddle):
         self.point["teleports"].append((self.now, 1 if paddle.is_left else 2))
         self.event("teleport", 1 if paddle.is_left else 2)
 
     def on_stick(self, paddle):
-        self.event("stick", 1 if paddle.is_left else 2)
+        return self.event("stick", 1 if paddle.is_left else 2)
 
     def on_blink(self, *xy):
         self.point["blinks"] += 1
-        self.event("blink")
+        return self.event("blink")
 
     def on_swap(self, banner):
         self.point["swap"] = self.now

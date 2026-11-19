@@ -127,6 +127,23 @@ seam crossfaded; CC0 allows this without credit, but credit is given anyway.
 | Ambience Fire.wav | Fireplace Sound loop | PagDev | CC0 | https://opengameart.org/content/fireplace-sound-loop |
 | Ambience Crickets.wav | Crickets Ambient Noise - loopable | Wolfgang_ | CC0 | https://opengameart.org/content/crickets-ambient-noise-loopable |
 
+## Match sound effects (1.9)
+
+`Resources/Sounds/Match/`: the ball off each kind of surface, each talisman's pickup, and the
+talismans' big moments.  Made from three CC0 packs by Kenney (www.kenney.nl): cut, mixed, levelled
+and saved as mono 44.1 kHz WAV.  CC0 needs no credit, but credit is given anyway.
+
+| Pack | Author | Licence | Source | Used for |
+| --- | --- | --- | --- | --- |
+| Impact Sounds (1.0) | Kenney | CC0 | https://kenney.nl/assets/impact-sounds | the ball off the court's top and bottom (edge_), a tombstone (tomb_), a Ferry Gate (gate_), Narrow Pass's walls (pillar_) and a Twin Balls goal (goal_); a stone chipped (chip_) and broken (crumble); the Snowball (plough, shove); and the snow, bell and thud in some pickups |
+| Interface Sounds (1.0) | Kenney | CC0 | https://opengameart.org/content/interface-sounds | Portal Pair (portal_in, portal_out), Blink Ball (blink), the pops of Twin Balls (twin_split), and whooshes in some pickups and the Black Hole's fling (hole_fling) |
+| RPG Audio | Kenney | CC0 | https://opengameart.org/content/50-rpg-sound-effects | the paper flutter in every talisman pickup, the coins in Double or Nothing's, cloth in Ghost Ball's and leather in Sticky Goo's |
+
+The talisman tunes in `talisman_*.wav` (plucked strings on a pentatonic scale), Lantern Night's temple
+bell, and the wind, fire, grinding stone and goo sounds were synthesised for Hu Taong by a short script,
+from tones and filtered noise, as the Black Hole's were.  `hole_fling.wav` is `black_hole_swallow.wav`
+played backwards.  None of these are taken from anywhere, so they need no credit or licence.
+
 ## Sound effects made for the game
 
 `Resources/Sounds/firecracker_bang.wav` (the Firecracker power-up's explosion) was synthesised for Hu Taong

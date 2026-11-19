@@ -8,6 +8,7 @@ import math, random
 from dataclasses import dataclass
 
 from config import BASE_W, BASE_H, MAX_BOUNCE_ANGLE, MAX_BALL_SPEEDUP
+from core import match_sounds
 from game.physics import Physics
 from helpers import clamp, reflect_in_range
 
@@ -840,7 +841,6 @@ class PowerUps:
         app = self.game.app
         app.fx.burst(item["x"], item["y"], 8, 44, owner.colour, life=(.6, 1.0))
         app.fx.spark(item["x"], item["y"], 18, FAMILY_COLOURS[kind.family], speed=380, life=.6)
-        app.sound_manager.play("countdown_go.wav")
         self.popups.append([kind.name, item["x"], item["y"], 0.0, FAMILY_COLOURS[kind.family]])
         self.game.on_powerup(kind, owner)
 
@@ -868,6 +868,7 @@ class PowerUps:
             ball.blazing = True
             self.game.app.fx.spark((ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2, 30,
                                    (255, 150, 60), speed=560, life=.7)
+            match_sounds.happen(self.game, "blaze", 1 if paddle.is_left else 2)
 
         if self.snow and normal[0] != 0 and main:
             self.shove(paddle)
@@ -941,7 +942,7 @@ class PowerUps:
         fx.spark(cx, cy, 50, (120, 100, 90), speed = 380, life = 1.4)       # smoke and grit
         fx.burst(cx, cy, 18, 80, "red", life = (.6, 1.1))
         self.blasts.append([cx, cy, 0.0])
-        app.sound_manager.play("firecracker_bang.wav")
+        match_sounds.happen(self.game, "bang", cx, cy)
         renderer = getattr(app, "renderer", None)
         if renderer is not None:
             renderer.shake(22, 0.45)
@@ -1137,7 +1138,7 @@ class PowerUps:
                 out["flash"] = 1.0
                 fx = self.game.app.fx
                 fx.spark(door["x"], door["y"], 16, (170, 120, 255), speed = 260, life = .45)
-                self.game.app.sound_manager.play("countdown_tick.wav", multiplier = 0.5)
+                match_sounds.happen(self.game, "portal", door["x"], door["y"])
                 hook = getattr(self.game, "on_portal", None)
                 if hook:
                     hook(door, out)
@@ -1175,11 +1176,13 @@ class PowerUps:
         if hole:
             ball.hole_cool, ball.hole_time = self.HOLE_COOL, 0.0
             self.game.app.fx.spark(x, y, 30, (255, 196, 120), speed = 520, life = .55)
-            self.game.app.sound_manager.play("countdown_go.wav", multiplier = 0.5)
             if out.get("collapse") is not None and out["dying"] is None:
                 self.spit(ball, out, transit_speed)     # it has collapsed in on itself, and bursts
+            else:
+                match_sounds.happen(self.game, "fling", x, y)
             return
         self.game.app.fx.spark(out["x"], out["y"], 22, (120, 230, 255), speed = 340, life = .5)
+        match_sounds.happen(self.game, "portal_out", x, y)
 
     def close_portals(self):
         """The portals snap shut (a ball was looping through them with no paddle near)."""
@@ -1530,6 +1533,7 @@ class PowerUps:
                     app.fx.spark(cx + dx * 30 * n, cy + dy * 30 * n, 6, tint, speed = 160, life = .45)
             ball.side, blue.side = "red", "blue"
             self.twin = {"left": UNTIL_POINT, "ball": blue}
+            match_sounds.happen(game, "split", hole["x"], hole["y"])
         hole["dying"], hole["power"] = self.HOLE_IMPLODE * self.HOLE_BURST, 0.0     # (just the flash)
         self.minis = {"next": self.MINI_FIRST}
         renderer = getattr(app, "renderer", None)
@@ -1599,6 +1603,7 @@ class PowerUps:
         game = self.game
         cx, cy = (paddle.x0 + paddle.x1) / 2, (paddle.y0 + paddle.y1) / 2
         game.app.fx.spark(cx, cy, int(8 + 10 * size), (226, 240, 255), speed = 200 + 120 * size, life = .5)
+        match_sounds.happen(game, "shove", cx, cy)
 
     def plough(self, ball, stone, data):
         """A big Snowball meeting a Tombstone's stone (1.8): it ploughs straight on through, losing
@@ -1611,6 +1616,7 @@ class PowerUps:
         stone.crumble()
         cx, cy = (stone.x0 + stone.x1) / 2, (stone.y0 + stone.y1) / 2
         self.ploughs.append([cx, cy, 0.0])
+        match_sounds.happen(self.game, "plough", cx, cy)
         app = self.game.app
         app.fx.spark(cx, cy, 36, (236, 246, 255), speed = 640, life = .9)
         app.fx.spark(cx, cy, 20, (176, 160, 130), speed = 460, life = 1.0)
@@ -1723,6 +1729,8 @@ class PowerUps:
         for paddle in (self.game.p1, self.game.p2):
             paddle.shoved = 0.0
         for tomb in self.tombs:
+            if tomb.life > Obstacle.SINK and not tomb.broken:
+                match_sounds.happen(self.game, "sink", (tomb.x0 + tomb.x1) / 2, (tomb.y0 + tomb.y1) / 2)
             tomb.life = min(tomb.life, Obstacle.SINK)
         if self.wall_down > 0:
             self.wall_down = 0.0
@@ -1750,7 +1758,6 @@ class PowerUps:
         ball.stuck = {"paddle": paddle, "dy": cy, "side": side, "left": hold, "total": hold,
                       "vx": ball.vx * k, "vy": ball.vy * k}
         self.lock_aim(ball.stuck)
-        self.game.app.sound_manager.play("countdown_tick.wav", multiplier = 0.5)
         self.game.on_stick(paddle)
 
     @staticmethod
@@ -1813,6 +1820,7 @@ class PowerUps:
         ball.unstick = 0.3
         self.game.app.fx.spark((ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2, 12, (214, 196, 90),
                                speed = 260, life = .5)
+        match_sounds.happen(self.game, "sling", (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2)
 
     # ---------------- Blink Ball ----------------
 
@@ -1857,7 +1865,6 @@ class PowerUps:
             fx = game.app.fx
             fx.spark(bx, by, 8, (150, 220, 255), speed = 200, life = .35)
             fx.spark(x, y, 10, (210, 240, 255), speed = 260, life = .4)
-            game.app.sound_manager.play("countdown_tick.wav", multiplier = 0.35)
             game.on_blink(bx, by, x, y)
             return
 

@@ -4,9 +4,17 @@ Every version of Hu Taong, newest first. Toki Hub shows each version's section o
 
 ## 1.9 — 2026-11-18
 
-Computer players that go back round a ball that's got past them, a harder Hard and Insane, and three game modes renamed.
+Sounds for every surface the ball bounces off and for every talisman, computer players that go back round a ball that's got past them, a harder Hard and Insane, and three game modes renamed.
+
+### Added
+- The ball makes a sound off everything it bounces off: a light knock off the top and bottom of the court, stone off a tombstone, deep wood off a Ferry Gate, a plank off Narrow Pass's long walls, and a thud as a Twin Ball turns back from its own goal. The harder it's going, the louder.
+- Every talisman has its own pickup sound: a paper flutter and a short plucked tune. Boons climb, the Shrink Curse falls and Wilds twist about.
+- Sounds for the talismans' big moments: into and out of a portal, a Black Hole flinging the ball out and bursting into Twin Balls, the Snowball shoving a paddle back and ploughing through a stone, Sticky Goo sticking and slinging, a Tombstone sinking away, every Spirit Fire shot and every Blink hop.
+- A stone that's chipped cracks, and one that breaks crumbles.
 
 ### Changed
+- Your friend online hears the same match sounds you do, once each. The Firecracker's bang, a stone breaking, Sticky Goo, the portals and Soul Swap's warning tick were silent on their screen before. Replays play them all too.
+- A stone breaking no longer says "euugh": that's for points now.
 - Every computer player now goes back round a ball that has got between it and its goal, at every level, with the Middle Wall up or down. It keeps out of the ball's row so it doesn't knock it in, hurries back, and lines up the save. Before, only some tried, at random, and with the Middle Wall up the rest stepped aside and let it in.
 - Hard and Insane read the ball better, react quicker, hesitate less and place their returns a little more. Their shots are no harder.
 - Three game modes have new names: Chaos is Shape Shift, Switch is Soul Swap, and Talisman Rush is CHAOS. Your settings carry over. In a Soul Swap match the banner says "Swap!".

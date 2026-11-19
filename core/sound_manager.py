@@ -59,7 +59,7 @@ class SoundManager:
         self.next_channel = 0
 
         if pygame.mixer.get_init():
-            pygame.mixer.set_num_channels(16)
+            pygame.mixer.set_num_channels(24)       # (16 till 1.9, when a match got many more sounds)
             pygame.mixer.set_reserved(MUSIC_CHANNELS + 1)
         self.preload_sounds()
 
@@ -97,6 +97,8 @@ class SoundManager:
             return
         for path in SOUND_DIR.glob("*.wav"):
             SOUND_CACHE[path.name] = pygame.mixer.Sound(str(path))
+        for path in (SOUND_DIR / "Match").glob("*.wav"):           # (1.9: see core/match_sounds.py)
+            SOUND_CACHE["Match/" + path.name] = pygame.mixer.Sound(str(path))
         for name, _ in AMBIENCE:
             self.sound(name, SOUND_DIR / "Ambience")
 

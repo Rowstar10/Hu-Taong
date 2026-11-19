@@ -18,6 +18,7 @@ from config import BASE_W, BASE_H, MAX_BOUNCE_ANGLE
 from core import net as netcode
 from core.states.base_state import State
 from core.states.jukebox import JukeboxControls
+from core import match_sounds
 from core.states.replay_state import play_event
 from game import engines
 from game.powerups import PowerUps
@@ -29,7 +30,9 @@ WARP_IN = 0.4            # seconds after a serve over which the sliding clock ea
 GLIDE = 0.07             # how quickly a corrected ball glides to where it should be
 SNAP = 160               # a correction bigger than this is a jump (a Blink, a serve), not a glide
 RUN_ON = 0.1             # seconds the picture clock may run on past the newest picture when they stop coming
-BALL_EVENTS = ("hit", "wall", "stone")     # heard when the ball is drawn there, not by the pictures' clock
+# heard when the ball is drawn there, not by the pictures' clock (1.9: and a talisman's moments with the ball)
+BALL_EVENTS = ("hit", "wall", "stone", "chip", "crumble", "bang", "portal", "portal_out", "fling", "split",
+               "plough", "shove", "stick", "sling", "blaze", "blink")
 
 
 class _Feed:
@@ -228,7 +231,7 @@ class GuestMatchState(State):
             if clock > due:
                 keep.append((clock, kind, values))
                 continue
-            if kind == "hit" and values and values[0] == side and clock <= self.quiet_hit_until:
+            if kind in ("hit", "blaze") and values and values[0] == side and clock <= self.quiet_hit_until:
                 continue                            # heard already, the moment it happened here
             if kind == "teleport" and values and values[0] == side and self.clock <= self.quiet_teleport_until:
                 continue                            # your own teleport, made (and heard) here already
@@ -650,6 +653,8 @@ class GuestMatchState(State):
         sound = self.app.sound_manager
         if sound.paddle_hit_sound:
             sound.play("Hu.wav" if side == 1 else "Tao.wav")
+        if "fire" in mine_fx:
+            match_sounds.play(self.app, "blaze", (side,))      # (1.9: a blazing shot, heard here at once)
         paddle.flash = 1.0
         self.app.fx.spark(bx, by, 22, (255, 122, 44) if side == 1 else (120, 190, 255), speed = 520)
 

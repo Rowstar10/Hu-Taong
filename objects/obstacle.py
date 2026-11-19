@@ -1,4 +1,5 @@
 from config import BASE_H, KINEMATIC, STATIC
+from core import match_sounds
 from objects.game_object import GameObject
 
 
@@ -108,7 +109,7 @@ class Obstacle(GameObject):
         if self.hp <= 0:
             self.crumble()
             return True
-        self.game.app.sound_manager.play("countdown_tick.wav", multiplier = 0.6)
+        match_sounds.happen(self.game, "chip", cx, cy)
         return False
 
     def crumble(self):
@@ -122,7 +123,7 @@ class Obstacle(GameObject):
         fx = self.game.app.fx
         fx.spark(cx, cy, 40, (180, 166, 140), speed = 520, life = .8)
         fx.spark(cx, cy, 16, (120, 104, 88), speed = 300, life = 1.0)
-        self.game.app.sound_manager.play("euugh.wav", multiplier = 0.5)
+        match_sounds.happen(self.game, "crumble", cx, cy)          # ("euugh" till 1.9, as for a point)
 
     def restore(self):
         """A court stone broken (or chipped) during a point stands whole again for the next serve."""
