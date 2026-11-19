@@ -53,7 +53,8 @@ class GameState(State):
             self.game.update(dt)
             if not self.game.paused:
                 self.app.sound_manager.holes.hear(self.game.powerups.holes)     # (1.8)
-            self.app.stats.track(self.game, dt)
+            if not self.game.practice:                 # (Practice counts for nothing: 1.9)
+                self.app.stats.track(self.game, dt)
             recorder = self.game.recorder
             recorder.capture(dt)
             if self.game.net:
@@ -76,7 +77,8 @@ class GameState(State):
 
             total = self.game.p1.score + self.game.p2.score
             if total > self.last_total_score:
-                self.app.stats.points += total - self.last_total_score
+                if not self.game.practice:
+                    self.app.stats.points += total - self.last_total_score
                 self.app.renderer.shake(14, 0.3)
                 if self.app.touch:
                     self.app.touch.buzz(40, 170)

@@ -4,9 +4,10 @@ Every version of Hu Taong, newest first. Toki Hub shows each version's section o
 
 ## 1.9 — 2026-11-18
 
-Sounds for every surface the ball bounces off and for every talisman, computer players that go back round a ball that's got past them, a harder Hard and Insane, and three game modes renamed.
+A Practice mode, sounds for every surface the ball bounces off and for every talisman, computer players that go back round a ball that's got past them, a harder Hard and Insane, and three game modes renamed.
 
 ### Added
+- Practice, on Match Setup beside vs AI and vs Human: play on your own against a wall or the AI. You choose whether points count, and a talisman to practise with (only it turns up, even with Power-Ups off), or keep the talismans as set. Every other setting and mode works as usual, and nothing counts towards your stats. Against the wall, a miss counts against you and the match never ends; Soul Swap stays out, as there's no one to swap with.
 - The ball makes a sound off everything it bounces off: a light knock off the top and bottom of the court, stone off a tombstone, deep wood off a Ferry Gate, a plank off Narrow Pass's long walls, and a thud as a Twin Ball turns back from its own goal. The harder it's going, the louder.
 - Every talisman has its own pickup sound: a paper flutter and a short plucked tune. Boons climb, the Shrink Curse falls and Wilds twist about.
 - Sounds for the talismans' big moments: into and out of a portal, a Black Hole flinging the ball out, the Snowball shoving a paddle back and ploughing through a stone, Sticky Goo sticking and slinging, a Tombstone sinking away, every Spirit Fire shot and every Blink hop.

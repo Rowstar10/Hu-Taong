@@ -33,7 +33,7 @@ class WinState(JukeboxControls, State):
         sound_manager = self.app.sound_manager
         if getattr(winner.game, "net", None):          # online: counted as your own win or loss
             self.app.stats.record_online(not getattr(winner, "remote", False))
-        else:
+        elif not getattr(winner.game, "practice", False):     # (Practice counts for nothing: 1.9)
             self.app.stats.record_match(p1, winner, loser)
         save_data.save(self.app)
         if not winner.ai_enabled and loser.ai_enabled:

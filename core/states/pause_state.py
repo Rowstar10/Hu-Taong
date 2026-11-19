@@ -75,6 +75,8 @@ class PauseState(JukeboxControls, State):
             game = self.game_state.game
             toggles = [("p1_ai", f"{game.p1.color1} AI", lambda: game.p1.ai_enabled),     # (a Switch can
                        ("p2_ai", f"{game.p2.color1} AI", lambda: game.p2.ai_enabled)]     # swap the colours)
+            if getattr(game, "bench", None) is not None:      # (Practice against the wall: 1.9)
+                toggles = [t for t, p in zip(toggles, (game.p1, game.p2)) if p is not game.bench]
         if online:
             # with a friend waiting: carry on, or leave; the match is paused for both
             buttons = [("resume", "Resume", theme.GREEN, theme.GREEN_HOVER),

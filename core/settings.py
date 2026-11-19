@@ -128,6 +128,12 @@ class MatchSettings:
         # Match setup (chosen on the Match Setup screen)
         self.vs_ai = True            # True: you play one paddle and the AI takes the other.
         self.play_as_blue = False    # Which paddle is yours vs the AI (Red: W A S D, Blue: Arrow Keys).
+        # Practice (1.9, Rowan's plan): a match that counts for nothing, on your own against a wall
+        # or the AI, with every other setting and mode as usual
+        self.practice = False
+        self.practice_wall = True        # against a wall (off: against the AI)
+        self.practice_scoring = True     # points count (off: nobody scores, and it never ends)
+        self.practice_talisman = 0       # 0: the talismans as set; n: only POWERUP_KINDS[n - 1]
 
         self.winning_score_index = 2
         self.win_by_two = True
@@ -226,6 +232,28 @@ class MatchSettings:
         self.talismans_at_once = 0       # at_once_options[...]: 1
         for kind in POWERUP_KINDS:
             setattr(self, "pu_" + kind.key, True)
+
+    PRACTICE_NOT_VS_WALL = ("swap",)     # Soul Swap: against a wall there's no one to swap with
+
+    def practise(self):
+        """Practice's own rules, on a match's copy of them (1.9): with a talisman picked, only that
+        one turns up, Power-Ups on or not; against the wall, no swapping of paddles."""
+        n = self.practice_talisman
+        if 0 < n <= len(POWERUP_KINDS) and not (self.practice_wall and
+                                                POWERUP_KINDS[n - 1].key in self.PRACTICE_NOT_VS_WALL):
+            self.powerups = True
+            for kind in POWERUP_KINDS:
+                setattr(self, "pu_" + kind.key, kind.key == POWERUP_KINDS[n - 1].key)
+        if self.practice_wall:
+            self.mode_switch = False
+            for key in self.PRACTICE_NOT_VS_WALL:
+                setattr(self, "pu_" + key, False)
+        return self
+
+    def practice_talismans(self):
+        """The talismans the picker offers (0 is "As set"): against the wall, not Soul Swap."""
+        return [0] + [i + 1 for i, kind in enumerate(POWERUP_KINDS)
+                      if not (self.practice_wall and kind.key in self.PRACTICE_NOT_VS_WALL)]
 
     def copy(self):
         """The rules a match plays by: a copy, so what you change mid-match (from Pause) only comes

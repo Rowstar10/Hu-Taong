@@ -14,7 +14,7 @@ MODES = ["mode_chaos", "chaos_timing", "mode_switch", "switch_timing", "mode_cur
          "mode_lantern_night", "mode_twin_ball", "mode_talisman_rush", "mode_black_hole"]
 GAMEPLAY = ["paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "ball_speed",
             "winning_score_index", "win_by_two", "ai_difficulty", "adaptive_ai",
-            "vs_ai", "play_as_blue", "middle_wall", "ai_style", "pace", "physics", "speed_cap",
+            "vs_ai", "play_as_blue", "practice", "practice_wall", "practice_scoring", "practice_talisman", "middle_wall", "ai_style", "pace", "physics", "speed_cap",
             "powerups", "powerup_rate", "talismans_at_once", "court", "online_host_blue"] + MODES + ["pu_" + kind.key for kind in POWERUP_KINDS]
 DISPLAY = ["max_fps", "show_fps", "dim", "rotate_backgrounds", "background", "rotate_every", "parallax", "court_dim_level"]
 OLD_COURT_DIM = [0, 60, 100, 150]     # before the Court Dim slider: Off, Light, Medium, Strong (out of 255)
@@ -27,7 +27,7 @@ if ANDROID:
 INDEX_FIELDS = {"winning_score_index", "ai_difficulty", "max_fps", "background",
                 "ai_style", "chaos_timing", "switch_timing", "physics", "hud", "effects", "countdown", "fade", "ambience",
                 "instant_replay",
-                "rotate_every", "parallax", "powerup_rate", "talismans_at_once", "play_mode", "court",
+                "rotate_every", "parallax", "powerup_rate", "talismans_at_once", "play_mode", "court", "practice_talisman",
                 "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right",
                 "touch_steer", "touch_sensitivity"}  # whole numbers only
 SOUND = ["master_volume", "sfx_volume", "music_volume", "paddle_hit_sound", "score_sound",

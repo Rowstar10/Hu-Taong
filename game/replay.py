@@ -161,6 +161,7 @@ class Recorder:
                 "pace": g.settings.pace, "switch_each_point": g.settings.switch_each_point,
                 "switching": g.settings.switching,
                 "court": g.court.name, "strings": self.strings, "rows": ROWS,
+                "bench": 0 if getattr(g, "bench", None) is None else 1 if g.bench is g.p1 else 2,   # (1.9)
                 "title": f"{datetime.datetime.now():%d %b %Y, %H:%M}"}
 
     def new_point(self):
@@ -604,6 +605,8 @@ class ReplayView:
         self.p2 = ViewPaddle(self, False, "Blue", labels[1])
         self.ball = ViewBall(self)
         self.extra_balls = []           # Twin Balls' blue ball
+        bench = info.get("bench", 0)    # Practice against the wall (1.9): that side's paddle sits out
+        self.bench = self.p1 if bench == 1 else self.p2 if bench == 2 else None
         self.powerups = ViewPowerUps(self)
         self.stones = []
         self.objects = []
@@ -789,7 +792,7 @@ class ReplayView:
                         hole["size"], hole["collapse"] = v[8], None if v[9] < 0 else v[9]
                     pu.holes.append(hole)
                 pos += fields
-        self.objects = [*self.stones, self.p1, self.p2, ball, *self.extra_balls]
+        self.objects = [*self.stones, *[p for p in (self.p1, self.p2) if p is not self.bench], ball, *self.extra_balls]
 
 
 def replays_folder():

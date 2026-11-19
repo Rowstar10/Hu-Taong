@@ -37,6 +37,15 @@ TIPS = {
     "opponent_ai": "vs AI\nYou play one paddle, the AI the other.",
     "opponent_human": "vs Human\nTwo players on one keyboard.",
     "opponent_online": "Online\nPlay a friend over the internet: one of you hosts, the other joins with a code.",
+    "opponent_practice": "Practice\nPlay on your own, against a wall or the AI, with every setting and mode as usual.\n"
+                         "• Nothing counts towards your stats\n• Choose what you play against, whether points count, "
+                         "and a talisman to practise with",
+    "practice_wall": "Against a wall\nThe other end of the court is a wall: the ball always comes back.\n"
+                     "• With scoring on, it counts your misses; the match never ends",
+    "practice_ai": "Against the AI\nThe AI plays the other paddle, at the level and style set in Match settings.",
+    "practice_scoring_on": "Scoring on\nPoints count, as in a match.",
+    "practice_scoring_off": "Scoring off\nNobody scores: a ball that gets past is just served again, and the "
+                            "match goes on until you leave it.",
     "start_match": "Start Match\nPlay with the settings chosen here and in Match Settings.\n~ Enter",
 
     # Gameplay
@@ -608,6 +617,7 @@ class Renderer:
             for level in range(1, 5):
                 jobs.append(lambda finish=finish, level=level: art.paddle_flash(w, h, finish, level))
         jobs.append(self.warm_pause_screen)
+        jobs.append(lambda: art.stone(self.PRACTICE_WALL, BASE_H, "pillar"))      # (Practice's wall, 1.9)
 
         # Every size and colour of butterfly the game sends out, at every angle: goal bursts (64),
         # hits (48, 40), talismans taken (44), the Firecracker's bang (80), the swarm (88) and the
@@ -823,25 +833,28 @@ class Renderer:
                 return Button(key, text, f, colors, tip=tips.get(key))
 
             opponent = self.section(ui, s, "Opponent", Stack([
-                choice("opponent_ai",     "vs AI",    lambda: g.vs_ai),
-                choice("opponent_human",  "vs Human", lambda: not g.vs_ai),
-                choice("opponent_online", "Online",   lambda: False, (theme.BLUE, theme.BLUE_HOVER))],
+                choice("opponent_ai",       "vs AI",    lambda: g.vs_ai and not g.practice),
+                choice("opponent_human",    "vs Human", lambda: not g.vs_ai and not g.practice),
+                choice("opponent_practice", "Practice", lambda: g.practice),
+                choice("opponent_online",   "Online",   lambda: False, (theme.BLUE, theme.BLUE_HOVER))],
                 vertical=False, gap=gap, uniform=True))
 
-            vs_ai = lambda: g.vs_ai
+            vs_ai = lambda: g.vs_ai or g.practice
             paddle = self.section(ui, s, "Your Paddle", Stack([
                 choice("side_red",  "Red",  lambda: not g.play_as_blue, (theme.RED,  theme.RED_HOVER),  vs_ai),
                 choice("side_blue", "Blue", lambda: g.play_as_blue,     (theme.BLUE, theme.BLUE_HOVER), vs_ai)],
                 vertical=False, gap=gap, uniform=True))
 
             def summary():
-                if not g.vs_ai:
+                if not g.vs_ai and not g.practice:
                     return f"Red: {red_keys}      Blue: {blue_keys}"
                 me, ai = ("Blue", "Red") if g.play_as_blue else ("Red", "Blue")
                 keys = blue_keys if g.play_as_blue else red_keys
+                if g.practice and g.practice_wall:
+                    return f"You: {me} ({keys})      {ai}'s end: a wall"
                 return f"You: {me} ({keys})      AI: {ai}"
             samples = [f"You: Blue ({blue_keys})      AI: Red", f"You: Red ({red_keys})      AI: Blue",
-                       f"Red: {red_keys}      Blue: {blue_keys}"]
+                       f"Red: {red_keys}      Blue: {blue_keys}", f"You: Blue ({blue_keys})      Red's end: a wall"]
             caption = Text(summary, sm, theme.PARCHMENT, samples=samples)
 
             start = Button("start_match", "Start Match", ui.fnt(0.05, s), (theme.ORANGE, theme.ORANGE_HOVER),
@@ -855,7 +868,10 @@ class Renderer:
                                          tip=court_tip),
                                  Text(lambda: self.court_about(g.court), sm, theme.PARCHMENT,
                                       samples=[self.court_about(i) for i in range(len(names))]))
-            left = Stack([opponent, paddle, caption], gap=self.vgap(ui, s, 2))
+            column = [opponent, paddle]
+            if g.practice:                  # (Match Setup lays itself out again as Practice comes and goes)
+                column.append(self.practice_section(ui, s, sm, gap))
+            left = Stack([*column, caption], gap=self.vgap(ui, s, 1.4 if g.practice else 2))
             more = Button("open_match_settings", "Match Settings", f, (theme.BLUE, theme.BLUE_HOVER),
                           tip=TIPS["open_match_settings"])
             buttons = Stack([more, start], vertical=False, gap=int(BASE_W * 0.03 * s))
@@ -863,6 +879,31 @@ class Renderer:
                           self.modes_section(ui, s, sm), buttons], gap=self.vgap(ui, s, 1.4))
 
         ui.screen_menu(state, screen, build, title="对局 Match Setup", mark="战")
+
+    def practice_section(self, ui, s, font, gap):
+        """Practice's own choices (1.9): what you play against, whether points count, and a talisman
+        to practise with."""
+        g = self.app.settings.match
+        names = ["As set"] + [kind.name for kind in POWERUP_KINDS]
+
+        def pair(keys, texts, first):
+            def colours(on):
+                return lambda: (theme.GREEN, theme.GREEN_HOVER) if on() else (theme.GRAY, theme.GRAY_HOVER)
+            return Stack([Button(keys[0], texts[0], font, colours(first), tip=TIPS.get(keys[0])),
+                          Button(keys[1], texts[1], font, colours(lambda: not first()), tip=TIPS.get(keys[1]))],
+                         vertical=False, gap=gap // 2, uniform=True)
+
+        label = lambda text: Text(text, font, theme.GOLD, samples=["Talisman"], align="right")
+        talisman_tip = lambda: ("Talisman\nPractise with one talisman: only it turns up, every time one does, "
+                                "even with Power-Ups off.\n• As set: the talismans as Match settings have them"
+                                + ("\n~ Against the wall, Soul Swap can't be picked: there's no one to swap with"
+                                   if g.practice_wall else ""))
+        rows = [[label("Against"), pair(("practice_wall", "practice_ai"), ("Wall", "AI"), lambda: g.practice_wall)],
+                [label("Scoring"), pair(("practice_scoring_on", "practice_scoring_off"), ("On", "Off"),
+                                        lambda: g.practice_scoring)],
+                [label("Talisman"), Cycle("cycle_practice_talisman", lambda: names[g.practice_talisman], font, names,
+                                          tip=talisman_tip)]]
+        return self.section(ui, s, "Practice", Grid(rows, gap_x=gap // 2, gap_y=self.vgap(ui, s, 0.35)))
 
     @staticmethod
     def court_about(index):
@@ -2820,6 +2861,9 @@ class Renderer:
         powerups = getattr(game, "powerups", None)
         open_court = bool(powerups) and powerups.wall_open()
         self.draw_arena(screen, ox, oy, game.wall_up, cord=not open_court, flipped=game.p1.colour == "blue")
+        bench = getattr(game, "bench", None)
+        if bench is not None:
+            self.draw_practice_wall(screen, bench.is_left, ox, oy)
         if powerups:
             self.draw_goal_alerts(screen, game, powerups)
         for obj in game.objects:
@@ -2911,6 +2955,13 @@ class Renderer:
         words = self.art.gilded("LIVE  -  back to the match", self.fnt(0.036), glow=None)
         surf.blit(words, words.get_rect(midleft=(dot_x + 28, m + h // 2 - 2)))
         return surf
+
+    PRACTICE_WALL = 30          # px (as Hu_Taong.PRACTICE_WALL)
+
+    def draw_practice_wall(self, screen, left, ox, oy):
+        """Practice against the wall (1.9): a lacquered wall down that end of the court."""
+        sprite = self.art.stone(self.PRACTICE_WALL, BASE_H, "pillar")
+        screen.blit(sprite, (int((0 if left else BASE_W - self.PRACTICE_WALL) + ox), int(oy)))
 
     def draw_stone(self, screen, stone, ox, oy):
         """A court stone, rising out of the ground when it arrives and sinking when it goes."""

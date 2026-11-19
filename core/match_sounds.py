@@ -17,9 +17,9 @@ FOLDER = "Match"
 # What the ball bounced off, as a "wall" or "stone" event's third value (events from before 1.9 have
 # none: those were the top and bottom walls and tombstones, which it falls back to).  (The Middle
 # Wall only stops paddles: the ball goes through it, so it has no sound.)
-EDGE, GOAL = 0, 1                   # "wall": the top or bottom of the court, a Twin Balls goal
+EDGE, GOAL, PRACTICE = 0, 1, 2      # "wall": the top or bottom of the court, a Twin Balls goal, Practice's wall
 TOMB, GATE, PILLAR = 0, 1, 2        # "stone": a tombstone, a Ferry Gate, Narrow Pass's long walls
-WALL_SOUNDS = {EDGE: "edge", GOAL: "goal"}
+WALL_SOUNDS = {EDGE: "edge", GOAL: "goal", PRACTICE: "pillar"}
 STONE_SOUNDS = {TOMB: "tomb", GATE: "gate", PILLAR: "pillar"}
 STONE_KINDS = {"tomb": TOMB, "gate": GATE, "wall": PILLAR}       # Obstacle.kind -> the sound's code
 
@@ -76,6 +76,8 @@ def surface(other):
         return STONE_KINDS.get(getattr(other, "kind", "tomb"), TOMB)
     if getattr(other, "is_goal", False):
         return GOAL
+    if getattr(other, "practice", False):
+        return PRACTICE
     return EDGE
 
 

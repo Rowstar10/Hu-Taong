@@ -24,9 +24,11 @@ BANTER_CONCEDED = ["Hmph. Lucky shot.", "Ooh, not bad~", "Again! Again!", "You'l
 
 class Hu_Taong(GameBase):
     SWITCH_GRACE = 0.4          # a mid-rally Switch is armed this long before a hit sets it off
+    PRACTICE_WALL = 30          # px: how far the practice wall stands out from the end of the court
     MESSAGE_COLOURS = {"red": (255, 80, 80), "blue": (60, 140, 255)}
 
     def __init__(self, app, width=BASE_W, height=BASE_H):
+        self.practice, self.bench = False, None     # (see build_world)
         super().__init__(app, width, height)
         self.message_text = ""
         self.message_color = (255, 255, 255)
@@ -99,6 +101,26 @@ class Hu_Taong(GameBase):
             net.over = None
             net.guest_clear_tau = None
             net.guest_tells_tau = False
+
+        # Practice (1.9), never online: your paddle against the AI or a wall.  Against the wall, the
+        # other side's goal is a wall the ball bounces off, and the other paddle leaves the court.
+        self.practice = bool(settings.practice) and not net
+        self.bench = None                       # the paddle that sits out (against the wall)
+        if self.practice:
+            settings.practise()
+            you, other = (self.p2, self.p1) if settings.play_as_blue else (self.p1, self.p2)
+            you.ai_enabled, other.ai_enabled = False, not settings.practice_wall
+            if settings.practice_wall:
+                self.bench = other
+                self.objects.remove(other)
+                other.controls_label = "Wall"
+                wall = self.left_wall if other.is_left else self.right_wall
+                wall.is_goal, wall.practice = False, True
+                if other.is_left:                       # (its face where the wall is drawn)
+                    wall.x1 = self.PRACTICE_WALL
+                else:
+                    wall.x0 = BASE_W - self.PRACTICE_WALL
+                wall.width = wall.x1 - wall.x0
 
         self.ball = Ball(self, diameter = settings.ball_diameter, x = (BASE_W - settings.ball_diameter) / 2, y = (BASE_H - settings.ball_diameter) / 2, speed = settings.ball_speed, color = "white")
 
@@ -465,6 +487,8 @@ class Hu_Taong(GameBase):
         settings = self.settings
         sound_manager = self.app.sound_manager
         win_score = settings.winning_scores[settings.winning_score_index]
+        if self.bench is not None:
+            win_score = "Endless Mode"          # practice against the wall: it can only count your misses
 
         if nx != 0:
             cy = (obj.y0 + obj.y1) / 2
@@ -475,6 +499,8 @@ class Hu_Taong(GameBase):
                               speed = 720, life = .9, arc = arc)
 
         points = self.powerups.point_value()           # Double or Nothing makes it 2
+        if self.practice and not settings.practice_scoring:
+            points = 0                                 # (Practice with scoring off: nobody scores)
         if nx == 1:
             self.p2.score += points
             self.message_text = f"{self.p2.color1} scored!" + (" x2" if points == 2 else "")
@@ -505,6 +531,10 @@ class Hu_Taong(GameBase):
             return
 
         scorer = self.p2 if nx == 1 else self.p1
+        if scorer is self.bench:
+            self.message_text = "Missed!"
+        elif not points:
+            self.message_text = f"{scorer.color1}'s point (not counted)"
         self.recorder.on_point(scorer, False)
 
         if sound_manager.score_sound:
@@ -528,6 +558,8 @@ class Hu_Taong(GameBase):
         # A new serve plays by the rules as they stand now: anything changed since (from Pause)
         # comes in here, never mid-rally
         settings = self.settings = self.app.settings.match.copy()
+        if getattr(self, "practice", False):
+            settings.practise()
         if settings.chaos_each_point:
             settings.chaos_roll()
             self.apply_gameplay_settings()
@@ -580,11 +612,14 @@ class Hu_Taong(GameBase):
             for out, nx in ((cx < 0, 1), (cx > BASE_W, -1)):
                 if not out:
                     continue
-                if b.scores_in(nx):
+                walled = self.bench is not None and (nx == 1) == self.bench.is_left    # (Practice's wall)
+                if b.scores_in(nx) and not walled:
                     self.on_score(b, {"normal": (nx, 0)})
                     return
-                # Twin Balls: past its own colour's goal it is put back and turned round
-                cx = r + 6 if nx == 1 else BASE_W - r - 6
+                # Twin Balls: past its own colour's goal it is put back and turned round (and past
+                # Practice's wall, in front of it)
+                edge = self.PRACTICE_WALL if walled else 0
+                cx = edge + r + 6 if nx == 1 else BASE_W - edge - r - 6
                 b.x0, b.x1 = cx - r, cx + r
                 b.vx = nx * max(abs(b.vx), b.speed)
             if cy < r or cy > BASE_H - r:
