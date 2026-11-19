@@ -161,10 +161,17 @@ class Surfaces(unittest.TestCase):
         self.assertEqual(soft, 0.0)
 
     def test_a_rattle_is_heard_once(self):
-        with Heard() as names:
-            for _ in range(5):
+        from unittest import mock
+        clock = [100.0]
+        with mock.patch.object(match_sounds.time, "perf_counter", lambda: clock[0]):
+            with Heard() as names:
+                for _ in range(5):
+                    match_sounds.play(app, "wall", (10, 10, match_sounds.EDGE, 0.5))
+                    clock[0] += 0.005
+                self.assertEqual(len(names), 1)
+                clock[0] += match_sounds.AGAIN
                 match_sounds.play(app, "wall", (10, 10, match_sounds.EDGE, 0.5))
-        self.assertEqual(len(names), 1)
+                self.assertEqual(len(names), 2, "and again once the moment has passed")
 
 
 class Talismans(unittest.TestCase):

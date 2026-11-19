@@ -42,8 +42,7 @@ class MatchSettingsState(MatchControls, State):
                         setattr(m, field, (getattr(m, field) + step) % len(options))
 
             toggles = {"toggle_win_by_two": "win_by_two", "toggle_middle_wall": "middle_wall",
-                       "toggle_adaptive_ai": "adaptive_ai", "toggle_powerups": "powerups",
-                       "toggle_hole_twins": "hole_twins"}
+                       "toggle_adaptive_ai": "adaptive_ai", "toggle_powerups": "powerups"}
             if key in toggles:
                 setattr(m, toggles[key], not getattr(m, toggles[key]))
 

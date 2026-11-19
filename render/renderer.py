@@ -54,9 +54,6 @@ TIPS = {
                         "catching its own ball again\n~ Classic physics never passes on a paddle's speed: no "
                         "difference there",
     "open_powerups": "Choose Talismans\nSee what each talisman does, and choose which can appear.",
-    "toggle_hole_twins": "Black Hole Twins\nWhen a Black Hole collapses, the ball inside bursts out as Twin Balls.\n"
-                         "• Off: it comes out as one ball, heading for the goal it can score in\n"
-                         "• For the Black Hole talisman and the Black Hole mode alike",
     "open_ball_paddles": "Ball & Paddles\nThe ball's and paddles' sizes and speeds, the game's pace, and the physics.",
     "toggle_powerups": "Power-Ups\nTalismans appear on the court during a match.\n• Touch one with your paddle, or a ball you hit last\n~ Hold Tab in a match to see every power-up in play",
     "toggle_lantern_night": "Lantern Night\nThe court is always dark, lit only by lanterns round the paddles and the ball's glow.\n~ Off by default",
@@ -419,11 +416,31 @@ class Renderer:
         screen.blit(self.art.button(rect.w, rect.h, finish, hovered, down), (rect.x - m, rect.y - m + offset))
         return offset
 
-    def draw_lacquer(self, screen, mouse_pos, rect, text, font, finish, fg=None):
+    def draw_lacquer(self, screen, mouse_pos, rect, text, font, finish, fg=None, arrow=None):
         offset = self.draw_face(screen, mouse_pos, rect, finish)
         fg = fg or theme.LACQUER[finish][3]
         shadow = None if finish == "paper" else theme.INK
-        self.text(screen, text, font, fg, shadow, center=(rect.centerx, rect.centery - 3 + offset))
+        cy = rect.centery - 3 + offset
+        if arrow not in ("down", "up"):
+            self.text(screen, text, font, fg, shadow, center=(rect.centerx, cy))
+            return rect
+        # A small triangle after the text, pointing down while what it opens is closed, up while
+        # it's open (the font has no arrow characters, so it's drawn)
+        from render.ui.layout import arrow_room
+        room = arrow_room(font)
+        tw = font.size(text)[0]
+        left = rect.centerx - (tw + room) // 2
+        self.text(screen, text, font, fg, shadow, center=(left + tw // 2, cy))
+        size = max(6, int(font.get_height() * 0.3))
+        ax = left + tw + room - size // 2 - 2
+        ay = cy + 2
+        down = arrow == "down"
+        tip, half = size * 0.45, size * 0.55
+        points = [(ax - half, ay - tip), (ax + half, ay - tip), (ax, ay + tip)] if down else \
+                 [(ax - half, ay + tip), (ax + half, ay + tip), (ax, ay - tip)]
+        if shadow:
+            pygame.draw.polygon(screen, shadow, [(x + 2, y + 2) for x, y in points])
+        pygame.draw.polygon(screen, fg, points)
         return rect
 
     def draw_button(self, screen, mouse_pos, font, text, cx, cy, col, *, width=None):
@@ -756,8 +773,8 @@ class Renderer:
         "black_hole": "Black Hole\nA black hole drifts about mid-court all match, pulling the ball in and flinging it out.\n"
                       "• It grows with each ball it swallows, and stays that big point after point\n"
                       "• Grown five times, the next ball it swallows makes it collapse in on itself: the ball bursts\n"
-                      "  out as Twin Balls (or alone, with Black Hole Twins off), and mini black holes come and go till the point\n"
-                      "  ends; a new one opens at the next serve\n"
+                      "  out, heading for the goal it can score in, and mini black holes come and go till the point ends;\n"
+                      "  a new one opens at the next serve\n"
                       "~ The Black Hole talisman doesn't turn up"}
 
     def modes_section(self, ui, s, font, m=None, columns=3):
@@ -1260,9 +1277,7 @@ class Renderer:
                                            [Button("open_powerups", "Choose Talismans", sm, (theme.ORANGE, theme.ORANGE_HOVER),
                                                    tip=TIPS["open_powerups"]),
                                             Cycle("cycle_at_once", lambda: at_once[g.talismans_at_once], sm, at_once,
-                                                  tip=at_once_tip)],
-                                           [self.toggle(sm, "toggle_hole_twins", "Black Hole Twins", lambda: g.hole_twins,
-                                                        tip=TIPS["toggle_hole_twins"])]],
+                                                  tip=at_once_tip)]],
                                           gap_x=int(BASE_W * 0.012 * s), gap_y=self.vgap(ui, s, 0.35)),
                                      Text(lambda: f"{sum(getattr(g, 'pu_' + k.key) for k in POWERUP_KINDS)} of "
                                                   f"{len(POWERUP_KINDS)} talismans switched on", ty, theme.PARCHMENT,
@@ -3187,7 +3202,9 @@ class Renderer:
             if buttons is not None:
                 bf = ui.fnt(btn_size, s)
                 cols = getattr(state, "ui_cols", len(buttons))
-                nodes = [Button(key, text, bf, (c1, c2), tip=tips.get(key)) for key, text, c1, c2 in buttons]
+                arrows = getattr(state, "button_arrows", {})        # (1.9: e.g. Reset's, in the pause menu)
+                nodes = [Button(key, text, bf, (c1, c2), tip=tips.get(key), arrow=arrows.get(key))
+                         for key, text, c1, c2 in buttons]
                 rows = [nodes[i:i + cols] for i in range(0, len(nodes), cols)]
                 items.append(Grid(rows, gap_x=int(BASE_W * 0.015 * s), gap_y=int(ui.gap * s), uniform=True))
             if jukebox:

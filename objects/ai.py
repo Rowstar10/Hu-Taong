@@ -97,6 +97,8 @@ class PaddleAI:
     MEMORY = 0.5        # seconds of the ball's past positions it keeps
     EASE = 110          # px over which it slows down as it arrives
     STRIKE_TIME = 0.3   # seconds before contact that it drives forward into the ball
+    PICKUP_SPARE = 0.5  # seconds to spare it keeps, after its reaction time, on a trip for a talisman
+    RETURN_PACE = 2.0   # a return can come back this much faster than the ball went out (1 in 10 do, AI v AI)
     POUNCE_FASTEST = 2000   # px/s: a trickster only tries a pounce on a ball slower than this
 
     def __init__(self, paddle):
@@ -116,6 +118,7 @@ class PaddleAI:
         self.t_hit = math.inf
         self.pickup = None          # the power-up it has decided to go for
         self.pickup_cooldown = 0.0
+        self.pickup_hope = 0.0      # how much more time it thinks it has than it does, this shot
         self.heading = None         # direction of the ball last frame, to notice a sudden change
         self.power, self.fake = 1.0, False      # this shot's change of pace (a trickster's), and its fake lunge
         self.plan, self.pounce = None, None     # a trickster's trick for this shot; a pounce under way
@@ -442,24 +445,47 @@ class PaddleAI:
                 return x, y
         return None, None
 
+    def time_to_return(self):
+        """Seconds till the ball could be back on this paddle's line, at the soonest: on to the
+        other paddle (which meets it in front of the far wall), then back faster than it went (a
+        return often is).  (Till 1.9 it reckoned on the ball going right to the far wall and back
+        at the same speed, so a sharp AI set off for talismans it couldn't get back from in time,
+        and lost the point: Rowan's report.)"""
+        p = self.paddle
+        ball = p.game.ball
+        opp = self.opponent()
+        forward = 1 if p.is_left else -1
+        face = opp.x0 if p.is_left else opp.x1
+        line = p.x1 if p.is_left else p.x0
+        speed = max(abs(ball.vx), 1.0)
+        out = max(0.0, (face - (ball.x0 + ball.x1) / 2) * forward) / speed
+        back = max(0.0, (face - line) * forward) / (max(speed, getattr(ball, "speed", 0)) * self.RETURN_PACE)
+        return out + back
+
+    def trip_time(self, item, k):
+        """Seconds to go and take a talisman and get back to its post."""
+        p = self.paddle
+        px, py = (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2
+        there = math.hypot(item["x"] - px, item["y"] - py)
+        back = math.hypot(item["x"] - p.home_x, item["y"] - BASE_H / 2)
+        return (there + back) / max(1.0, p.speed * k["pace"])
+
     def pickup_target(self, k):
-        """Between shots, a sharp AI nips over to a power-up it can reach and get back from in time."""
+        """Between shots, a sharp AI nips over to a power-up it can reach and get back from in time,
+        with time to spare (the less sharp it is, the more often it misjudges it; how keen it is
+        goes with how much it plays for placement)."""
         p = self.paddle
         powerups = getattr(p.game, "powerups", None)
         if not powerups or not powerups.pickups or k["aim"] < 0.2:
             return None
-        ball = p.game.ball
         px, py = (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2
-        far = BASE_W if p.is_left else 0                  # the ball has to get there and back first
-        bx = (ball.x0 + ball.x1) / 2
-        back = (abs(far - bx) + abs(far - px)) / max(abs(ball.vx), 1)
+        have = self.time_to_return() * (1 + self.pickup_hope) * min(0.9, 0.5 + 0.5 * k["aim"])
         best, best_d = None, math.inf
         for item in powerups.pickups:
             if p.game.wall_up and (item["x"] < BASE_W / 2) != p.is_left:
                 continue                                   # on the other side of the wall
             d = math.hypot(item["x"] - px, item["y"] - py)
-            trip = 2 * d / max(1.0, p.speed * k["pace"])
-            if trip < back * 0.6 * k["aim"] and d < best_d:
+            if self.trip_time(item, k) + k["reaction"] + self.PICKUP_SPARE < have and d < best_d:
                 best, best_d = item, d
         return (best["x"], best["y"]) if best else None
 
@@ -476,12 +502,8 @@ class PaddleAI:
             if not powerups or item not in powerups.pickups:
                 self.pickup = None                      # taken, or faded away
             else:
-                ball = p.game.ball
-                px, py = (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2
-                far = BASE_W if p.is_left else 0
-                back = (abs(far - (ball.x0 + ball.x1) / 2) + abs(far - px)) / max(abs(ball.vx), 1)
-                trip = 2 * math.hypot(item["x"] - px, item["y"] - py) / max(1.0, p.speed * k["pace"])
-                if trip > back:                         # can't make it back: drop it for good
+                have = self.time_to_return() * (1 + self.pickup_hope)
+                if self.trip_time(item, k) + k["reaction"] > have:     # can't make it back: drop it for good
                     self.pickup, self.pickup_cooldown = None, 1.0
                     return None
                 return item["x"], item["y"]
@@ -600,6 +622,10 @@ class PaddleAI:
         if incoming and not self.incoming:
             self.new_shot(k, math.hypot(vx, vy))
             self.pickup = None                      # the ball comes first; it re-decides later
+        if self.incoming and not incoming:
+            # Away it goes: how far off its sense of time is till it's back (only the less sharp
+            # misjudge much: up to 30% at Normal, under 10% at Insane)
+            self.pickup_hope = random.uniform(0.0, k["misread"] / 400)
         self.incoming = incoming
         self.pickup_cooldown = max(0.0, self.pickup_cooldown - dt)
 

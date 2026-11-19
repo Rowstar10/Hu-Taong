@@ -174,8 +174,7 @@ KINDS = (
          "• Its heart pulses as it swallows the ball: no telling which way it will come out until it does\n"
          "• Each ball it swallows makes it bigger, and its pull stronger\n"
          "• Once it has grown five times, the next ball it swallows makes it collapse in on itself, and the\n"
-         "  ball bursts out as Twin Balls, each heading for the goal it can score in (or, with Black Hole\n"
-         "  Twins off in Match settings, alone, heading for the goal it can score in)\n"
+         "  ball bursts out, heading for the goal it can score in\n"
          "• You can hear it: a low hum while it's on the court, growing as it grows, and a roar as it collapses\n"
          "• Then mini black holes drift about until the point ends, each pulling the ball in and flinging\n"
          "  it on towards the side it was heading for\n"
@@ -1507,33 +1506,12 @@ class PowerUps:
     def spit(self, ball, hole, speed):
         """A full-grown Black Hole has collapsed in on itself with a ball inside (1.8; until Rowan's
         second playtest, Portal Pair's portals collapsed into a black hole that did this), and it
-        bursts: a lone ball comes out as Twin Balls, red heading for Blue's goal and blue for Red's
-        (where each can score), each at any angle (never straight up or down) and at half its
-        speed, as Twin Balls split (never slower than half a serve).  With two balls in play
-        already, or with Black Hole Twins off (Match settings: Rowan's fourth playtest, to try it),
-        the ball comes out alone, heading for the goal it can score in.  The hole is gone
-        in a flash, and mini black holes come and go till the point ends."""
-        game = self.game
-        app = game.app
-        if ball is game.ball and self.twin is None and getattr(self.settings, "hole_twins", True):
-            blue = self.new_blue(ball)
-            each = max(speed * 0.5, ball.speed * math.sqrt(2) * 0.5)
-            r = ball.width / 2
-            out = self.hole_style(hole)[2] + r + 6
-            blues_goal = self.scoring_way(ball)
-            for b, way, tint in ((ball, blues_goal, (255, 120, 100)), (blue, -blues_goal, (110, 170, 255))):
-                angle = self.fling_angle(hole, way)
-                dx, dy = math.cos(angle), math.sin(angle)
-                cx = hole["x"] + dx * out
-                cy = clamp(hole["y"] + dy * out, r + 2, BASE_H - r - 2)
-                b.x0, b.y0, b.x1, b.y1 = cx - r, cy - r, cx + r, cy + r
-                b.vx, b.vy = each * dx, each * dy
-                b.portal_cool, b.hole_cool, b.hole_time = self.PORTAL_COOL, self.HOLE_COOL, 0.0
-                for n in range(1, 5):                                 # streaks the way it goes
-                    app.fx.spark(cx + dx * 30 * n, cy + dy * 30 * n, 6, tint, speed = 160, life = .45)
-            ball.side, blue.side = "red", "blue"
-            self.twin = {"left": UNTIL_POINT, "ball": blue}
-            match_sounds.happen(game, "split", hole["x"], hole["y"])
+        bursts: the ball comes out alone, heading for the goal it can score in (come_out has sent
+        it).  The hole is gone in a flash, and mini black holes come and go till the point ends.
+        (In 1.8 a lone ball burst out as Twin Balls, unless Black Hole Twins was off in Match
+        settings.  Rowan, 1.9: "Make Black Hole Collapse shoot out just one ball, not twin balls.
+        And remove the setting to toggle between the two.")"""
+        app = self.game.app
         hole["dying"], hole["power"] = self.HOLE_IMPLODE * self.HOLE_BURST, 0.0     # (just the flash)
         self.minis = {"next": self.MINI_FIRST}
         renderer = getattr(app, "renderer", None)

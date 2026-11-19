@@ -9,7 +9,7 @@ Sounds for every surface the ball bounces off and for every talisman, computer p
 ### Added
 - The ball makes a sound off everything it bounces off: a light knock off the top and bottom of the court, stone off a tombstone, deep wood off a Ferry Gate, a plank off Narrow Pass's long walls, and a thud as a Twin Ball turns back from its own goal. The harder it's going, the louder.
 - Every talisman has its own pickup sound: a paper flutter and a short plucked tune. Boons climb, the Shrink Curse falls and Wilds twist about.
-- Sounds for the talismans' big moments: into and out of a portal, a Black Hole flinging the ball out and bursting into Twin Balls, the Snowball shoving a paddle back and ploughing through a stone, Sticky Goo sticking and slinging, a Tombstone sinking away, every Spirit Fire shot and every Blink hop.
+- Sounds for the talismans' big moments: into and out of a portal, a Black Hole flinging the ball out, the Snowball shoving a paddle back and ploughing through a stone, Sticky Goo sticking and slinging, a Tombstone sinking away, every Spirit Fire shot and every Blink hop.
 - A stone that's chipped cracks, and one that breaks crumbles.
 
 ### Changed
@@ -19,11 +19,19 @@ Sounds for every surface the ball bounces off and for every talisman, computer p
 - Hard and Insane read the ball better, react quicker, hesitate less and place their returns a little more. Their shots are no harder.
 - Three game modes have new names: Chaos is Shape Shift, Switch is Soul Swap, and Talisman Rush is CHAOS. Your settings carry over. In a Soul Swap match the banner says "Swap!".
 - CHAOS brings a new talisman every 1.5 to 3 seconds, whatever the spawn rate is set to. As Talisman Rush, it made the set rate three times as often.
-- Music: ten new spooky, playful tracks by Kevin MacLeod: six play in matches (Sneaky Snitch, Investigations, Moonlight Hall, Netherworld Shanty, Professor and the Plant, Marty Gots a Plan), two in the menus (Thinking Music, Brittle Rille), one when you win (Comic Hero) and one when you lose (Laconic Granny). "Chinese Game" and "Halloween Playful" join the match music too.
+- Music: seven new spooky, playful tracks by Kevin MacLeod: two play in matches (Moonlight Hall, Netherworld Shanty), three in the menus (Thinking Music, Brittle Rille, Sneaky Snitch), one when you win (Comic Hero) and one when you lose (Laconic Granny). "Chinese Game" and "Halloween Playful" join the match music too.
+- Monster Promenade, Scheming Weasel and Sunrise in the Dynasty were too calm for a match: they play in the menus now.
+- A Black Hole that collapses lets the ball out alone, heading for the goal it can score in. It burst out as Twin Balls before.
+- Computer players only go for a talisman when they can get back in time for the ball, and give up the chase sooner. They used to set off thinking the ball had to reach the far wall and come back at the same speed, and lost points for it.
+- The pause menu's Reset shows an arrow, down while Reset Point and Reset Match are hidden and up while they show.
+
+### Fixed
+- On Shuffle, the jukebox's Next button plays a random track. It played the next one in the list.
 
 ### Removed
 - Chaotic from the spawn rate: it's CHAOS's own now. If you had it set, you have Frequent.
 - Waltz of the Carnies, the circus-sounding match track.
+- Black Hole Twins, from Match settings: a collapsing Black Hole always lets the ball out alone now.
 
 ## 1.8 — 2026-11-18
 

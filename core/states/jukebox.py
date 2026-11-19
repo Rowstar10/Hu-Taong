@@ -64,7 +64,7 @@ class JukeboxControls:
             elif key == "cycle_music_left":
                 sound.step_track(-1)
             elif key == "cycle_music_right":
-                sound.step_track(1)
+                sound.next_track()
             elif key == "music_pause":
                 sound.toggle_music_pause()
             elif key == "music_mode":

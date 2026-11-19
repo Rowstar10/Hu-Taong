@@ -152,7 +152,6 @@ class MatchSettings:
         self.mode_twin_ball = False  # every point is played with two balls, Red's and Blue's (the Twin Balls rules)
         self.mode_talisman_rush = False   # CHAOS (Talisman Rush till 1.9): talismans on, every 1.5-3 s, no limit
         self.mode_black_hole = False      # a Black Hole all match, growing point after point till it collapses
-        self.hole_twins = True       # a Black Hole that collapses lets out Twin Balls (off: just the ball: 1.8)
                                           # (1.8: Portal Pair was the mode until Rowan's second playtest)
 
         self.court = 0               # Classic: an open court
@@ -385,7 +384,12 @@ class AudioSettings:
                         "Senbazuru.mp3",
                         "Million Elephants.ogg",
                         "Thinking Music.mp3",           # (1.9: quirky, a little spooky)
-                        "Brittle Rille.mp3"],
+                        "Brittle Rille.mp3",
+                        # 1.9, Rowan: too calm for a match, so they play here now
+                        "Scheming Weasel.mp3",
+                        "Sunrise in the Dynasty.mp3",
+                        "Monster Promenade.mp3",
+                        "Sneaky Snitch.mp3"],
 
             "game":    ["Hillichurl REMIX.mp3",
                         "Epic Conquest.mp3",
@@ -393,25 +397,20 @@ class AudioSettings:
                         "Operation Awesome.mp3",
                         "Big Mojo.mp3",
                         "Mountain Emperor.mp3",
-                        "Scheming Weasel.mp3",
                         "Graveyard Shift.mp3",
                         "Burnt Spirit.mp3",
-                        "Sunrise in the Dynasty.mp3",
                         "Chipnese.ogg",
                         "Taiko Drums.ogg",
                         "One-eyed Maestro.mp3",
-                        "Monster Promenade.mp3",
                         "Malicious.mp3",
                         "Chinese Tales.mp3",
                         "Drums of Dawn.mp3",
                         # 1.9: spooky and playful (Waltz of the Carnies, the circus one, is gone),
-                        # and Rowan's two picks (played once their files are in the folder)
-                        "Sneaky Snitch.mp3",
-                        "Investigations.mp3",
+                        # and Rowan's two picks (played once their files are in the folder).
+                        # (Rowan found seven too calm for a match: four play in the menus now, and
+                        # Investigations, Professor and the Plant and Marty Gots a Plan are gone.)
                         "Moonlight Hall.mp3",
                         "Netherworld Shanty.mp3",
-                        "Professor and the Plant.mp3",
-                        "Marty Gots a Plan.mp3",
                         "Chinese Game.mp3",
                         "Halloween Playful.mp3"],
 

@@ -33,7 +33,8 @@ last for a bit longer.  Maybe one spawns randomly every 0.5 - 1.5 seconds, and t
 5-10 seconds."  Up to six at once now (three would have held most of them back), 220 px apart.
 And "I would like to be able to see what it'd be like to play the game where black holes collapsing
 didn't spew out twin balls, but instead just one ball still": Black Hole Twins, a Match setting, on
-by default; off, the ball bursts out alone, heading for the goal it can score in.
+by default; off, the ball bursts out alone, heading for the goal it can score in.  In 1.9 Rowan
+settled it: one ball, always, and the switch is gone.
 """
 import json
 import math
@@ -238,47 +239,44 @@ class Collapsing(Match):
         self.assertTrue(self.ball.transit)
         self.assertAlmostEqual(h["collapse"], P.COLLAPSE_TIME / 2, delta = DT)
 
-    def test_then_a_lone_ball_bursts_out_as_twin_balls_heading_for_where_each_scores(self):
+    def test_then_the_ball_bursts_out_alone_heading_for_where_it_scores(self):
+        """Rowan, 1.9: "Make Black Hole Collapse shoot out just one ball, not twin balls.  And remove
+        the setting to toggle between the two."  (1.8 burst it out as Twin Balls, unless the Black
+        Hole Twins switch in Match settings was off.)"""
         h = self.grown()
-        speed = 1400.0
-        self.feed(speed)
-        self.play(P.COLLAPSE_TIME + 0.05, balls = [])
-        self.assertIsNotNone(self.pu.twin, "Twin Balls")
-        blue = self.pu.twin["ball"]
-        self.assertEqual((self.ball.side, blue.side), ("red", "blue"))
-        self.assertIn(blue, self.game.objects)
-        self.assertGreater(self.ball.vx, 0, "red heads for Blue's goal (on the right)")
-        self.assertLess(blue.vx, 0, "blue for Red's")
-        half = max(speed * 0.5, self.ball.speed * math.sqrt(2) * 0.5)
-        for b in (self.ball, blue):
-            self.assertGreaterEqual(abs(b.vx) / math.hypot(b.vx, b.vy), P.PORTAL_STEEPEST - 1e-6)
-            self.assertAlmostEqual(math.hypot(b.vx, b.vy), half, delta = 1, msg = "as Twin Balls split")
-        self.assertAlmostEqual(h["dying"], P.HOLE_IMPLODE * P.HOLE_BURST, msg = "gone in a flash")
-        self.assertIsNone(self.pu.big_hole())
-        self.assertTrue(self.pu.minis, "then the mini ones")
-
-    def test_with_black_hole_twins_off_it_bursts_out_alone(self):
-        h = self.grown()
-        self.game.settings.hole_twins = False
         self.feed(1400.0)
         self.play(P.COLLAPSE_TIME + 0.05, balls = [])
         self.assertIsNone(self.pu.twin, "no Twin Balls")
         self.assertEqual(len([o for o in self.game.objects if o.is_ball]), 1)
         self.assertGreater(self.ball.vx, 0, "heading for Blue's goal, where it scores")
+        self.assertGreaterEqual(abs(self.ball.vx) / math.hypot(self.ball.vx, self.ball.vy), P.PORTAL_STEEPEST - 1e-6)
         self.assertAlmostEqual(math.hypot(self.ball.vx, self.ball.vy), 1400.0, delta = 1, msg = "at its own speed")
-        self.assertIsNotNone(h["dying"], "the hole bursts all the same")
-        self.assertTrue(self.pu.minis, "and the mini ones come")
+        self.assertAlmostEqual(h["dying"], P.HOLE_IMPLODE * P.HOLE_BURST, msg = "gone in a flash")
+        self.assertIsNone(self.pu.big_hole())
+        self.assertTrue(self.pu.minis, "then the mini ones")
 
-    def test_black_hole_twins_is_a_match_setting_on_by_default(self):
+    def test_no_black_hole_twins_switch(self):
         m.reset()
-        self.assertTrue(m.hole_twins)
-        self.assertIn("hole_twins", save_data.collect(app)["gameplay"])
-        from tests.test_settings_menus import open_screen, click
-        screen = open_screen("match")
-        self.assertIn("toggle_hole_twins", screen.ui_hitboxes)
-        click(screen, "toggle_hole_twins")
-        self.assertFalse(m.hole_twins)
-        m.reset()
+        self.assertFalse(hasattr(m, "hole_twins"))
+        self.assertNotIn("hole_twins", save_data.collect(app)["gameplay"])
+        from tests.test_settings_menus import open_screen
+        self.assertNotIn("toggle_hole_twins", open_screen("match").ui_hitboxes)
+
+    def test_a_save_with_it_still_loads(self):
+        path = save_data.save_path()
+        kept = path.read_text() if path.exists() else None
+        try:
+            data = save_data.collect(app)
+            data["gameplay"]["hole_twins"] = False          # (1.8 wrote it)
+            path.parent.mkdir(parents = True, exist_ok = True)
+            path.write_text(json.dumps(data))
+            save_data.load(app)
+            self.assertFalse(hasattr(m, "hole_twins"))
+        finally:
+            if kept is None:
+                path.unlink()
+            else:
+                path.write_text(kept)
 
     def test_with_two_balls_in_play_the_ball_comes_out_alone(self):
         self.grown()
@@ -313,9 +311,10 @@ class Collapsing(Match):
 
     def test_said_so(self):
         about = BY_KEY["hole"].about
-        for words in ("drifts", "bigger", "collapse in on itself", "Twin Balls", "mini black holes",
-                      "Doesn't turn up in a Black Hole match"):
+        for words in ("drifts", "bigger", "collapse in on itself", "ball bursts out, heading for the goal it can score in",
+                      "mini black holes", "Doesn't turn up in a Black Hole match"):
             self.assertIn(words, about)
+        self.assertNotIn("Twin Balls", about)
 
 
 class InABlackHoleMatch(Match):

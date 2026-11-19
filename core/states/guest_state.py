@@ -31,7 +31,7 @@ GLIDE = 0.07             # how quickly a corrected ball glides to where it shoul
 SNAP = 160               # a correction bigger than this is a jump (a Blink, a serve), not a glide
 RUN_ON = 0.1             # seconds the picture clock may run on past the newest picture when they stop coming
 # heard when the ball is drawn there, not by the pictures' clock (1.9: and a talisman's moments with the ball)
-BALL_EVENTS = ("hit", "wall", "stone", "chip", "crumble", "bang", "portal", "portal_out", "fling", "split",
+BALL_EVENTS = ("hit", "wall", "stone", "chip", "crumble", "bang", "portal", "portal_out", "fling",
                "plough", "shove", "stick", "sling", "blaze", "blink")
 
 

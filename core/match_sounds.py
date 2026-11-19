@@ -29,7 +29,7 @@ SOUNDS = {
     "tomb": (3, 0.9), "gate": (3, 0.9), "pillar": (3, 0.9),
     "chip": (2, 0.8), "crumble": (1, 0.9),
     "portal_in": (1, 0.7), "portal_out": (1, 0.7),
-    "hole_fling": (1, 0.8), "twin_split": (1, 0.8),
+    "hole_fling": (1, 0.8),
     "plough": (1, 0.9), "shove": (1, 0.8),
     "goo_stick": (1, 0.8), "goo_sling": (1, 0.7),
     "tomb_sink": (1, 0.8), "blaze": (1, 0.8), "blink": (1, 0.8),
@@ -43,7 +43,6 @@ MOMENTS = {
     "portal": "portal_in",          # Portal Pair: into one...
     "portal_out": "portal_out",     # ...and out of the other
     "fling": "hole_fling",          # a Black Hole flings a ball out
-    "split": "twin_split",          # a collapsed Black Hole bursts into Twin Balls
     "plough": "plough",             # the Snowball ploughs through a stone...
     "shove": "shove",               # ...and shoves back the paddle that hit it
     "stick": "goo_stick",           # Sticky Goo: the ball sticks...

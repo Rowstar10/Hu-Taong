@@ -31,6 +31,9 @@ class PauseState(JukeboxControls, State):
         self.game_state = self.app.state_manager.get_state(GameState)
         self.ui_cols = 2
         self.reset_open = False       # Reset shows Reset Point and Reset Match beneath it while open
+        # ...and says so with an arrow: down while they're hidden, up while they show (1.9, Rowan:
+        # "I want it to be obvious that it is [a dropdown]")
+        self.button_arrows = {"reset": lambda: "up" if self.reset_open else "down"}
         self.init_jukebox()
 
     def enter(self, **kwargs):

@@ -222,6 +222,14 @@ class SoundManager:
         here = pool.index(self.now_playing) if self.now_playing in pool else (-1 if step > 0 else 0)
         self.play_music(pool[(here + step) % len(pool)])
 
+    def next_track(self):
+        """The jukebox's Next: on Shuffle, a random track; otherwise the next in order.  (Till 1.9 it
+        was always the next in order, even on Shuffle: Rowan's report.)"""
+        if self.app.settings.audio.play_mode == 1:
+            self.random_track()
+        else:
+            self.step_track(1)
+
     def random_track(self):
         """A random track from the current mood, other than the current one."""
         pool = self.pool

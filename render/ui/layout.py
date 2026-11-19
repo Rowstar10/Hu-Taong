@@ -194,16 +194,20 @@ class Title(Node):
 
 class Button(Node):
     """Lacquered button.  `colors` may be a callable returning (normal, hover);
-    the normal colour picks the finish, and DARK_GRAY means greyed out."""
+    the normal colour picks the finish, and DARK_GRAY means greyed out.  `arrow` ("down", "up",
+    or a callable answering one, or None) puts a small triangle after the text, for a button that
+    opens and closes more buttons (1.9: the pause menu's Reset)."""
 
-    def __init__(self, key, text, font, colors, samples=None, tip=None):
+    def __init__(self, key, text, font, colors, samples=None, tip=None, arrow=None):
         super().__init__()
         self.key, self.text, self.font = key, text, font
-        self.colors, self.samples, self.tip = colors, samples, tip
+        self.colors, self.samples, self.tip, self.arrow = colors, samples, tip, arrow
 
     def measure(self):
         samples = self.samples or [_val(self.text)]
         self.w = max(self.font.size(s)[0] for s in samples) + int(BASE_W * 0.03)
+        if self.arrow is not None:
+            self.w += arrow_room(self.font)
         self.h = self.font.size("Ag")[1] + int(BASE_H * 0.024)
         return self.w, self.h
 
@@ -212,9 +216,14 @@ class Button(Node):
         enabled = normal != theme.DARK_GRAY
         ui.renderer.draw_lacquer(ui.screen, ui.mouse if enabled else (-1, -1), self.rect,
                                  _val(self.text), self.font, theme.finish(normal),
-                                 fg=None if enabled else theme.GRAY)
+                                 fg=None if enabled else theme.GRAY, arrow=_val(self.arrow))
         ui.state.ui_hitboxes[self.key] = self.rect
         ui.offer_tip(self.rect, self.tip)
+
+
+def arrow_room(font):
+    """The width a button's arrow takes, with its gap from the text."""
+    return int(font.get_height() * 0.62)
 
 
 class Toggle(Node):

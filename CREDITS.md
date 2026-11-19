@@ -33,10 +33,10 @@ Both are under the SIL Open Font License 1.1. The licence texts are in `Resource
 | Shenyang.mp3 | menu | Shenyang | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Big Mojo.mp3 | game | Big Mojo | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Mountain Emperor.mp3 | game | Mountain Emperor | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
-| Scheming Weasel.mp3 | game | Scheming Weasel (faster version) | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Scheming Weasel.mp3 | menu | Scheming Weasel (faster version) | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Graveyard Shift.mp3 | game | Graveyard Shift | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Burnt Spirit.mp3 | game | Burnt Spirit | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
-| Sunrise in the Dynasty.mp3 | game | Sunrise in the Dynasty | Yottabyte1024 | CC-BY 3.0 | https://opengameart.org/content/sunrise-in-the-dynasty |
+| Sunrise in the Dynasty.mp3 | menu | Sunrise in the Dynasty | Yottabyte1024 | CC-BY 3.0 | https://opengameart.org/content/sunrise-in-the-dynasty |
 | Chipnese.ogg | game | Chipnese | Spring Spring | CC0 | https://opengameart.org/content/chipnese |
 | Taiko Drums.ogg | game | Taiko Drums | congusbongus | CC-BY 3.0 | https://opengameart.org/content/taiko-drums-seamless-loop |
 | Winner Winner.mp3 | win | Winner Winner! | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
@@ -53,7 +53,7 @@ Both are under the SIL Open Font License 1.1. The licence texts are in `Resource
 | Tea Roots.mp3 | menu | Tea Roots | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Senbazuru.mp3 | menu | Senbazuru | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | One-eyed Maestro.mp3 | game | One-eyed Maestro | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
-| Monster Promenade.mp3 | game | Monster Promenade | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Monster Promenade.mp3 | menu | Monster Promenade | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Malicious.mp3 | game | Malicious | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Monkeys Spinning Monkeys.mp3 | win | Monkeys Spinning Monkeys | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Heroic Age.mp3 | win | Heroic Age | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
@@ -63,12 +63,9 @@ Both are under the SIL Open Font License 1.1. The licence texts are in `Resource
 | Million Elephants.ogg | menu | Kingdom of a Million Elephants under a White Parasol | Spring Spring | CC0 | https://opengameart.org/content/kingdom-of-a-million-elephants-under-a-white-parasol |
 | Chinese Tales.mp3 | game | Chinese Tales (PSG version) | Snabisch | CC-BY 3.0 | https://opengameart.org/content/chinese-tales-psg-version |
 | Drums of Dawn.mp3 | game | Drums of Dawn | Magnesus | CC-BY 3.0 | https://opengameart.org/content/drums-of-dawn |
-| Sneaky Snitch.mp3 | game | Sneaky Snitch | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
-| Investigations.mp3 | game | Investigations | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
+| Sneaky Snitch.mp3 | menu | Sneaky Snitch | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Moonlight Hall.mp3 | game | Moonlight Hall | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Netherworld Shanty.mp3 | game | Netherworld Shanty | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
-| Professor and the Plant.mp3 | game | Professor and the Plant | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
-| Marty Gots a Plan.mp3 | game | Marty Gots a Plan | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Thinking Music.mp3 | menu | Thinking Music | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Brittle Rille.mp3 | menu | Brittle Rille | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
 | Comic Hero.mp3 | win | Comic Hero | Kevin MacLeod | CC BY 4.0 | https://incompetech.com |
@@ -104,11 +101,8 @@ Kevin MacLeod credit line, as his licence asks for it:
 - "Monkeys Spinning Monkeys" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Heroic Age" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Sneaky Snitch" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
-- "Investigations" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Moonlight Hall" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Netherworld Shanty" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
-- "Professor and the Plant" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
-- "Marty Gots a Plan" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Thinking Music" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Brittle Rille" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
 - "Comic Hero" Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/
@@ -136,7 +130,7 @@ and saved as mono 44.1 kHz WAV.  CC0 needs no credit, but credit is given anyway
 | Pack | Author | Licence | Source | Used for |
 | --- | --- | --- | --- | --- |
 | Impact Sounds (1.0) | Kenney | CC0 | https://kenney.nl/assets/impact-sounds | the ball off the court's top and bottom (edge_), a tombstone (tomb_), a Ferry Gate (gate_), Narrow Pass's walls (pillar_) and a Twin Balls goal (goal_); a stone chipped (chip_) and broken (crumble); the Snowball (plough, shove); and the snow, bell and thud in some pickups |
-| Interface Sounds (1.0) | Kenney | CC0 | https://opengameart.org/content/interface-sounds | Portal Pair (portal_in, portal_out), Blink Ball (blink), the pops of Twin Balls (twin_split), and whooshes in some pickups and the Black Hole's fling (hole_fling) |
+| Interface Sounds (1.0) | Kenney | CC0 | https://opengameart.org/content/interface-sounds | Portal Pair (portal_in, portal_out), Blink Ball (blink), the pops in Twin Balls' pickup, and whooshes in some pickups and the Black Hole's fling (hole_fling) |
 | RPG Audio | Kenney | CC0 | https://opengameart.org/content/50-rpg-sound-effects | the paper flutter in every talisman pickup, the coins in Double or Nothing's, cloth in Ghost Ball's and leather in Sticky Goo's |
 
 The talisman tunes in `talisman_*.wav` (plucked strings on a pentatonic scale), Lantern Night's temple

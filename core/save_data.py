@@ -14,7 +14,7 @@ MODES = ["mode_chaos", "chaos_timing", "mode_switch", "switch_timing", "mode_cur
          "mode_lantern_night", "mode_twin_ball", "mode_talisman_rush", "mode_black_hole"]
 GAMEPLAY = ["paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "ball_speed",
             "winning_score_index", "win_by_two", "ai_difficulty", "adaptive_ai",
-            "vs_ai", "play_as_blue", "middle_wall", "ai_style", "pace", "physics", "speed_cap", "hole_twins",
+            "vs_ai", "play_as_blue", "middle_wall", "ai_style", "pace", "physics", "speed_cap",
             "powerups", "powerup_rate", "talismans_at_once", "court", "online_host_blue"] + MODES + ["pu_" + kind.key for kind in POWERUP_KINDS]
 DISPLAY = ["max_fps", "show_fps", "dim", "rotate_backgrounds", "background", "rotate_every", "parallax", "court_dim_level"]
 OLD_COURT_DIM = [0, 60, 100, 150]     # before the Court Dim slider: Off, Light, Medium, Strong (out of 255)
