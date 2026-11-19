@@ -305,7 +305,13 @@ class Recorder:
         """Note something that happened (and answer the note, as replays and the friend online get it)."""
         event = (self.now, kind, *[round(v, 1) if isinstance(v, float) else v for v in values])
         self.events.append(event)
+        noted = getattr(self.game, "noted", None)
+        if noted:
+            noted(event)
         return event
+
+    def on_spawn(self, key):
+        return self.event("spawn", KIND_KEYS.index(key))
 
     def on_hit(self, ball, paddle, data):
         p = self.point

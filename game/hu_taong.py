@@ -194,6 +194,16 @@ class Hu_Taong(GameBase):
     def on_blink(self, x0, y0, x1, y1):
         self.hear(self.recorder.on_blink(x0, y0, x1, y1))
 
+    def on_spawn(self, key):
+        self.recorder.on_spawn(key)
+
+    def noted(self, event):
+        """Every event recorded: the talisman stats count from them (1.9), when the match screen has
+        asked (`tally`), and not in Practice."""
+        tally = getattr(self, "tally", None)
+        if tally is not None and not self.practice:
+            tally(event[1], event[2:])
+
     def moment(self, kind, *values):
         """Something worth hearing (core/match_sounds.py): recorded, for replays and the friend's
         screen online, and heard here."""

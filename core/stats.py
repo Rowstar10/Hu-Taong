@@ -1,5 +1,9 @@
 import datetime, json, math
 
+from game.powerups import KINDS
+
+TALISMAN_KEYS = [kind.key for kind in KINDS]      # (a "spawn" or "pickup" event's index, as game/replay.py's KIND_KEYS)
+
 
 class Stats:
     """Lifetime statistics.  Saved with the settings (see core/save_data.py)."""
@@ -27,6 +31,64 @@ class Stats:
     def reset(self):
         for key, value in self.DEFAULTS.items():
             setattr(self, key, value)
+        # Each talisman (1.9, Rowan's plan): [times it turned up, times taken, points won by whoever
+        # took it, points they lost], counting the point it was taken in.  Saved in a file of its
+        # own (see core/save_data.py), so an older version saving can't lose it.
+        self.talismans = {}
+        self.this_point = []        # (talisman, side 1 or 2) taken in the point being played
+
+    # ---------------- Talismans ----------------
+
+    def talisman(self, key):
+        return self.talismans.setdefault(key, [0, 0, 0, 0])
+
+    def new_match(self):
+        self.this_point = []
+
+    def tally(self, kind, values, key_of = None):
+        """One event of a match being played (game/replay.py's: here, or the host's online), for
+        the talisman stats: one turning up, one taken, a point won.  Each player's own stats count
+        their own matches, online too; Practice and replays don't count."""
+        key_of = key_of or (lambda i: TALISMAN_KEYS[int(i)] if 0 <= int(i) < len(TALISMAN_KEYS) else None)
+        try:
+            if kind == "spawn":
+                key = key_of(values[0])
+                if key:
+                    self.talisman(key)[0] += 1
+            elif kind == "pickup":
+                key = key_of(values[0])
+                if key:
+                    self.talisman(key)[1] += 1
+                    self.this_point.append((key, int(values[1])))
+            elif kind == "score":
+                for key, side in self.this_point:
+                    self.talisman(key)[2 if int(values[0]) == side else 3] += 1
+                self.this_point = []
+        except (IndexError, TypeError, ValueError):
+            pass                        # a damaged event is skipped
+
+    def talisman_line(self, key):
+        """The talisman page's line about it."""
+        seen, taken, won, lost = self.talismans.get(key, (0, 0, 0, 0))
+        if not seen and not taken:
+            return "Your stats: not seen in a match yet"
+        line = f"Your stats: turned up {seen} time{'s' if seen != 1 else ''}, taken {taken}"
+        if won + lost:
+            line += f", and whoever took it won {won} of the {won + lost} point{'s' if won + lost != 1 else ''} it was taken in"
+        return line
+
+    def talismans_dict(self):
+        return {key: list(counts) for key, counts in self.talismans.items()}
+
+    def load_talismans(self, data):
+        """From the file, or an import: anything unknown or nonsensical is dropped."""
+        self.talismans = {}
+        if not isinstance(data, dict):
+            return
+        for key, counts in data.items():
+            if key in TALISMAN_KEYS and isinstance(counts, list) and len(counts) == 4 and \
+                    all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in counts):
+                self.talismans[key] = list(counts)
 
     # ---------------- Saving ----------------
 
@@ -46,7 +108,16 @@ class Stats:
     def export_text(self):
         return json.dumps({"kind": self.FILE_KIND, "version": 1,
                            "exported": datetime.datetime.now().isoformat(timespec = "seconds"),
-                           "stats": self.to_dict()}, indent = 2)
+                           "stats": self.to_dict(), "talismans": self.talismans_dict()}, indent = 2)
+
+    @staticmethod
+    def read_export_talismans(text):
+        """The talisman stats in an exported file (1.9), or None."""
+        try:
+            data = json.loads(text)
+        except ValueError:
+            return None
+        return data.get("talismans") if isinstance(data, dict) else None
 
     @classmethod
     def read_export(cls, text):

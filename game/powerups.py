@@ -773,6 +773,9 @@ class PowerUps:
             off_stones = all(not (o.x0 - 50 < x < o.x1 + 50 and o.y0 - 50 < y < o.y1 + 50) for o in stones)
             if clear and apart and off_stones:
                 self.pickups.append({"kind": key, "x": x, "y": y, "age": 0.0, "phase": random.uniform(0, math.tau)})
+                hook = getattr(game, "on_spawn", None)
+                if hook:
+                    hook(key)
                 return
 
     def reached(self, item):

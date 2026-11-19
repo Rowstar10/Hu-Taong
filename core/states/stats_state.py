@@ -50,9 +50,12 @@ class StatsState(State):
             self.toast(f"{path.name} isn't a Hu Taong stats file")
             return
 
+        talismans = Stats.read_export_talismans(path.read_text(encoding = "utf-8"))
+
         def replace():
             self.app.stats.reset()
             self.app.stats.load_dict(stats)
+            self.app.stats.load_talismans(talismans)
             save_data.save(self.app)
             self.pop_state(mute = True)
             self.toast(f"Stats imported from {path.name}")

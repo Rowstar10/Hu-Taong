@@ -139,8 +139,9 @@ class _PowerTile(Node):
 
 
 class _PowerDetails(Node):
-    """The panel under the tiles: the power-up the mouse is on, in full (or a hint)."""
-    LINES = 7
+    """The panel under the tiles: the power-up the mouse is on, in full (or a hint), and your stats
+    for it (1.9)."""
+    LINES = 8
 
     def __init__(self, width, title_font, body_font, s):
         super().__init__()
@@ -170,9 +171,11 @@ class _PowerDetails(Node):
         ui.screen.blit(title, (x, y))
         ui.screen.blit(note, (x + title.get_width(), y + (title.get_height() - note.get_height()) // 2))
         y += title.get_height() + int(8 * self.s)
-        for line in kind.about.split("\n")[:self.LINES - 1]:
+        for line in kind.about.split("\n")[:self.LINES - 2]:
             ui.screen.blit(ui.text(self.body_font, line, theme.PARCHMENT), (x, y))
             y += self.line_h
+        stats = ui.text(self.body_font, ui.app.stats.talisman_line(key), theme.GOLD)
+        ui.screen.blit(stats, (x, r.bottom - self.pad - stats.get_height()))
 
 
 STYLE_TIPS = {

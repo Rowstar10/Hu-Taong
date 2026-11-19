@@ -19,6 +19,8 @@ class GameState(State):
         self.app.sound_manager.set_mood("game")
         if not self.game:
             self.game = Hu_Taong(self.app)
+            self.game.tally = self.app.stats.tally         # (the talisman stats, 1.9)
+            self.app.stats.new_match()
             self.game.start()
 
     def exit(self, **kwargs):

@@ -146,13 +146,20 @@ def _migrate_modes(m, saved):
     m.mode_lantern_night = saved.get("lantern_night") is True
 
 
+def talismans_path():
+    """The talisman stats (1.9): a file of their own, which older versions never touch (they rewrite
+    save.json with only what they know, and would drop them)."""
+    return data_dir() / "talisman_stats.json"
+
+
 def save(app):
     path = save_path()
     try:
         path.parent.mkdir(parents = True, exist_ok = True)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(collect(app), indent = 2))
-        tmp.replace(path)          # never leave a half-written save behind
+        for target, data in ((path, collect(app)), (talismans_path(), app.stats.talismans_dict())):
+            tmp = target.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, indent = 2))
+            tmp.replace(target)    # never leave a half-written save behind
     except OSError as e:
         print(f"[save_data] could not save: {e}")
 
@@ -191,3 +198,7 @@ def load(app):
     _restore(app.sound_manager, data.get("sound"), limits)
     _restore(s.online, data.get("online"), limits)
     app.stats.load_dict(data.get("stats"))
+    try:
+        app.stats.load_talismans(json.loads(talismans_path().read_text()))
+    except (OSError, ValueError):
+        pass                       # none yet, or a damaged file: none

@@ -201,6 +201,7 @@ class GuestMatchState(State):
         self.view = ReplayView(_Feed(meta), self.app)
         self.clock = None
         self.pending.clear()
+        self.app.stats.new_match()
         self.pred = None
         self.teleport_hold, self.teleport_claim = None, False
         self.history.clear()
@@ -217,6 +218,7 @@ class GuestMatchState(State):
                 if isinstance(event[0], int) and event[0] > net.played:
                     net.played = event[0]
                     self.pending.append((clock, event[1], event[2:]))
+                    self.app.stats.tally(event[1], event[2:], self.view.kind)     # (your talisman stats, 1.9)
                     log = net.__dict__.setdefault("event_log", [])
                     log.append((clock, event[1], event[2:]))     # for the replay afterwards
                     del log[:-20000]
