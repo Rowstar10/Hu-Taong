@@ -14,6 +14,15 @@ class GameplaySettingsState(State):
     def __init__(self, app):
         super().__init__(app)
         self.listening = None        # the key binding waiting for a new key, e.g. "p1_up"
+        self.listening_pad = None    # the controller action waiting for a button (1.9), e.g. "pause"
+
+    def stop_listening_pad(self):
+        self.listening_pad = None
+        self.app.gamepads.listen = None
+
+    def exit(self, **kwargs):
+        self.stop_listening_pad()
+        super().exit(**kwargs)
 
     def draw(self, screen):
         super().draw(screen)
@@ -21,6 +30,10 @@ class GameplaySettingsState(State):
 
     def handle_event(self, event):
         controls = self.app.settings.gameplay
+
+        if self.listening_pad and event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.stop_listening_pad()               # (Esc cancels a controller button too)
+            return
 
         # While a binding is waiting, the next key press is the new key (Esc cancels)
         if self.listening and event.type == pygame.KEYDOWN:
@@ -53,6 +66,20 @@ class GameplaySettingsState(State):
             if key and key.startswith("key_"):
                 field = key[4:]
                 self.listening = None if listening == field else field
+
+            if key in ("cycle_pad_first_left", "cycle_pad_first_right"):
+                controls.pad_first = 1 - controls.pad_first
+            if key and key.startswith("pad_") and key[4:] in controls.PAD_ACTIONS:
+                action = key[4:]
+                if self.listening_pad == action:
+                    self.stop_listening_pad()
+                else:
+                    def done(button, action = action):
+                        controls.bind_pad(action, button)
+                        self.listening_pad = None
+                        self.app.sound_manager.play("click.wav")
+                    self.listening_pad = action
+                    self.app.gamepads.listen = (action, done)
 
             if key == "reset_defaults":
                 self.confirm_reset("Reset gameplay settings?", self.app.reset_gameplay_settings)

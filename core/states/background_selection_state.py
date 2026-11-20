@@ -82,6 +82,8 @@ class BackgroundSelectionState(State):
         super().draw(screen)
         self.app.renderer.draw_background_selection(self, screen)
 
+    own_arrows = True                 # (up and down go through the pictures: not the menus' highlight)
+
     def handle_event(self, event):
         super().handle_event(event)
 

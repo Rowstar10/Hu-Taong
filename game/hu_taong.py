@@ -105,6 +105,7 @@ class Hu_Taong(GameBase):
         # Practice (1.9), never online: your paddle against the AI or a wall.  Against the wall, the
         # other side's goal is a wall the ball bounces off, and the other paddle leaves the court.
         self.practice = bool(settings.practice) and not net
+        self.label_pads()
         self.bench = None                       # the paddle that sits out (against the wall)
         if self.practice:
             settings.practise()
@@ -121,6 +122,7 @@ class Hu_Taong(GameBase):
                 else:
                     wall.x0 = BASE_W - self.PRACTICE_WALL
                 wall.width = wall.x1 - wall.x0
+            self.label_pads()
 
         self.ball = Ball(self, diameter = settings.ball_diameter, x = (BASE_W - settings.ball_diameter) / 2, y = (BASE_H - settings.ball_diameter) / 2, speed = settings.ball_speed, color = "white")
 
@@ -208,6 +210,16 @@ class Hu_Taong(GameBase):
         for listener in (getattr(self, "tally", None), getattr(self, "achieve", None)):
             if listener is not None:
                 listener(event[1], event[2:])
+
+    def label_pads(self):
+        """A paddle a controller steers says so (the HUD's label), when it's played here (1.9)."""
+        pads = getattr(self.app, "gamepads", None)
+        if pads is None or self.net:
+            return
+        for paddle in (self.p1, self.p2):
+            label = pads.label_for(paddle)
+            if label:
+                paddle.controls_label = label
 
     def you(self):
         """The sides (1 left, 2 right) played by someone here: no AI, not the friend online, not

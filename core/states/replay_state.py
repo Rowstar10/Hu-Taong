@@ -217,6 +217,8 @@ class ReplayState(State):
         k = max(0.0, min(1.0, (pos[0] - rect.left) / max(1, rect.width)))
         return k * (len(self.clip.frames) - 1)
 
+    own_arrows = True                 # (left and right step through the replay)
+
     def handle_event(self, event):
         super().handle_event(event)
         if event.type == pygame.MOUSEMOTION:

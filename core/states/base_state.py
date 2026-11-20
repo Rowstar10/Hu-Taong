@@ -16,6 +16,7 @@ class State:
     def __init__(self, app):
         self.app = app
         self.ui_hitboxes = {}
+        self.ui_values = {}           # each slider's value, 0-1, as drawn (a controller moves them: 1.9)
 
     def enter(self, mute = False, **kwargs):
         if not mute:
@@ -30,6 +31,7 @@ class State:
 
     def draw(self, screen):
         self.ui_hitboxes.clear()
+        self.ui_values.clear()
 
     def handle_event(self, event):        
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:

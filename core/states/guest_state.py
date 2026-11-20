@@ -49,6 +49,9 @@ def held_keys(app):
         k = controls.keys(player)
         bits |= (netcode.UP if k["up"] in keys else 0) | (netcode.DOWN if k["down"] in keys else 0)
         bits |= (netcode.LEFT if k["left"] in keys else 0) | (netcode.RIGHT if k["right"] in keys else 0)
+    pads = getattr(app, "gamepads", None)
+    if pads is not None:
+        bits |= pads.held_bits(netcode)             # (a controller's stick: 1.9)
     return bits
 
 

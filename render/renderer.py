@@ -10,6 +10,11 @@ from render.art import ADD, blank, mix, scaled, v_gradient
 from core.settings import key_name
 from core import net as netcode
 from core.platform import ANDROID
+from core.gamepad import LABELS as _PAD_LABELS
+
+
+def gamepad_labels(family):
+    return _PAD_LABELS[family]
 from core import rooms
 from game import courts
 from game.powerups import BY_KEY as POWERUPS, FAMILY_COLOURS, FAMILY_NOTES, KINDS as POWERUP_KINDS, PowerUps
@@ -225,6 +230,17 @@ def options_tip(title, intro, options, current=None, hint=None):
 KEY_HINTS = ("Esc", "Enter", "Space", "Ctrl", "Tab", "Keys:", "Mouse wheel", "Left / Right", "Hold Tab")
 
 
+def pad_tip(text):
+    """A tip as a controller player sees it: no keyboard shortcuts, and controls are pressed."""
+    lines = []
+    for line in text.split("\n"):
+        hint = line[2:] if line.startswith("~ ") else None
+        if hint is not None and (hint.startswith(KEY_HINTS) or (len(hint) == 1 and hint.isupper())):
+            continue
+        lines.append(line.replace("Click", "Press").replace("click", "press"))
+    return "\n".join(lines)
+
+
 def touch_tip(text):
     """A tip as a phone shows it: no keyboard shortcuts, and controls are tapped, not clicked."""
     lines = []
@@ -255,7 +271,8 @@ class Tooltips:
 
     def offer(self, rect, text):
         if text and rect.collidepoint(self.app.renderer.mouse()):
-            self.offered = touch_tip(text) if ANDROID else text
+            nav = getattr(self.app, "navigator", None)
+            self.offered = touch_tip(text) if ANDROID else pad_tip(text) if nav and nav.active and nav.via == "pad" else text
 
     def showing(self):
         """A tip is up (on a phone, a finger resting on a control asked for it)."""
@@ -785,7 +802,10 @@ class Renderer:
                 self.app.fx.spark(edge, top + random.uniform(0, h), 2, speed=120, life=.8,
                                   arc=(-2.2, -.9), gravity=-120)
 
-        self.text(screen, "Tap Play Game to begin   ·   Back to quit" if ANDROID else "Enter to play   ·   Esc to quit",
+        pads = self.app.gamepads
+        hint = ("Tap Play Game to begin   ·   Back to quit" if ANDROID else
+                f"{pads.label('a')} to play   ·   {pads.label('b')} to quit" if pads.pads else "Enter to play   ·   Esc to quit")
+        self.text(screen, hint,
                   self.fnt(0.024, bold=False),
                   theme.GOLD, center=(cx, 944))
 
@@ -851,6 +871,7 @@ class Renderer:
         blue_keys = self.app.settings.gameplay.keys_label("p2")
         tips = dict(TIPS, side_red=f"Red\nPlay the left paddle.\n~ Keys: {red_keys}",
                     side_blue=f"Blue\nPlay the right paddle.\n~ Keys: {blue_keys}")
+        red_keys, blue_keys = self.setup_controls(red_keys, blue_keys)
 
         def build(s):
             f, sm = ui.fnt(0.042, s), ui.fnt(0.03, s)
@@ -911,6 +932,19 @@ class Renderer:
                           self.modes_section(ui, s, sm), buttons], gap=self.vgap(ui, s, 1.4))
 
         ui.screen_menu(state, screen, build, title="对局 Match Setup", mark="战")
+
+    def setup_controls(self, red, blue):
+        """What Match Setup says each side plays with: its keys, or a controller (1.9)."""
+        g, pads = self.app.settings.match, self.app.gamepads
+        connected = len(pads.pads)
+        if not connected:
+            return red, blue
+        if g.vs_ai or g.practice:
+            return ("Controller", blue) if not g.play_as_blue else (red, "Controller")
+        first, second = ("Controller 1", "Controller 2") if connected > 1 else ("Controller", None)
+        if self.app.settings.gameplay.pad_first == 0:
+            return first, second or blue
+        return second or red, first
 
     def practice_section(self, ui, s, font, gap):
         """Practice's own choices (1.9): what you play against, whether points count, and a talisman
@@ -1464,9 +1498,37 @@ class Renderer:
             keys = self.section(ui, s, "Keys",
                                 Grid(rows, gap_x=int(BASE_W * 0.01 * s), gap_y=int(ui.gap * 0.6 * s)),
                                 Text("Click a key, then press the new one.", ty, theme.PARCHMENT))
-            return Grid([[keys, play]], gap_x=int(BASE_W * 0.08 * s))
+            return Grid([[keys, Stack([play, self.pad_section(ui, s, state, sm, ty)], gap=self.vgap(ui, s, 1.4))]],
+                        gap_x=int(BASE_W * 0.08 * s))
 
         ui.screen_menu(state, screen, build, title="玩法 Gameplay", mark="玩", reset="Reset to Default")
+
+    def pad_section(self, ui, s, state, font, small):
+        """Gameplay settings' Controller section (1.9): which side the first controller plays when two
+        play here, and its buttons for Pause and the talisman list."""
+        controls, pads = self.app.settings.gameplay, self.app.gamepads
+        sides = ["Red", "Blue"]
+        names = {"pause": "Pause", "list": "Talisman list"}
+        samples = ["Press a button", "Triangle", "Options", "D-pad right"]
+
+        def bind(action):
+            return KeyButton(f"pad_{action}", lambda: pads.label(getattr(controls, "pad_" + action)), font,
+                             lambda: state.listening_pad == action, samples,
+                             tip=f"{names[action]}\nThe controller button for it in a match.\n"
+                                 "• Click, then press the button on the controller\n"
+                                 "• A button that's already used swaps over\n~ Esc cancels")
+        rows = [[Text("First controller", font, theme.GOLD, align="right"),
+                 Cycle("cycle_pad_first", lambda: sides[controls.pad_first], font, sides,
+                       tip="First controller\nWith two players here, the side the first controller plays; the "
+                           "second plays the other.  The keyboard works for either.\n• On your own (against the AI, "
+                           "or online) any controller plays your paddle")]]
+        for action in controls.PAD_ACTIONS:
+            rows.append([Text(names[action], font, theme.GOLD, align="right"), bind(action)])
+        status = Text(lambda: (", ".join(p.name for p in pads.order()) + " connected") if pads.pads else
+                      "No controller connected", small, theme.PARCHMENT,
+                      samples=["No controller connected", "Xbox 360 Controller, Xbox 360 Controller connected"])
+        return self.section(ui, s, "Controller", Grid(rows, gap_x=int(BASE_W * 0.01 * s), gap_y=int(ui.gap * 0.6 * s)),
+                            status)
 
     # ── Power-ups ──────────────────────────────────────────────────────────────
 
@@ -2155,6 +2217,58 @@ class Renderer:
         y = int(lerp(-surf.get_height(), BASE_H * 0.02, 1 - (1 - t) ** 3))
         surf.set_alpha(None if age < drop + hold else int(255 * (1 - (age - drop - hold) / fade)))
         screen.blit(surf, (BASE_W // 2 - surf.get_width() // 2, y))
+
+    # ── Controllers (1.9) ──────────────────────────────────────────────────────
+
+    PAD_COLOURS = {"a": (84, 168, 64), "b": (204, 64, 52), "x": (56, 112, 206), "y": (222, 178, 40)}
+
+    def pad_badge(self, name, size):
+        """A controller button as a round badge, as its maker draws it: Xbox's coloured letters,
+        PlayStation's shapes, otherwise its name."""
+        fam = self.app.gamepads.labels() is gamepad_labels("playstation")
+        return self.art.get(("pad_badge", name, size, fam), self._pad_badge, name, size, fam)
+
+    def _pad_badge(self, name, size, playstation):
+        surf = blank(size, size)
+        r = size // 2
+        face = name in ("a", "b", "x", "y")
+        tint = self.PAD_COLOURS.get(name, (200, 190, 170)) if face else (200, 190, 170)
+        pygame.draw.circle(surf, (24, 18, 18), (r, r), r)
+        pygame.draw.circle(surf, tint, (r, r), r, max(2, size // 12))
+        if face and playstation:
+            k, c, w = size * 0.22, (r, r), max(2, size // 10)
+            ps = {"a": (150, 190, 255), "b": (255, 110, 110), "x": (240, 150, 210), "y": (110, 220, 160)}[name]
+            if name == "a":
+                pygame.draw.line(surf, ps, (r - k, r - k), (r + k, r + k), w)
+                pygame.draw.line(surf, ps, (r - k, r + k), (r + k, r - k), w)
+            elif name == "b":
+                pygame.draw.circle(surf, ps, c, int(k * 1.1), w)
+            elif name == "x":
+                pygame.draw.rect(surf, ps, (r - k, r - k, 2 * k, 2 * k), w)
+            else:
+                pygame.draw.polygon(surf, ps, [(r, r - k * 1.15), (r - k * 1.15, r + k * 0.8), (r + k * 1.15, r + k * 0.8)], w)
+            return surf
+        text = self.app.gamepads.labels().get(name, name)
+        font = self.ui.fnt(0.022 if len(text) < 3 else 0.016)
+        label = font.render(text if len(text) < 6 else text[:5], True, tint if face else theme.PARCHMENT)
+        surf.blit(label, label.get_rect(center=(r, r)))
+        return surf
+
+    def draw_pad_prompts(self, screen):
+        """While a controller works the menus: what A and B do, at the bottom right."""
+        nav = self.app.navigator
+        if not nav.active or nav.via != "pad" or not self.app.gamepads.pads:
+            return
+        font, size = self.ui.fnt(0.026), 44
+        x, y = BASE_W - 40, BASE_H - 50
+        for name, what in (("b", "Back"), ("a", "Select")):
+            text = font.render(what, True, theme.GOLD_BRIGHT)
+            x -= text.get_width()
+            screen.blit(text, text.get_rect(midleft=(x, y)))
+            badge = self.pad_badge(name, size)
+            x -= size + 10
+            screen.blit(badge, (x, y - size // 2))
+            x -= 34
 
     def draw_toast(self, screen, dt):
         """Slides in at the bottom-left, holds, then fades out."""

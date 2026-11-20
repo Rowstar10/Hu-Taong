@@ -21,7 +21,8 @@ OLD_COURT_DIM = [0, 60, 100, 150]     # before the Court Dim slider: Off, Light,
 AUDIO = ["play_mode", "even_volume", "fade", "menu_sounds", "ambience"]
 INTERFACE = ["tooltips", "ai_banter", "screen_shake", "ball_trail", "auto_pause", "hide_cursor",
              "hud", "effects", "countdown", "instant_replay",
-             "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right"]
+             "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right",
+             "pad_first", "pad_pause", "pad_list"]
 if ANDROID:
     INTERFACE += ["touch_steer", "touch_sensitivity", "vibration"]
 INDEX_FIELDS = {"winning_score_index", "ai_difficulty", "max_fps", "background",
@@ -29,7 +30,7 @@ INDEX_FIELDS = {"winning_score_index", "ai_difficulty", "max_fps", "background",
                 "instant_replay",
                 "rotate_every", "parallax", "powerup_rate", "talismans_at_once", "play_mode", "court", "practice_talisman",
                 "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right",
-                "touch_steer", "touch_sensitivity"}  # whole numbers only
+                "touch_steer", "touch_sensitivity", "pad_first"}  # whole numbers only
 SOUND = ["master_volume", "sfx_volume", "music_volume", "paddle_hit_sound", "score_sound",
          "master_muted", "sfx_muted", "music_muted"]
 ONLINE = ["own_server", "server_address", "server_user", "server_password"]
@@ -58,6 +59,7 @@ def _limits(app):
                   countdown = (0, len(m.countdown_options) - 1),
                   touch_steer = (0, len(g.touch_steer_options) - 1),
                   touch_sensitivity = (0, len(g.touch_sensitivity_options) - 1),
+                  pad_first = (0, 1),
                   fade = (0, len(a.fade_options) - 1),
                   play_mode = (0, 2),
                   ambience = (0, len(a.ambience_options) - 1),
@@ -203,6 +205,9 @@ def load(app):
     _restore_section(s, data.get("interface"), limits)
     if not s.gameplay.keys_valid():
         s.gameplay.reset_keys()    # a missing or doubled-up key would leave a paddle uncontrollable
+    if not s.gameplay.pads_valid():
+        for action, button in s.gameplay.PAD_DEFAULTS.items():
+            setattr(s.gameplay, "pad_" + action, button)
     _restore(app.sound_manager, data.get("sound"), limits)
     _restore(s.online, data.get("online"), limits)
     app.stats.load_dict(data.get("stats"))

@@ -10,6 +10,7 @@ import tempfile
 GAME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 os.environ["SDL_AUDIODRIVER"] = "dummy"
+os.environ["HUTAONG_NO_PADS"] = "1"          # real controllers left out: tests add made-up ones (1.9)
 os.environ["APPDATA"] = tempfile.mkdtemp(prefix = "hutaong-tests-")
 os.chdir(GAME)
 if GAME not in sys.path:

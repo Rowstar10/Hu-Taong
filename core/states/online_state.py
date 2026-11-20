@@ -256,6 +256,10 @@ class OnlineState(MatchControls, State):
         if name in SERVER_FIELDS:
             self.sync_server()
 
+    def typing(self):
+        """A text box has the keys (so the arrow keys and Enter aren't the menus' highlight's)."""
+        return bool(self.focus)
+
     def handle_event(self, event):
         super().handle_event(event)
         if event.type == pygame.TEXTINPUT:

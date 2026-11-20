@@ -70,6 +70,10 @@ class Paddle(GameObject):
                 other = self.game.app.settings.gameplay.keys("p2" if self.up == self.game.app.settings.gameplay.p1_up else "p1")
                 dvx = dvx or self.speed * ((other["right"] in keys) - (other["left"] in keys))
                 dvy = dvy or self.speed * ((other["down"] in keys) - (other["up"] in keys))
+            pads = getattr(self.game.app, "gamepads", None)   # a controller's stick (core/gamepad.py, 1.9)
+            steer = pads.steer_paddle(self) if pads is not None else None
+            if steer is not None:
+                dvx, dvy = steer
             touch = getattr(self.game.app, "touch", None)     # on a phone, a finger on this paddle (core/touch.py)
             steer = touch.steer_paddle(self) if touch else None
             if steer is not None:

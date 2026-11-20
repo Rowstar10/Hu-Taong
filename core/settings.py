@@ -303,8 +303,14 @@ class GameplaySettings:
         self.touch_sensitivity_options = ["Low", "Normal", "High", "Very High"]
         self.reset()
 
+    PAD_ACTIONS = ("pause", "list")         # a controller's buttons in a match (1.9): Pause, the talisman list
+    PAD_DEFAULTS = {"pause": "start", "list": "back"}
+
     def reset(self):
         self.auto_pause = True       # pause a match when the window loses focus
+        self.pad_first = 0           # two players: the first controller plays Red (1: Blue), the second the other
+        for action, button in self.PAD_DEFAULTS.items():
+            setattr(self, "pad_" + action, button)
         self.touch_steer = 0         # (a phone) Drag
         self.touch_sensitivity = 1   # (a phone) Normal
         self.vibration = True        # (a phone) a buzz when your paddle hits the ball, and at each point
@@ -322,6 +328,18 @@ class GameplaySettings:
         if keys == {a: self.DEFAULT_KEYS[f"p2_{a}"] for a in self.ACTIONS}:
             return "Arrow Keys"
         return " ".join(key_name(keys[a]) for a in ("up", "left", "down", "right"))
+
+    def bind_pad(self, action, button):
+        """A controller button for `action`.  One that already had it swaps, as keys do."""
+        for other in self.PAD_ACTIONS:
+            if other != action and getattr(self, "pad_" + other) == button:
+                setattr(self, "pad_" + other, getattr(self, "pad_" + action))
+        setattr(self, "pad_" + action, button)
+
+    def pads_valid(self):
+        from core.gamepad import BUTTONS, FIXED
+        buttons = [getattr(self, "pad_" + a) for a in self.PAD_ACTIONS]
+        return all(b in BUTTONS and b not in FIXED for b in buttons) and len(set(buttons)) == len(buttons)
 
     def bind(self, field, key):
         """Give `field` this key.  A binding that already had it swaps, so no key is used twice."""

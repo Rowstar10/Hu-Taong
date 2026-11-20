@@ -414,6 +414,9 @@ class Slider(Node):
             ui.state.ui_hitboxes[self.mute_key] = self.mute_rect
 
         ui.state.ui_hitboxes[self.key] = self.grab
+        values = getattr(ui.state, "ui_values", None)
+        if values is not None:
+            values[self.key] = value
         if self.reset_key and self.reset_rect.collidepoint(ui.mouse):
             ui.offer_tip(self.reset_rect, "Reset\nBack to the default value.")
         elif self.mute_key and self.mute_rect.collidepoint(ui.mouse):

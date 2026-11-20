@@ -7,6 +7,7 @@ from core.backgrounds import Backgrounds
 from core.settings import Settings
 from core.stats import Stats
 from core.achievements import Achievements
+from core.gamepad import Gamepads, Navigator
 from core.sound_manager import SoundManager
 from core.state_manager import StateManager
 from core.states.base_state import State
@@ -44,6 +45,8 @@ class App:
         self.stats = Stats()
         self.achievements = Achievements()        # (1.9)
         self.achievements.on_earn = self.earned
+        self.navigator = Navigator(self)          # the menus' highlight, for a controller or the arrow keys (1.9)
+        self.gamepads = Gamepads(self)            # controllers (1.9)
         self.choose_file = files.ask      # the Save / Open dialog (tests swap in their own)
         self.net = None                   # an online session (core/net.py) while hosting or joining
         save_data.load(self)
@@ -205,6 +208,10 @@ class App:
         the menus, or nowhere when no finger is down."""
         if self.touch:
             return self.touch.pointer
+        navigator = getattr(self, "navigator", None)
+        point = navigator.point() if navigator is not None else None
+        if point is not None:
+            return point                  # the menus' highlight stands in for the mouse (1.9)
         return self.window_to_base(pygame.mouse.get_pos())
 
     def pointer_down(self):
@@ -494,6 +501,7 @@ class App:
         events = pygame.event.get()
         if self.touch:                    # fingers become steering, or the menus' mouse
             events = self.touch.flush() + [e for raw in events for e in self.touch.translate(raw)]
+        events = [e for raw in events for e in self.gamepads.translate(raw)]    # (controllers, the arrow keys: 1.9)
         for event in events:
             
             # ---------- Essential Events ----------
@@ -551,6 +559,7 @@ class App:
             self.net.update(self.dt)
             self.online_requests()
         self.state_manager.update(self.dt)
+        self.gamepads.update(self.dt)
         if self.touch:
             self.touch.update(self.dt)
         if self.net:
@@ -570,6 +579,9 @@ class App:
 
         for state in stack[self.state_manager.screen_index():]:
             state.draw(self.virtual)
+        self.navigator.snapshot()
+        self.navigator.draw(self.virtual)
+        self.renderer.draw_pad_prompts(self.virtual)
 
         if not quiet_menus:
             self.fx.draw_front(self.virtual)
