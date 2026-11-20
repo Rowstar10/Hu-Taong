@@ -38,9 +38,11 @@ class Groups(unittest.TestCase):
                            "powerup_rate", "pu_fire", "countdown", "mode_chaos", "chaos_timing", "mode_switch",
                            "switch_timing", "mode_curveball", "mode_lantern_night", "mode_twin_ball",
                            "mode_talisman_rush", "mode_black_hole", "physics", "speed_cap"],
-                 "gameplay": ["p1_up", "p2_right", "auto_pause", "touch_steer", "touch_sensitivity", "vibration"],
+                 "gameplay": ["p1_up", "p2_right", "touch_steer", "touch_sensitivity", "vibration",
+                              "pad_stick", "pad_deadzone", "pad_up", "mouse_steer", "mouse_side"],
                  "display": ["max_fps", "dim", "court_dim_level", "effects", "screen_shake", "ball_trail"],
-                 "interface": ["tooltips", "ai_banter", "hud", "instant_replay", "hide_cursor"]}
+                 "interface": ["tooltips", "ai_banter", "hud", "instant_replay", "hide_cursor",
+                               "auto_pause"]}                   # (1.9, Rowan: Auto-Pause to UI)
         for group, names in where.items():
             for name in names:
                 self.assertIs(s.group_of(name), getattr(s, group), f"{name} should be in {group}")

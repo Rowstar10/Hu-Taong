@@ -35,7 +35,7 @@ class Hud:
         # Each score plate swells briefly when its score changes
         self._scores = {}
         self._pops = {}
-        self._wind_way = 0                      # Wind Gust: 1 blowing down, -1 up (for the arrow by its icon)
+        self._wind_way = None                   # Wind Gust: the angle it blows at, or None (for the arrow by its icon)
 
     # ------------------------------------------------------------------
     # Public draw entry point
@@ -67,8 +67,8 @@ class Hud:
             if live and "double" in court_keys:        # Double or Nothing: a big x2 by both scores
                 self.draw_double(screen, left - 130)
                 self.draw_double(screen, right + 130)
-            force = powerups.wind_force() if hasattr(powerups, "wind_force") else 0.0
-            self._wind_way = (1 if force > 0 else -1) if force else 0
+            wx, wy = powerups.wind_vector() if hasattr(powerups, "wind_vector") else (0.0, 0.0)
+            self._wind_way = math.atan2(wy, wx) if (wx or wy) else None
             top = 196 if owners else 150
             self.draw_effects(screen, powerups.effect_list(p1), left, top)
             self.draw_effects(screen, powerups.effect_list(p2), right, top)
@@ -201,12 +201,15 @@ class Hud:
                 arc.center = (x, top + 22)
                 pygame.draw.arc(screen, FAMILY_COLOURS[kind.family], arc, math.pi / 2, math.pi / 2 + k * math.tau, 3)
             renderer.text(screen, self.label(key, left, charges), font, theme.PARCHMENT, center=(x, top + 56))
-            if key == "wind" and self._wind_way:
-                # which way it's blowing: an arrow beside the icon
-                way, ax, ay = self._wind_way, x + 32, top + 22
-                tip = (ax, ay + way * 16)
-                pygame.draw.line(screen, theme.PARCHMENT, (ax, ay - way * 14), (ax, ay + way * 6), 4)
-                pygame.draw.polygon(screen, theme.PARCHMENT, [tip, (ax - 8, ay + way * 4), (ax + 8, ay + way * 4)])
+            if key == "wind" and self._wind_way is not None:
+                # which way it's blowing (any way, 1.9): an arrow beside the icon
+                ux, uy = math.cos(self._wind_way), math.sin(self._wind_way)
+                ax, ay = x + 34, top + 22
+                tip = (ax + ux * 16, ay + uy * 16)
+                base = (ax + ux * 4, ay + uy * 4)
+                pygame.draw.line(screen, theme.PARCHMENT, (ax - ux * 14, ay - uy * 14), base, 4)
+                pygame.draw.polygon(screen, theme.PARCHMENT, [tip, (base[0] - uy * 8, base[1] + ux * 8),
+                                                              (base[0] + uy * 8, base[1] - ux * 8)])
             x += step
 
     def draw_double(self, screen, cx):

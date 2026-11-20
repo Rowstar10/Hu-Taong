@@ -560,14 +560,15 @@ class FriendsScreenAndReplays(Match):
 
     def test_earlier_1_8_rows_still_load(self):
         """Rows from before this playtest (layout 3) gave each black hole 15 numbers: its way out,
-        two arrows and where Portal Pair's portals were as they collapsed (kind 2)."""
+        two arrows and where Portal Pair's portals were as they collapsed (kind 2).  (Layout 5, 1.9,
+        ends with the wind's push across: layout 3 had none, so it's taken off too.)"""
         rec = self.game.recorder
         self.hole.update(x = 900.0, y = 500.0)
         rec.capture(1 / 60)
         clip = rec.clip()
         row = array("f")
         row.frombytes(clip.frames[-1])
-        old = list(row[:-HOLE_FIELDS]) + [900.0, 500.0, 2, 1.0, 3.0, 0.0, -1.0, 1, NO_AIM, NO_AIM, NO_AIM,
+        old = list(row[:-HOLE_FIELDS - 1]) + [900.0, 500.0, 2, 1.0, 3.0, 0.0, -1.0, 1, NO_AIM, NO_AIM, NO_AIM,
                                           -200.0, 0.0, 200.0, 0.0]
         clip.frames[-1] = array("f", old).tobytes()
         clip.info["rows"] = 3

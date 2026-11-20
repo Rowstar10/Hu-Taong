@@ -33,6 +33,13 @@ BG_OVERSCAN = (30, 17)
 EPSILON = 0.001
 HALF_PI = math.pi / 2
 MAX_BOUNCE_ANGLE = math.radians(60)
+BALL_PACE = 0.9         # the ball is served this much slower than its Ball Speed setting, and so the
+                        # speed floor and ceiling built on the serve are this much lower, while the
+                        # paddles keep their speed (Rowan, 1.9: Game Pace's slower ball, without its
+                        # slower paddles).  A paddle's push isn't scaled: at 0.9 a paddle pushing its
+                        # own slow ball along couldn't send it faster than itself, and was held behind
+                        # it (1.8's "moves like a turtle").  The Speed Cap keeps its limit (game/
+                        # engines.py cap_drive).  1.0 is 1.8's ball.
 MAX_BALL_SPEEDUP = 4.5  # hard hits speed the ball up to at most this many times its serve speed
                         # (it was 2.4, which flattened every swing to the same speed: the player
                         # couldn't out-hit the AI any more, as they could in the original physics)

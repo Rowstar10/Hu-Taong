@@ -155,6 +155,9 @@ class GuestMatchState(State):
         touch = self.app.touch        # on a phone, a finger on your paddle (core/touch.py)
         net.axis = (touch.guest_axis(self, getattr(self, "own_speed", 1500))
                     if touch and self.app.state_manager.current() is self else None)
+        mouse = getattr(self.app, "mouse_steer", None)     # or the mouse, if it steers (1.9)
+        if net.axis is None and mouse is not None and self.app.state_manager.current() is self:
+            net.axis = mouse.guest_axis(self, getattr(self, "own_speed", 1500))
         if not net.snaps:
             return
         newest, row, info, _ = net.snaps[-1]
@@ -638,7 +641,7 @@ class GuestMatchState(State):
         # Swift Step: the host plays a hit as if the paddle went at its normal top speed
         factor = PowerUps.SWIFT if "swift" in mine_fx else 1.0
         speed = getattr(self, "own_speed", 0)
-        top = speed / factor if factor > 1 and speed else math.inf
+        top = speed / factor * engines.push_pace(capped) if factor > 1 and speed else math.inf   # (1.9)
         if capped and serve:
             top = min(top, engines.cap_drive(serve))
         hits = getattr(ball, "rally_value", 0) + (getattr(ball, "last_paddle", None) is not paddle)      # Classic: this hit's number
@@ -742,13 +745,15 @@ class GuestMatchState(State):
         res = (0.6 + 0.4) / 2
         rvn = (pvx - bvx) * nx + (pvy - bvy) * ny
         kvx, kvy, qvx, qvy = bvx, bvy, pvx, pvy
+        k = engines.push_pace(capped)                  # the paddle's push as the ball feels it (1.9), as the host plays it
+        spvx, spvy = pvx * k, pvy * k
         if rvn <= 0:
-            imp = -(1 + res) * rvn / 1.05
+            imp = -(1 + res) * min(0.0, (spvx - bvx) * nx + (spvy - bvy) * ny) / 1.05
             kvx, kvy = bvx - imp * nx, bvy - imp * ny
             qvx, qvy = pvx + imp * nx * 0.05, pvy + imp * ny * 0.05
-        drive = -(pvx * nx + pvy * ny)
+        drive = -(spvx * nx + spvy * ny)
         if nx and drive > top:                                 # Swift Step: knocked as if at its normal speed
-            cvx, cvy = pvx + nx * (drive - top), pvy + ny * (drive - top)
+            cvx, cvy = spvx + nx * (drive - top), spvy + ny * (drive - top)
             crvn = (cvx - bvx) * nx + (cvy - bvy) * ny
             kvx, kvy = bvx, bvy
             if crvn <= 0:
@@ -793,7 +798,7 @@ class GuestMatchState(State):
         chasing = qvx * out_x + qvy * out_y
         leaving = vx * out_x + vy * out_y
         need = chasing + 150
-        want = max(need, min(min(chasing, top) * 1.3, cap if serve else math.inf))
+        want = max(need, min(min(chasing * k, top) * 1.3, cap if serve else math.inf))
         current = physics not in (engines.CLASSIC, engines.V09) or not serve
         if chasing > 0 and leaving < want and not pinched and ny == 0 and current and not capped:
             total = math.hypot(vx, vy)

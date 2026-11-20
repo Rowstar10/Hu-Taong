@@ -11,6 +11,7 @@ friend who joined doesn't see it at all.
 import unittest
 
 from tests import harness
+from config import BALL_PACE                                    # noqa: E402  (the ball's pace, 1.9)
 
 app = harness.app()
 
@@ -79,12 +80,12 @@ class MidMatch(unittest.TestCase):
         self.assertFalse(m.middle_wall)
         game.apply_gameplay_settings()
         self.assertTrue(game.wall_up, "not mid-rally")
-        self.assertNotEqual(game.ball.speed, m.ball_speed_max)
+        self.assertNotEqual(game.ball.speed, m.ball_speed_max * BALL_PACE)
         game.on_score(game.ball, {"normal": (1, 0)})
         game.message_timer = 0.001
         game.update(0.01)                                        # the next serve
         self.assertFalse(game.wall_up)
-        self.assertEqual(game.ball.speed, m.ball_speed_max)
+        self.assertEqual(game.ball.speed, m.ball_speed_max * BALL_PACE)
         self.assertEqual(game.countdown.shown_value, 2)
 
     def test_a_mode_switched_on_comes_in_at_the_next_serve(self):

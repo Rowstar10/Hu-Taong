@@ -126,14 +126,12 @@ class MatchSettings:
         self.speed_cap = False       # a paddle can only pass on so much of its speed to the ball
 
         # Match setup (chosen on the Match Setup screen)
-        self.vs_ai = True            # True: you play one paddle and the AI takes the other.
+        self.vs_ai = True            # True: you play one paddle and the AI takes the other ("Practice vs AI").
         self.play_as_blue = False    # Which paddle is yours vs the AI (Red: W A S D, Blue: Arrow Keys).
-        # Practice (1.9, Rowan's plan): a match that counts for nothing, on your own against a wall
-        # or the AI, with every other setting and mode as usual
-        self.practice = False
-        self.practice_wall = True        # against a wall (off: against the AI)
-        self.practice_scoring = True     # points count (off: nobody scores, and it never ends)
-        self.practice_talisman = 0       # 0: the talismans as set; n: only POWERUP_KINDS[n - 1]
+        # Practice vs AI's two choices (1.9: Practice was a mode of its own till Rowan folded it in).
+        # Either one makes it a practice match, which counts for nothing
+        self.vs_wall = False         # the far end is a wall, not the AI
+        self.scoring = True          # points count (off: nobody scores, and it never ends)
 
         self.winning_score_index = 2
         self.win_by_two = True
@@ -233,27 +231,14 @@ class MatchSettings:
         for kind in POWERUP_KINDS:
             setattr(self, "pu_" + kind.key, True)
 
-    PRACTICE_NOT_VS_WALL = ("swap",)     # Soul Swap: against a wall there's no one to swap with
+    NOT_VS_WALL = ("swap",)          # Soul Swap: against a wall there's no one to swap with
 
-    def practise(self):
-        """Practice's own rules, on a match's copy of them (1.9): with a talisman picked, only that
-        one turns up, Power-Ups on or not; against the wall, no swapping of paddles."""
-        n = self.practice_talisman
-        if 0 < n <= len(POWERUP_KINDS) and not (self.practice_wall and
-                                                POWERUP_KINDS[n - 1].key in self.PRACTICE_NOT_VS_WALL):
-            self.powerups = True
-            for kind in POWERUP_KINDS:
-                setattr(self, "pu_" + kind.key, kind.key == POWERUP_KINDS[n - 1].key)
-        if self.practice_wall:
-            self.mode_switch = False
-            for key in self.PRACTICE_NOT_VS_WALL:
-                setattr(self, "pu_" + key, False)
+    def wall_rules(self):
+        """Against the wall (1.9), on a match's copy of the rules: no swapping of paddles."""
+        self.mode_switch = False
+        for key in self.NOT_VS_WALL:
+            setattr(self, "pu_" + key, False)
         return self
-
-    def practice_talismans(self):
-        """The talismans the picker offers (0 is "As set"): against the wall, not Soul Swap."""
-        return [0] + [i + 1 for i, kind in enumerate(POWERUP_KINDS)
-                      if not (self.practice_wall and kind.key in self.PRACTICE_NOT_VS_WALL)]
 
     def copy(self):
         """The rules a match plays by: a copy, so what you change mid-match (from Pause) only comes
@@ -289,7 +274,8 @@ def key_name(key):
     return name.upper() if len(name) == 1 else name.title()
 
 class GameplaySettings:
-    """Your own controls: the keys, Auto-Pause, and on a phone the touch steering."""
+    """Your own controls (Settings > Controls, "Gameplay" till 1.9): the keys, a controller's
+    buttons and stick, the mouse, and on a phone the touch steering and vibration."""
 
     ACTIONS = ("up", "down", "left", "right")
     KEY_FIELDS = ("p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right")
@@ -303,16 +289,26 @@ class GameplaySettings:
         self.touch_sensitivity_options = ["Low", "Normal", "High", "Very High"]
         self.reset()
 
-    # A controller's buttons in a match (1.9): Pause, the talisman list, and online the five emotes
-    PAD_ACTIONS = ("pause", "list", "emote_1", "emote_2", "emote_3", "emote_4", "emote_5")
+    # A controller's buttons in a match (1.9): Pause, the talisman list, online the five emotes, and
+    # (Rowan, "more custom controls for the controller") the paddle's four directions
+    PAD_ACTIONS = ("pause", "list", "emote_1", "emote_2", "emote_3", "emote_4", "emote_5",
+                   "up", "down", "left", "right")
     PAD_DEFAULTS = {"pause": "start", "list": "back", "emote_1": "y", "emote_2": "x", "emote_3": "b",
-                    "emote_4": "leftshoulder", "emote_5": "rightshoulder"}
+                    "emote_4": "leftshoulder", "emote_5": "rightshoulder",
+                    "up": "dpad_up", "down": "dpad_down", "left": "dpad_left", "right": "dpad_right"}
+    PAD_STICKS = ["Left stick", "Right stick", "Either stick"]      # which steers in a match
+    PAD_DEADZONES = ["Small", "Normal", "Large"]                     # how much of a stick's travel is ignored
+    SIDES = ["Red", "Blue"]
 
     def reset(self):
-        self.auto_pause = True       # pause a match when the window loses focus
         self.pad_first = 0           # two players: the first controller plays Red (1: Blue), the second the other
         for action, button in self.PAD_DEFAULTS.items():
             setattr(self, "pad_" + action, button)
+        self.pad_stick = 0           # PAD_STICKS: the left stick steers
+        self.pad_deadzone = 1        # PAD_DEADZONES: Normal
+        # The mouse (1.9, Rowan): the paddle heads for the pointer once the mouse moves in a match
+        self.mouse_steer = False
+        self.mouse_side = 0          # two players here: the mouse plays Red (1: Blue)
         self.touch_steer = 0         # (a phone) Drag
         self.touch_sensitivity = 1   # (a phone) Normal
         self.vibration = True        # (a phone) a buzz when your paddle hits the ball, and at each point
@@ -337,6 +333,13 @@ class GameplaySettings:
             if other != action and getattr(self, "pad_" + other) == button:
                 setattr(self, "pad_" + other, getattr(self, "pad_" + action))
         setattr(self, "pad_" + action, button)
+
+    def reset_emotes(self):
+        """The emotes' buttons back to their defaults (Controls > Emotes' Reset), swapping with any
+        action that has one of them now."""
+        for action in self.PAD_ACTIONS:
+            if action.startswith("emote_"):
+                self.bind_pad(action, self.PAD_DEFAULTS[action])
 
     def pads_valid(self):
         from core.gamepad import BUTTONS, FIXED
@@ -514,7 +517,7 @@ class AudioSettings:
         return Path(track).stem if track else ""
 
 class InterfaceSettings:
-    """Menus, the HUD and tooltips."""
+    """Menus, the HUD, tooltips and (1.9) Auto-Pause."""
 
     def __init__(self, app):
         self.app = app
@@ -527,6 +530,7 @@ class InterfaceSettings:
 
     def reset(self):
         self.tooltips = True
+        self.auto_pause = True       # pause a match when the window loses focus (in Gameplay till 1.9)
         self.ai_banter = True
         self.hide_cursor = True      # hide the mouse during a match until it moves
         self.friend_emotes = True    # online, your friend's quick emotes show (1.9)

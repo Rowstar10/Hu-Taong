@@ -5,9 +5,10 @@ menus.  Like the phone's fingers (core/touch.py), it turns what it's given into 
 
 * In a match, the left stick (or the D-pad) steers a paddle, as finely as the stick is pushed.
   With one player here (against the AI, or online) every controller steers that player's paddle;
-  with two, the first controller takes the side set in Gameplay and the second the other, and the
-  keyboard still works for either.  The buttons for Pause and the talisman list can be changed in
-  Gameplay settings.
+  with two, the first controller takes the side set in Controls and the second the other, and the
+  keyboard still works for either.  Controls settings can change the buttons for Pause, the
+  talisman list, the emotes and the paddle's four directions, which stick steers, and how much of
+  the stick's travel is ignored.
 * In the menus, the D-pad or stick moves a highlight from control to control, A presses it, B goes
   back, the right stick scrolls and left/right on a slider moves it.  The arrow keys and Enter
   move the same highlight from the keyboard (Navigator).
@@ -28,6 +29,7 @@ except Exception:                       # (an older pygame, or a phone without i
     sdl_controller = None
 
 DEADZONE = 0.28                         # of the stick's travel, ignored (sticks never rest at 0)
+DEADZONES = (0.15, DEADZONE, 0.4)       # Controls' Small, Normal and Large (1.9)
 AXIS_MAX = 32767
 REPEAT_FIRST, REPEAT_EVERY = 0.38, 0.11     # seconds: holding a direction in the menus
 SCROLL_EVERY = 0.12                     # seconds between scroll steps with the right stick held
@@ -37,8 +39,12 @@ BUTTONS = {name: getattr(pygame, "CONTROLLER_BUTTON_" + name.upper(), None) for 
            ("a", "b", "x", "y", "back", "guide", "start", "leftstick", "rightstick",
             "leftshoulder", "rightshoulder", "dpad_up", "dpad_down", "dpad_left", "dpad_right")}
 NAME_OF = {code: name for name, code in BUTTONS.items() if code is not None}
-DPAD = {"dpad_up": (0, -1), "dpad_down": (0, 1), "dpad_left": (-1, 0), "dpad_right": (1, 0)}
-FIXED = ("a", "dpad_up", "dpad_down", "dpad_left", "dpad_right")     # not for actions: steering, and A selects
+DPAD = {"dpad_up": (0, -1), "dpad_down": (0, 1), "dpad_left": (-1, 0), "dpad_right": (1, 0)}   # (the menus')
+FIXED = ("a",)                          # not for a match's actions: A selects in the menus
+# The sticks' axes, (x, y), for Controls' "Steer with": the left, the right, or either
+_LEFT = (getattr(pygame, "CONTROLLER_AXIS_LEFTX", 0), getattr(pygame, "CONTROLLER_AXIS_LEFTY", 1))
+_RIGHT = (getattr(pygame, "CONTROLLER_AXIS_RIGHTX", 2), getattr(pygame, "CONTROLLER_AXIS_RIGHTY", 3))
+STICK_AXES = ((_LEFT,), (_RIGHT,), (_LEFT, _RIGHT))
 
 # What each family of controller calls its buttons
 _LETTERS = {"a": "A", "b": "B", "x": "X", "y": "Y", "start": "Start", "back": "Back", "guide": "Guide",
@@ -77,19 +83,9 @@ class Pad:
         self.buttons = set()            # names of the buttons held
         self.axes = {}                  # SDL axis -> -1..1
 
-    def axis(self, axis):
+    def axis(self, axis, deadzone = DEADZONE):
         v = self.axes.get(axis, 0.0)
-        return 0.0 if abs(v) < DEADZONE else math.copysign((abs(v) - DEADZONE) / (1 - DEADZONE), v)
-
-    def stick(self):
-        """The left stick, or the D-pad if it's held: (x, y), each -1..1."""
-        x = self.axis(getattr(pygame, "CONTROLLER_AXIS_LEFTX", 0))
-        y = self.axis(getattr(pygame, "CONTROLLER_AXIS_LEFTY", 1))
-        dx = ("dpad_right" in self.buttons) - ("dpad_left" in self.buttons)
-        dy = ("dpad_down" in self.buttons) - ("dpad_up" in self.buttons)
-        if dx or dy:
-            return float(dx), float(dy)
-        return x, y
+        return 0.0 if abs(v) < deadzone else math.copysign((abs(v) - deadzone) / (1 - deadzone), v)
 
 
 class Gamepads:
@@ -99,8 +95,9 @@ class Gamepads:
         self.last = None                # the one used last (its labels for the prompts)
         self.held = None                # menus: (direction, when it repeats next)
         self.scroll_next = 0.0
-        self.listen = None              # (action, done) while Gameplay settings waits for a button
-        self.available = False
+        self.listen = None              # (action, done) while Controls settings waits for a button
+        self.using = "keys"             # what was used last: "keys" (the keyboard or mouse) or "pad" (1.9),
+        self.available = False          # for the prompts and labels on screen
         if sdl_controller is None or os.environ.get("HUTAONG_NO_PADS"):
             return                      # (the tests leave real controllers out, and add made-up ones)
         try:
@@ -159,7 +156,7 @@ class Gamepads:
             if pad is not None:
                 pad.axes[event.axis] = max(-1.0, min(1.0, event.value / AXIS_MAX))
                 if abs(pad.axes[event.axis]) > 0.5:
-                    self.last = pad
+                    self.used(pad)
             return []
         if t in (getattr(pygame, "CONTROLLERBUTTONDOWN", -1), getattr(pygame, "CONTROLLERBUTTONUP", -1)):
             pad = self.pads.get(event.instance_id)
@@ -169,13 +166,27 @@ class Gamepads:
             down = t == pygame.CONTROLLERBUTTONDOWN
             (pad.buttons.add if down else pad.buttons.discard)(name)
             if down:
-                self.last = pad
+                self.used(pad)
                 return self.pressed(name)
             return self.released(name)
         if t in (getattr(pygame, "JOYAXISMOTION", -1), getattr(pygame, "JOYBUTTONDOWN", -1),
                  getattr(pygame, "JOYBUTTONUP", -1), getattr(pygame, "JOYHATMOTION", -1)):
             return []                   # (the same presses again, as a plain joystick's)
+        if not getattr(event, "synthetic", False):
+            if t in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.MOUSEWHEEL) or \
+                    (t == pygame.MOUSEMOTION and event.rel != (0, 0)):
+                self.using = "keys"     # the keyboard or mouse: their prompts on screen
+            mouse = getattr(self.app, "mouse_steer", None)
+            if mouse is not None:
+                mouse.notice(event)     # (whether the mouse is steering a paddle)
         return self.app.navigator.translate(event)
+
+    def used(self, pad):
+        """A controller pushed or pressed: its prompts on screen, and it steers, not the mouse."""
+        self.last, self.using = pad, "pad"
+        mouse = getattr(self.app, "mouse_steer", None)
+        if mouse is not None:
+            mouse.let_go()
 
     def action_of(self, name):
         """The match action a button is set to, if any."""
@@ -186,7 +197,7 @@ class Gamepads:
         return None
 
     def pressed(self, name):
-        if self.listen is not None:                 # Gameplay settings: setting a button
+        if self.listen is not None:                 # Controls settings: setting a button
             action, done = self.listen
             if name not in FIXED and name != "guide":
                 self.listen = None
@@ -202,6 +213,12 @@ class Gamepads:
             if action and action.startswith("emote_"):
                 self.app.emotes.send(int(action[6:]) - 1)   # (online only)
             return []
+        top = self.app.state_manager.current()
+        if getattr(top, "NAME", "") == "replay" and getattr(top, "mode", "viewer") != "viewer":
+            # an instant replay or the highlights (1.9): A skips on, X saves, as Space and S do
+            if name in ("a", "x"):
+                key = pygame.K_SPACE if name == "a" else pygame.K_s
+                return [key_event(pygame.KEYDOWN, key), key_event(pygame.KEYUP, key)]
         if name in DPAD:
             self.held = (DPAD[name], time.perf_counter() + REPEAT_FIRST)
             return nav.move(*DPAD[name], via = "pad")
@@ -240,7 +257,7 @@ class Gamepads:
                 events += self.app.navigator.move(*stick, via = "pad")
         elif self.held is not None and not any(DPAD.keys() & p.buttons for p in self.pads.values()):
             self.held = None
-        scroll = sum(p.axis(getattr(pygame, "CONTROLLER_AXIS_RIGHTY", 3)) for p in self.pads.values())
+        scroll = sum(p.axis(_RIGHT[1], self.deadzone()) for p in self.pads.values())
         if abs(scroll) > 0.3 and now >= self.scroll_next:
             self.scroll_next = now + SCROLL_EVERY
             events.append(pygame.event.Event(pygame.MOUSEWHEEL, x = 0, y = -1 if scroll > 0 else 1,
@@ -254,12 +271,37 @@ class Gamepads:
             for name, d in DPAD.items():
                 if name in pad.buttons:
                     return d
-            x, y = pad.axis(getattr(pygame, "CONTROLLER_AXIS_LEFTX", 0)), pad.axis(getattr(pygame, "CONTROLLER_AXIS_LEFTY", 1))
+            x, y = pad.axis(_LEFT[0], self.deadzone()), pad.axis(_LEFT[1], self.deadzone())
             if max(abs(x), abs(y)) > 0.5:
                 return (1 if x > 0 else -1, 0) if abs(x) > abs(y) else (0, 1 if y > 0 else -1)
         return (0, 0)
 
     # ---------------- Play ----------------
+
+    def deadzone(self):
+        return DEADZONES[self.app.settings.gameplay.pad_deadzone]
+
+    def stick_of(self, pad):
+        """Where a controller steers a paddle: (x, y), each -1..1.  The buttons set for the four
+        directions (the D-pad's, unless changed in Controls) go full speed; otherwise the stick
+        Controls says to steer with, as finely as it's pushed."""
+        g = self.app.settings.gameplay
+        dx = (g.pad_right in pad.buttons) - (g.pad_left in pad.buttons)
+        dy = (g.pad_down in pad.buttons) - (g.pad_up in pad.buttons)
+        if dx or dy:
+            return float(dx), float(dy)
+        x = y = 0.0
+        for ax, ay in STICK_AXES[g.pad_stick]:
+            px, py = pad.axis(ax, self.deadzone()), pad.axis(ay, self.deadzone())
+            if abs(px) > abs(x):
+                x = px
+            if abs(py) > abs(y):
+                y = py
+        return x, y
+
+    def stick_label(self):
+        """The stick that steers, as the labels on screen say it ("Left stick")."""
+        return self.app.settings.gameplay.PAD_STICKS[self.app.settings.gameplay.pad_stick]
 
     def players_here(self, game):
         """The paddles played on this computer (no AI, not the friend online)."""
@@ -287,7 +329,7 @@ class Gamepads:
         """(dvx, dvy) from its controller's stick, or None when it isn't being pushed (the keys then)."""
         x = y = 0.0
         for pad in self.pad_for(paddle):
-            px, py = pad.stick()
+            px, py = self.stick_of(pad)
             if abs(px) > abs(x):
                 x = px
             if abs(py) > abs(y):
@@ -300,7 +342,7 @@ class Gamepads:
         """Online, on the friend's screen: the stick as the key bits the host reads."""
         bits = 0
         for pad in self.pads.values():
-            x, y = pad.stick()
+            x, y = self.stick_of(pad)
             bits |= (netcode.UP if y < -0.5 else 0) | (netcode.DOWN if y > 0.5 else 0)
             bits |= (netcode.LEFT if x < -0.5 else 0) | (netcode.RIGHT if x > 0.5 else 0)
         return bits
@@ -315,13 +357,19 @@ class Gamepads:
         return self.labels().get(name, name)
 
     def label_for(self, paddle):
-        """How a paddle's player steers it, for the HUD and Match Setup: None if not by controller."""
+        """How a paddle's player steers it with a controller, for the HUD: None if not by one.
+        The stick it steers with (1.9, Rowan: "left/right joystick for controller")."""
         pads = self.pad_for(paddle)
         if not pads:
             return None
+        return self.side_label(pads)
+
+    def side_label(self, pads):
+        """The stick, and with a controller each, whose ("Pad 1, left stick")."""
+        stick = self.stick_label()
         if len(pads) > 1 or len(self.pads) == 1:
-            return "Controller"
-        return f"Controller {self.order().index(pads[0]) + 1}"
+            return stick
+        return f"Pad {self.order().index(pads[0]) + 1}, {stick.lower()}"
 
 
 def key_event(kind, key):
@@ -438,11 +486,42 @@ class Navigator:
             s = along + 2.2 * across
             if s < score:
                 best, score = key, s
+        if best is None:
+            best = self.wrap(targets, here, dx, dy)
         if best is not None:
             self.key = best
             self.reveal()
             self.app.sound_manager.play("click.wav", multiplier = 0.4)
         return []
+
+    BAND = 40                           # px: controls this close to the far edge count as its row or column
+
+    def wrap(self, targets, here, dx, dy):
+        """Past the last control that way, round to the far side in one push (1.9, Rowan): left and
+        right to the other end of the same row; up and down to the far row (the top or bottom of
+        the page), to the control there most in line.  None if there's none."""
+        cx, cy = here.center
+        back = []                       # (how far back the other way, how far off the line, key)
+        for key, r in targets.items():
+            if key == self.key:
+                continue
+            along = (r.centerx - cx) * dx + (r.centery - cy) * dy
+            if along >= -4:
+                continue
+            if dx:
+                in_line = r.top < here.bottom and r.bottom > here.top
+                across = abs(r.centery - cy)
+            else:
+                in_line = r.left < here.right and r.right > here.left
+                across = abs(r.centerx - cx)
+            back.append((along, across, in_line, key))
+        if dx:
+            lined = [b for b in back if b[2]]
+            return min(lined, key = lambda b: (b[0], b[1]))[3] if lined else None    # (alone: stays put)
+        if not back:
+            return None
+        far = min(b[0] for b in back)
+        return min((b for b in back if b[0] <= far + self.BAND), key = lambda b: b[1])[3]
 
     def nudge(self, dx):
         """Left or right on a slider moves it a step (as a click there would)."""

@@ -9,6 +9,7 @@ import math
 import unittest
 
 from tests import harness
+from config import BALL_PACE                                    # noqa: E402  (the ball's pace, 1.9)
 
 app = harness.app()
 
@@ -80,7 +81,7 @@ class TwinBall(ModeMatch):
 
     def test_served_at_the_usual_pace(self):
         for b in self.pu.balls():
-            self.assertAlmostEqual(math.hypot(b.vx, b.vy), m.ball_speed * math.sqrt(2), delta = 1)
+            self.assertAlmostEqual(math.hypot(b.vx, b.vy), m.ball_speed * BALL_PACE * math.sqrt(2), delta = 1)
 
     def test_no_twin_balls_talisman(self):
         self.assertFalse(self.pu.spawnable(BY_KEY["twin"]))

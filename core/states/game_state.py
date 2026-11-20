@@ -61,9 +61,10 @@ class GameState(State):
         super().update(dt)
         if self.game:
             self.game.update(dt)
+            self.game.label_pads()                     # (what each player steers with now: 1.9)
             if not self.game.paused:
                 self.app.sound_manager.holes.hear(self.game.powerups.holes)     # (1.8)
-            if not self.game.practice:                 # (Practice counts for nothing: 1.9)
+            if not self.game.practice:                 # (practice counts for nothing: 1.9)
                 self.app.stats.track(self.game, dt)
             recorder = self.game.recorder
             recorder.capture(dt)

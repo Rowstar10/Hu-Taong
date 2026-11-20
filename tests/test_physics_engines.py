@@ -100,7 +100,10 @@ class V09(unittest.TestCase):
                 bx = cx + at * pw / 2
                 by0 = prect[1] - size if kind == "above" else prect[3]
                 brect, normal = (bx - size / 2, by0, bx + size / 2, by0 + size), ((0, 1) if kind == "above" else (0, -1))
-            vx, vy = self.court.hit(paddle, brect, normal, (bvx, bvy), (pvx, pvy), prect)
+            # (1.9: a paddle's push counts at the ball's pace, engines.push_pace: 0.9's paddle at (pvx, pvy)
+            # is one going 1 / BALL_PACE as fast now)
+            k = engines.push_pace(False)
+            vx, vy = self.court.hit(paddle, brect, normal, (bvx, bvy), (pvx / k, pvy / k), prect)
             speed, want = math.hypot(vx, vy), math.hypot(ovx, ovy)
             with self.subTest(hit = [side, kind, at, bvx, bvy, pvx, pvy]):
                 self.assertAlmostEqual(speed, max(want, floor), delta = 0.5, msg = "its speed")
@@ -121,7 +124,7 @@ class V09(unittest.TestCase):
         still = math.hypot(*self.court.hit(p1, rect, normal, (-800.0, 0.0), (0.0, 0.0)))
         drive = math.hypot(*self.court.hit(p1, rect, normal, (-800.0, 0.0), (1500.0, 0.0)))
         self.assertLess(still, 800 * 0.5)
-        self.assertGreater(drive, 2400)
+        self.assertGreater(drive, 2400 * engines.push_pace(False))      # (the push at the ball's pace: 1.9)
 
     def test_no_top_speed(self):
         p1 = self.court.game.p1

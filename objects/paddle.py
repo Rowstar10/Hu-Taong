@@ -52,6 +52,7 @@ class Paddle(GameObject):
 
         self.held = None                     # (ball, out_y) after hitting a ball with an end: see hold_back
         self.trail = None                    # (ball, out_x) after a face hit it mustn't catch again: see keep_behind
+        self.steered_by = None               # "keys", "mouse" or "pad": what last moved it here (the HUD's label, 1.9)
 
     def apply_inputs(self, dt):
         """Keys or the AI ask for a velocity and the paddle eases towards it."""
@@ -70,10 +71,18 @@ class Paddle(GameObject):
                 other = self.game.app.settings.gameplay.keys("p2" if self.up == self.game.app.settings.gameplay.p1_up else "p1")
                 dvx = dvx or self.speed * ((other["right"] in keys) - (other["left"] in keys))
                 dvy = dvy or self.speed * ((other["down"] in keys) - (other["up"] in keys))
+            if dvx or dvy:
+                self.steered_by = "keys"
+            mouse = getattr(self.game.app, "mouse_steer", None)     # the mouse, if it steers (core/mouse_steer.py, 1.9)
+            steer = mouse.steer_paddle(self) if mouse is not None else None
+            if steer is not None:
+                dvx, dvy = steer
+                self.steered_by = "mouse"
             pads = getattr(self.game.app, "gamepads", None)   # a controller's stick (core/gamepad.py, 1.9)
             steer = pads.steer_paddle(self) if pads is not None else None
             if steer is not None:
                 dvx, dvy = steer
+                self.steered_by = "pad"
             touch = getattr(self.game.app, "touch", None)     # on a phone, a finger on this paddle (core/touch.py)
             steer = touch.steer_paddle(self) if touch else None
             if steer is not None:
@@ -201,7 +210,8 @@ class Paddle(GameObject):
         # paddle going faster than its normal top speed is played as if at that speed (the extra
         # power was most of Swift Step's edge: its taker won 74% of points against the Hard AI).
         # The Speed Cap does the same with a lower limit.
-        top = self.top_speed()
+        k = engines.push_pace(capped)                   # (how much a push counts: 1.9)
+        top = self.top_speed() * k
         if capped:
             top = min(top, engines.cap_drive(getattr(other, "speed", 0)))
         before = data.get("before", {})
@@ -254,7 +264,7 @@ class Paddle(GameObject):
         chasing = self.vx * out_x + self.vy * out_y
         leaving = other.vx * out_x + other.vy * out_y
         need = chasing + 150                                       # the least it must leave at
-        want = max(need, min(min(chasing, top) * 1.3, cap if serve else math.inf))
+        want = max(need, min(min(chasing * k, top) * 1.3, cap if serve else math.inf))
         if chasing > 0 and leaving < want and not pinched and ny == 0 and not capped:
             # Speed the whole return up, keeping its angle; at the ceiling the angle flattens
             # only as far as it must for the ball to get clear

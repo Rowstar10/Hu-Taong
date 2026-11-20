@@ -2,7 +2,7 @@ import math, pygame, random, struct
 from array import array
 from collections import deque
 
-from config import BASE_W, BASE_H
+from config import BASE_W, BASE_H, BALL_PACE
 from render import theme
 from game.game_base import GameBase
 from game.physics import Physics
@@ -28,7 +28,7 @@ class Hu_Taong(GameBase):
     MESSAGE_COLOURS = {"red": (255, 80, 80), "blue": (60, 140, 255)}
 
     def __init__(self, app, width=BASE_W, height=BASE_H):
-        self.practice, self.bench = False, None     # (see build_world)
+        self.practice, self.bench, self.scoreless = False, None, False     # (see build_world)
         super().__init__(app, width, height)
         self.message_text = ""
         self.message_color = (255, 255, 255)
@@ -102,29 +102,31 @@ class Hu_Taong(GameBase):
             net.guest_clear_tau = None
             net.guest_tells_tau = False
 
-        # Practice (1.9), never online: your paddle against the AI or a wall.  Against the wall, the
+        # Practice vs AI's choices (1.9), never online: against a wall instead of the AI, and scoring
+        # off.  Either makes it a practice match, which counts for nothing.  Against the wall, the
         # other side's goal is a wall the ball bounces off, and the other paddle leaves the court.
-        self.practice = bool(settings.practice) and not net
+        solo = bool(settings.vs_ai) and not net
+        self.scoreless = solo and not settings.scoring
+        self.practice = solo and (bool(settings.vs_wall) or self.scoreless)
         self.label_pads()
         self.bench = None                       # the paddle that sits out (against the wall)
-        if self.practice:
-            settings.practise()
+        if solo and settings.vs_wall:
+            settings.wall_rules()
             you, other = (self.p2, self.p1) if settings.play_as_blue else (self.p1, self.p2)
-            you.ai_enabled, other.ai_enabled = False, not settings.practice_wall
-            if settings.practice_wall:
-                self.bench = other
-                self.objects.remove(other)
-                other.controls_label = "Wall"
-                wall = self.left_wall if other.is_left else self.right_wall
-                wall.is_goal, wall.practice = False, True
-                if other.is_left:                       # (its face where the wall is drawn)
-                    wall.x1 = self.PRACTICE_WALL
-                else:
-                    wall.x0 = BASE_W - self.PRACTICE_WALL
-                wall.width = wall.x1 - wall.x0
+            you.ai_enabled, other.ai_enabled = False, False
+            self.bench = other
+            self.objects.remove(other)
+            other.controls_label = "Wall"
+            wall = self.left_wall if other.is_left else self.right_wall
+            wall.is_goal, wall.practice = False, True
+            if other.is_left:                       # (its face where the wall is drawn)
+                wall.x1 = self.PRACTICE_WALL
+            else:
+                wall.x0 = BASE_W - self.PRACTICE_WALL
+            wall.width = wall.x1 - wall.x0
             self.label_pads()
 
-        self.ball = Ball(self, diameter = settings.ball_diameter, x = (BASE_W - settings.ball_diameter) / 2, y = (BASE_H - settings.ball_diameter) / 2, speed = settings.ball_speed, color = "white")
+        self.ball = Ball(self, diameter = settings.ball_diameter, x = (BASE_W - settings.ball_diameter) / 2, y = (BASE_H - settings.ball_diameter) / 2, speed = settings.ball_speed * BALL_PACE, color = "white")
 
         # Chaos (Constant drift) and Shape Shift: the paddles' sizes drift together and the ball's on its own
         self.reset_drift()
@@ -204,7 +206,8 @@ class Hu_Taong(GameBase):
 
     def noted(self, event):
         """Every event recorded: the talisman stats and the achievements count from them (1.9), when
-        the match screen has asked (`tally`, `achieve`), and not in Practice."""
+        the match screen has asked (`tally`, `achieve`), and not in practice (against the wall, or
+        with scoring off)."""
         if self.practice:
             return
         for listener in (getattr(self, "tally", None), getattr(self, "achieve", None)):
@@ -212,14 +215,27 @@ class Hu_Taong(GameBase):
                 listener(event[1], event[2:])
 
     def label_pads(self):
-        """A paddle a controller steers says so (the HUD's label), when it's played here (1.9)."""
+        """Each paddle played here says what steers it (the HUD's label), as its player is playing
+        now (1.9, Rowan: on-screen controls follow "whatever form of controls they are currently
+        using"): its keys, the stick a controller steers with, or the mouse.  The match screen asks
+        again every frame.  (Online, the host's paddles say You and Friend; on a phone, its own.)"""
         pads = getattr(self.app, "gamepads", None)
-        if pads is None or self.net:
+        mouse = getattr(self.app, "mouse_steer", None)
+        if pads is None or self.net or ANDROID:
             return
+        controls = self.app.settings.gameplay
+        here = pads.players_here(self)
         for paddle in (self.p1, self.p2):
-            label = pads.label_for(paddle)
-            if label:
-                paddle.controls_label = label
+            if paddle is self.bench:
+                continue
+            label = controls.keys_label("p1" if paddle.up == controls.p1_up else "p2")
+            stick = pads.label_for(paddle)
+            used = getattr(paddle, "steered_by", None)
+            if mouse is not None and mouse.steering(paddle):
+                label = "Mouse"
+            elif stick and (used == "pad" or (used is None and (len(here) > 1 or pads.using == "pad"))):
+                label = stick
+            paddle.controls_label = label
 
     def you(self):
         """The sides (1 left, 2 right) played by someone here: no AI, not the friend online, not
@@ -532,8 +548,8 @@ class Hu_Taong(GameBase):
                               speed = 720, life = .9, arc = arc)
 
         points = self.powerups.point_value()           # Double or Nothing makes it 2
-        if self.practice and not settings.practice_scoring:
-            points = 0                                 # (Practice with scoring off: nobody scores)
+        if self.scoreless:
+            points = 0                                 # (Practice vs AI with scoring off: nobody scores)
         if nx == 1:
             self.p2.score += points
             self.message_text = f"{self.p2.color1} scored!" + (" x2" if points == 2 else "")
@@ -591,8 +607,8 @@ class Hu_Taong(GameBase):
         # A new serve plays by the rules as they stand now: anything changed since (from Pause)
         # comes in here, never mid-rally
         settings = self.settings = self.app.settings.match.copy()
-        if getattr(self, "practice", False):
-            settings.practise()
+        if getattr(self, "bench", None) is not None:
+            settings.wall_rules()                       # (against the wall: no swapping paddles)
         if settings.chaos_each_point:
             settings.chaos_roll()
             self.apply_gameplay_settings()
@@ -862,7 +878,7 @@ class Hu_Taong(GameBase):
                     diameter = s.ball_diameter_min + obj.drift["size"][0] * s.ball_diameter_range
                 else:
                     diameter = s.ball_diameter
-                obj.speed = s.ball_speed
+                obj.speed = s.ball_speed * BALL_PACE      # (the ball's pace, 1.9: config.py)
 
                 # A Snowball grows as it rolls (to 200 px at most)
                 powerups = getattr(self, "powerups", None)

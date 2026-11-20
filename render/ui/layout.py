@@ -632,7 +632,8 @@ class Grid(Node):
             row_w = sum(self.col_w[:len(row)]) + self.gap_x * max(0, len(row) - 1)
             cx = self.rect.left + (self.w - row_w) // 2
             for ci, c in enumerate(row):
-                c.place(cx, cy, self.col_w[ci], c.h)
+                # (each centred down its row, so a name beside a taller button lines up with it: 1.9)
+                c.place(cx, cy + (self.row_h[ri] - c.h) // 2, self.col_w[ci], c.h)
                 cx += self.col_w[ci] + self.gap_x
             cy += self.row_h[ri] + self.gap_y
 
@@ -644,12 +645,14 @@ class Grid(Node):
 
 class Form(Node):
     """Settings as rows (1.9's settings rework): each row's name right-aligned in one column and
-    its control left-aligned in the next, so the rows line up.  A row is (name, control), the name
-    a str or a node; a lone node (a heading, a note, a picture) spans both columns, centred, and a
-    heading (a Label) gets `section_gap` more room above it.  The cycles and key buttons in a form
-    are all as wide as the widest, so their arrows line up too.  Pointing at a row's name explains
-    its control, as pointing at the control does.  `name_w`: at least this wide a name column
-    (so forms side by side can share one)."""
+    its control in the next, so the rows line up.  A row is (name, control), the name a str or a
+    node; a lone node (a heading, a note, a picture, or a control with no name: "" or None) spans
+    both columns, centred, and a heading (a Label) gets `section_gap` more room above it.  The
+    cycles and key buttons in a form are all as wide as the widest, so their arrows line up too,
+    and anything narrower (an on/off switch) sits centred in their column, under their middles
+    (Rowan, 1.9: switches hanging left of the selectors, and buttons off-centre, looked untidy).
+    Pointing at a row's name explains its control, as pointing at the control does.  `name_w`: at
+    least this wide a name column (so forms side by side can share one)."""
 
     def __init__(self, rows, font, gap_x, gap_y, section_gap=0, color=theme.GOLD, name_w=0):
         super().__init__()
@@ -657,6 +660,9 @@ class Form(Node):
         for row in rows:
             if isinstance(row, tuple):
                 name, control = row
+                if name is None or name == "":
+                    self.rows.append((None, control))       # (a button of its own: centred)
+                    continue
                 if isinstance(name, str):
                     name = Text(name, font, color, align="right")
                 self.rows.append((name, control))
@@ -697,7 +703,8 @@ class Form(Node):
                 control.place(r.left, cy, self.w, rh)
             else:
                 name.place(left, cy, self.name_w, rh)
-                control.place(left + self.name_w + self.gap_x, cy, control.w, rh)
+                control.place(left + self.name_w + self.gap_x + (self.control_w - control.w) // 2, cy,
+                              control.w, rh)
             cy += rh + self.gap_y
 
     def draw(self, ui):

@@ -56,11 +56,11 @@ class OnTheCourt(Match):
     def test_the_wind_dies_down(self):
         self.take("wind")
         self.pu.wind["t"], self.pu.wind["left"] = 0.0, 5.0              # (at full strength)
-        full = abs(self.pu.wind_force())
+        full = math.hypot(*self.pu.wind_vector())                       # (any way, 1.9)
         self.pu.wind["left"] = PowerUps.WIND_DIES / 2
-        self.assertAlmostEqual(abs(self.pu.wind_force()), full / 2, delta = full * 0.05)
+        self.assertAlmostEqual(math.hypot(*self.pu.wind_vector()), full / 2, delta = full * 0.05)
         self.pu.wind["left"] = 0.05
-        self.assertLess(abs(self.pu.wind_force()), full * 0.05)
+        self.assertLess(math.hypot(*self.pu.wind_vector()), full * 0.05)
 
     def test_a_ghost_ball_fades_back_in(self):
         self.take("ghost")

@@ -32,28 +32,29 @@ TIPS = {
     "prompt_quit": "Quit\nClose the game. Settings and stats are saved.\n~ Esc",
     "match": "Match\nThe rules of a match: modes, points to win, the court, talismans, the ball and paddles, and the AI.\n"
              "~ The same for both players: online, the host's",
-    "gameplay": "Gameplay\nYour controls: the keys, and Auto-Pause.",
+    "gameplay": "Controls\nYour keys, a controller's buttons and stick, the mouse, and the emotes' buttons.",
     "display": "Display\nWindow, frame rate, background, dimming and effects.",
     "audio": "Audio\nVolume, sound effects and the jukebox.",
-    "interface": "UI\nTooltips, the HUD, AI banter and replays.",
+    "interface": "UI\nTooltips, the HUD, AI banter, replays and Auto-Pause.",
     "reset_all": "Reset All Settings\nEvery setting on every screen back to its default.\n• Your stats and replays are kept",
 
     # Match setup
-    "opponent_ai": "vs AI\nYou play one paddle, the AI the other.",
+    "opponent_ai": "Practice vs AI\nYou play one paddle; the AI plays the other, or the far end is a wall.\n"
+                   "• Every setting, mode and talisman works as usual\n"
+                   "• Against the AI with scoring on, it's a real match and counts towards your stats\n"
+                   "• Against the wall or with scoring off, it's practice: nothing counts",
     "opponent_human": "vs Human\nTwo players on one keyboard.",
     "opponent_online": "Online\nPlay a friend over the internet: one of you hosts, the other joins with a code.",
     "toggle_friend_emotes": "Friend's Emotes\nOnline, your friend's quick emotes (Nice shot!, Oops...) show by "
                             "their side of the court.\n• Off: you don't see theirs; yours still go to them\n"
-                            "~ Send your own with keys 1-5, or the controller buttons set in Gameplay",
-    "opponent_practice": "Practice\nPlay on your own, against a wall or the AI, with every setting and mode as usual.\n"
-                         "• Nothing counts towards your stats\n• Choose what you play against, whether points count, "
-                         "and a talisman to practise with",
+                            "~ Send your own with keys 1-5, or the controller buttons set in Controls > Emotes",
     "practice_wall": "Against a wall\nThe other end of the court is a wall: the ball always comes back.\n"
-                     "• With scoring on, it counts your misses; the match never ends",
+                     "• With scoring on, it counts your misses; the match never ends\n"
+                     "• No Soul Swap or Switch: there's no one to swap with\n• Doesn't count towards your stats",
     "practice_ai": "Against the AI\nThe AI plays the other paddle, at the level and style set in Match settings.",
     "practice_scoring_on": "Scoring on\nPoints count, as in a match.",
     "practice_scoring_off": "Scoring off\nNobody scores: a ball that gets past is just served again, and the "
-                            "match goes on until you leave it.",
+                            "match goes on until you leave it.\n• Doesn't count towards your stats",
     "start_match": "Start Match\nPlay with the settings chosen here and in Match Settings.\n~ Enter",
 
     # Gameplay
@@ -113,6 +114,13 @@ TIPS = {
     "toggle_screen_shake": "Screen Shake\nThe screen shakes when someone scores.",
     "toggle_ball_trail": "Ball Trail\nA fire trail behind the ball.",
     "toggle_auto_pause": "Auto-Pause\nPause the match if you click away from the game.",
+    "toggle_mouse_steer": "Mouse Steering\nSteer your paddle with the mouse: it heads for the pointer, no faster "
+                          "than the keys move it.\n• It takes over when you move the mouse in a match, and lets go "
+                          "when you use the keys or a controller\n~ Off by default, so a nudged mouse never "
+                          "moves your paddle",
+    "cycle_mouse_side": "Mouse Plays\nWith two players here, the side the mouse steers.\n"
+                        "• On your own (against the AI, or online) it steers your paddle",
+    "open_emotes": "Emote Buttons\nThe controller button for each quick emote (keys 1-5 send them too).",
     "toggle_hide_cursor": "Hide Mouse\nHide the mouse in a match until you move it.",
     "toggle_vibration": "Vibration\nA little buzz when your paddle hits the ball, and a bigger one at each point.",
     "key": "Key\nClick, then press the new key.\n• A key that's already used swaps over\n~ Esc cancels",
@@ -274,8 +282,7 @@ class Tooltips:
 
     def offer(self, rect, text):
         if text and rect.collidepoint(self.app.renderer.mouse()):
-            nav = getattr(self.app, "navigator", None)
-            self.offered = touch_tip(text) if ANDROID else pad_tip(text) if nav and nav.active and nav.via == "pad" else text
+            self.offered = touch_tip(text) if ANDROID else pad_tip(text) if self.app.renderer.using_pad() else text
 
     def showing(self):
         """A tip is up (on a phone, a finger resting on a control asked for it)."""
@@ -469,6 +476,12 @@ class Renderer:
 
     def mouse(self):
         return self.app.pointer()
+
+    def using_pad(self):
+        """A controller is what's being used now (1.9): the prompts on screen name its buttons and
+        stick.  The keyboard or mouse used since puts the keys back."""
+        pads = getattr(self.app, "gamepads", None)
+        return bool(pads is not None and pads.pads and pads.using == "pad")
 
     def lift(self, key, active):
         """Eases towards 1 while `active`, so hovered things rise smoothly."""
@@ -835,7 +848,8 @@ class Renderer:
 
         pads = self.app.gamepads
         hint = ("Tap Play Game to begin   ·   Back to quit" if ANDROID else
-                f"{pads.label('a')} to play   ·   {pads.label('b')} to quit" if pads.pads else "Enter to play   ·   Esc to quit")
+                f"{pads.label('a')} to play   ·   {pads.label('b')} to quit" if self.using_pad() else
+                "Enter to play   ·   Esc to quit")
         self.text(screen, hint,
                   self.fnt(0.024, bold=False),
                   theme.GOLD, center=(cx, 944))
@@ -871,9 +885,14 @@ class Renderer:
                       "~ The Black Hole talisman doesn't turn up"}
 
     def modes_section(self, ui, s, font, m=None, columns=3):
+        return self.section(ui, s, "Modes", self.modes_grid(ui, s, font, m, columns))
+
+    def modes_grid(self, ui, s, font, m=None, columns=3, uniform=False):
         """The game modes, any of them together: an on/off for each, and for Chaos and Switch one
         button that cycles Off and each of their versions.  `m`: the rules shown, if not your own;
-        `columns`: how many to a row (the online host's screen has room for fewer rows)."""
+        `columns`: how many to a row (the online host's screen has room for fewer rows);
+        `uniform`: all one width, a tidy block (1.9, where there's room).  A short last row is
+        centred."""
         m = m or self.app.settings.match
         gap = int(BASE_W * 0.012 * s)
 
@@ -890,10 +909,12 @@ class Renderer:
         buttons = [cycled("chaos", m.CHAOS_TIMINGS, "关乱狂"), cycled("switch", m.SWITCH_TIMINGS, "关换狂"),
                    mode("black_hole"), mode("curveball"), mode("lantern_night"), mode("twin_ball"),
                    mode("talisman_rush")]
-        buttons += [Space() for _ in range(-len(buttons) % columns)]
-        rows = Grid([buttons[i:i + columns] for i in range(0, len(buttons), columns)],
+        if uniform:
+            widest = [t for b in buttons for t in (getattr(b, "samples", None) or b.texts)]
+            for b in buttons:
+                b.samples = widest
+        return Grid([buttons[i:i + columns] for i in range(0, len(buttons), columns)],
                     gap_x=int(BASE_W * 0.02 * s), gap_y=self.vgap(ui, s, 0.6))
-        return self.section(ui, s, "Modes", rows)
 
     def draw_match_setup_menu(self, state, screen):
         ui = self.ui
@@ -902,7 +923,6 @@ class Renderer:
         blue_keys = self.app.settings.gameplay.keys_label("p2")
         tips = dict(TIPS, side_red=f"Red\nPlay the left paddle.\n~ Keys: {red_keys}",
                     side_blue=f"Blue\nPlay the right paddle.\n~ Keys: {blue_keys}")
-        red_keys, blue_keys = self.setup_controls(red_keys, blue_keys)
 
         def build(s):
             f, sm = ui.fnt(0.042, s), ui.fnt(0.03, s)
@@ -917,28 +937,33 @@ class Renderer:
                 return Button(key, text, f, colors, tip=tips.get(key))
 
             opponent = self.section(ui, s, "Opponent", Stack([
-                choice("opponent_ai",       "vs AI",    lambda: g.vs_ai and not g.practice),
-                choice("opponent_human",    "vs Human", lambda: not g.vs_ai and not g.practice),
-                choice("opponent_practice", "Practice", lambda: g.practice),
-                choice("opponent_online",   "Online",   lambda: False, (theme.BLUE, theme.BLUE_HOVER))],
+                choice("opponent_ai",     "Practice vs AI", lambda: g.vs_ai),
+                choice("opponent_human",  "vs Human",       lambda: not g.vs_ai),
+                choice("opponent_online", "Online",         lambda: False, (theme.BLUE, theme.BLUE_HOVER))],
                 vertical=False, gap=gap, uniform=True))
 
-            vs_ai = lambda: g.vs_ai or g.practice
+            vs_ai = lambda: g.vs_ai
             paddle = self.section(ui, s, "Your Paddle", Stack([
                 choice("side_red",  "Red",  lambda: not g.play_as_blue, (theme.RED,  theme.RED_HOVER),  vs_ai),
                 choice("side_blue", "Blue", lambda: g.play_as_blue,     (theme.BLUE, theme.BLUE_HOVER), vs_ai)],
                 vertical=False, gap=gap, uniform=True))
 
             def summary():
-                if not g.vs_ai and not g.practice:
-                    return f"Red: {red_keys}      Blue: {blue_keys}"
+                # (what each side plays with, as you're playing now: worked out afresh each frame, 1.9)
+                red, blue = self.setup_controls(*(self.app.settings.gameplay.keys_label(p) for p in ("p1", "p2")))
+                if not g.vs_ai:
+                    return f"Red: {red}      Blue: {blue}"
                 me, ai = ("Blue", "Red") if g.play_as_blue else ("Red", "Blue")
-                keys = blue_keys if g.play_as_blue else red_keys
-                if g.practice and g.practice_wall:
+                keys = blue if g.play_as_blue else red
+                if g.vs_wall:
                     return f"You: {me} ({keys})      {ai}'s end: a wall"
                 return f"You: {me} ({keys})      AI: {ai}"
-            samples = [f"You: Blue ({blue_keys})      AI: Red", f"You: Red ({red_keys})      AI: Blue",
-                       f"Red: {red_keys}      Blue: {blue_keys}", f"You: Blue ({blue_keys})      Red's end: a wall"]
+            red_keys, blue_keys = (self.app.settings.gameplay.keys_label(p) for p in ("p1", "p2"))
+            samples = [f"You: Blue ({blue_keys} or mouse)      Red's end: a wall",
+                       f"You: Red ({red_keys} or mouse)      Blue's end: a wall",
+                       f"Red: {red_keys} or mouse      Blue: {blue_keys} or mouse",
+                       "Red: Pad 1, right stick      Blue: Pad 2, right stick",
+                       "You: Blue (Either stick)      Red's end: a wall"]
             caption = Text(summary, sm, theme.PARCHMENT, samples=samples)
 
             start = Button("start_match", "Start Match", ui.fnt(0.05, s), (theme.ORANGE, theme.ORANGE_HOVER),
@@ -952,10 +977,9 @@ class Renderer:
                                          tip=court_tip),
                                  Text(lambda: self.court_about(g.court), sm, theme.PARCHMENT,
                                       samples=[self.court_about(i) for i in range(len(names))]))
-            column = [opponent, paddle]
-            if g.practice:                  # (Match Setup lays itself out again as Practice comes and goes)
-                column.append(self.practice_section(ui, s, sm, gap))
-            left = Stack([*column, caption], gap=self.vgap(ui, s, 1.4 if g.practice else 2))
+            practice = self.practice_section(ui, s, sm, gap, vs_ai)
+            beside = Grid([[paddle, practice]], gap_x=int(BASE_W * 0.04 * s))     # (side by side: room to spare)
+            left = Stack([opponent, beside, caption], gap=self.vgap(ui, s, 1.4))
             more = Button("open_match_settings", "Match Settings", f, (theme.BLUE, theme.BLUE_HOVER),
                           tip=TIPS["open_match_settings"])
             buttons = Stack([more, start], vertical=False, gap=int(BASE_W * 0.03 * s))
@@ -965,41 +989,49 @@ class Renderer:
         ui.screen_menu(state, screen, build, title="对局 Match Setup", mark="战")
 
     def setup_controls(self, red, blue):
-        """What Match Setup says each side plays with: its keys, or a controller (1.9)."""
-        g, pads = self.app.settings.match, self.app.gamepads
-        connected = len(pads.pads)
-        if not connected:
-            return red, blue
-        if g.vs_ai or g.practice:
-            return ("Controller", blue) if not g.play_as_blue else (red, "Controller")
-        first, second = ("Controller 1", "Controller 2") if connected > 1 else ("Controller", None)
-        if self.app.settings.gameplay.pad_first == 0:
-            return first, second or blue
-        return second or red, first
+        """What Match Setup says each side plays with (1.9), given each side's keys: what you're
+        using now.  On your own, the keys (and the mouse, if Controls has it steering) or, while
+        you're using a controller, the stick it steers with.  Two players: the side each controller
+        plays shows its stick, and the mouse's side its keys "or mouse"."""
+        g, pads, controls = self.app.settings.match, self.app.gamepads, self.app.settings.gameplay
+        mouse = bool(controls.mouse_steer) and not ANDROID
+        order = pads.order()
+        if g.vs_ai:
+            if self.using_pad():
+                mine = pads.stick_label()
+            else:
+                mine = (blue if g.play_as_blue else red) + (" or mouse" if mouse else "")
+            return (red, mine) if g.play_as_blue else (mine, blue)
+        sides = [red, blue]
+        if mouse:
+            sides[controls.mouse_side] += " or mouse"
+        if order:
+            first = controls.pad_first
+            sides[first] = pads.side_label(order[:1])
+            if len(order) > 1:
+                sides[1 - first] = pads.side_label(order[1:2])
+        return sides[0], sides[1]
 
-    def practice_section(self, ui, s, font, gap):
-        """Practice's own choices (1.9): what you play against, whether points count, and a talisman
-        to practise with."""
+    def practice_section(self, ui, s, font, gap, enabled):
+        """Practice vs AI's two choices (1.9): what you play against, and whether points count.
+        (Greyed out for vs Human, as Your Paddle is.)"""
         g = self.app.settings.match
-        names = ["As set"] + [kind.name for kind in POWERUP_KINDS]
 
         def pair(keys, texts, first):
             def colours(on):
-                return lambda: (theme.GREEN, theme.GREEN_HOVER) if on() else (theme.GRAY, theme.GRAY_HOVER)
+                def pick():
+                    if not enabled():
+                        return (theme.DARK_GRAY, theme.DARK_GRAY)
+                    return (theme.GREEN, theme.GREEN_HOVER) if on() else (theme.GRAY, theme.GRAY_HOVER)
+                return pick
             return Stack([Button(keys[0], texts[0], font, colours(first), tip=TIPS.get(keys[0])),
                           Button(keys[1], texts[1], font, colours(lambda: not first()), tip=TIPS.get(keys[1]))],
                          vertical=False, gap=gap // 2, uniform=True)
 
-        label = lambda text: Text(text, font, theme.GOLD, samples=["Talisman"], align="right")
-        talisman_tip = lambda: ("Talisman\nPractise with one talisman: only it turns up, every time one does, "
-                                "even with Power-Ups off.\n• As set: the talismans as Match settings have them"
-                                + ("\n~ Against the wall, Soul Swap can't be picked: there's no one to swap with"
-                                   if g.practice_wall else ""))
-        rows = [[label("Against"), pair(("practice_wall", "practice_ai"), ("Wall", "AI"), lambda: g.practice_wall)],
+        label = lambda text: Text(text, font, theme.GOLD, samples=["Against", "Scoring"], align="right")
+        rows = [[label("Against"), pair(("practice_ai", "practice_wall"), ("AI", "Wall"), lambda: not g.vs_wall)],
                 [label("Scoring"), pair(("practice_scoring_on", "practice_scoring_off"), ("On", "Off"),
-                                        lambda: g.practice_scoring)],
-                [label("Talisman"), Cycle("cycle_practice_talisman", lambda: names[g.practice_talisman], font, names,
-                                          tip=talisman_tip)]]
+                                        lambda: g.scoring)]]
         return self.section(ui, s, "Practice", Grid(rows, gap_x=gap // 2, gap_y=self.vgap(ui, s, 0.35)))
 
     @staticmethod
@@ -1330,7 +1362,7 @@ class Renderer:
         # The match's rules first, then your own settings.  Online the host's rules are the match's,
         # so the friend who joined has no Match card
         net = self.app.net
-        cards = (("match", "战", "Match", "jade"), ("gameplay", "玩", "Gameplay", "ink"),
+        cards = (("match", "战", "Match", "jade"), ("gameplay", "控", "Controls", "ink"),
                  ("display", "画", "Display", "amber"), ("audio", "音", "Audio", "azure"),
                  ("interface", "界", "UI", "crimson"))
         if net is not None and getattr(net, "role", None) == "guest":
@@ -1418,7 +1450,6 @@ class Renderer:
                         f"Speed Cap {'on' if g.speed_cap else 'off'}")
             # (Choose Talismans under Power-Ups, Rowan's playtest: the switch and what it switches on together)
             right = self.rows(ui, s, [
-                *self.mode_rows(ui, s, f, g),
                 self.heading(ui, s, "Talismans"),
                 ("Power-Ups", self.switch(f, "toggle_powerups", lambda: g.powerups)),
                 ("Spawn Rate", Cycle("cycle_powerup_rate", lambda: rates[g.powerup_rate], f, rates, tip=rate_tip)),
@@ -1428,6 +1459,7 @@ class Renderer:
                 Text(lambda: f"{sum(getattr(g, 'pu_' + k.key) for k in POWERUP_KINDS)} of "
                              f"{len(POWERUP_KINDS)} talismans switched on", ty, theme.PARCHMENT,
                      samples=[f"{len(POWERUP_KINDS)} of {len(POWERUP_KINDS)} talismans switched on"]),
+                *self.mode_rows(ui, s, f, g),          # (1.9: under Talismans, Rowan, and compact)
                 self.heading(ui, s, "Ball & Paddles"),
                 Button("open_ball_paddles", "Ball & Paddles", f, (theme.GREEN, theme.GREEN_HOVER),
                        tip=TIPS["open_ball_paddles"]),
@@ -1442,26 +1474,11 @@ class Renderer:
                        pinned=pinned, scroll=True)
 
     def mode_rows(self, ui, s, font, m):
-        """Settings > Match's Modes, as rows (1.9): an on/off for each, and for Shape Shift and Soul
-        Swap one button that cycles Off and each of their versions.  (Match Setup has them as a
-        block of buttons: modes_section.)"""
-        def mode(key):
-            return (m.MODE_NAMES[key], self.switch(font, f"toggle_mode_{key}", lambda: getattr(m, "mode_" + key),
-                                                   tip=self.MODE_TIPS[key]))
-
-        both = ["OFF", *m.CHAOS_TIMINGS, *m.SWITCH_TIMINGS]      # (the two as wide as each other)
-
-        def cycled(key, versions, glyphs):
-            texts = ["OFF"] + list(versions)
-            level = lambda: (getattr(m, "mode_" + key) and getattr(m, key + "_timing") + 1) or 0
-            button = CycleToggle(f"cycle_mode_{key}", texts, font, level, glyphs, tip=self.MODE_TIPS[key])
-            button.samples = both
-            return (m.MODE_NAMES[key], button)
-
-        return [self.heading(ui, s, "Modes"),
-                cycled("chaos", m.CHAOS_TIMINGS, "关乱狂"), cycled("switch", m.SWITCH_TIMINGS, "关换狂"),
-                mode("black_hole"), mode("curveball"), mode("lantern_night"), mode("twin_ball"),
-                mode("talisman_rush")]
+        """Settings > Match's Modes (1.9): a compact block of buttons, two to a row, each saying its
+        mode and whether it's on (Shape Shift and Soul Swap cycle Off and their versions), as on
+        Match Setup.  (They were a row each, until Rowan found the seven pushed Talismans out of
+        sight.)"""
+        return [self.heading(ui, s, "Modes"), self.modes_grid(ui, s, ui.fnt(0.024, s), m, columns=2, uniform=True)]
 
     PHYSICS_NOTES = ("1.7's: a hit's speed comes from how hard the paddle drives into the ball, eased "
                      "towards a top speed",
@@ -1518,16 +1535,16 @@ class Renderer:
         ui.screen_menu(state, screen, build, title="球拍 Ball & Paddles", mark="球", reset="Reset to Default")
 
     def draw_gameplay_settings_menu(self, state, screen):
-        """Settings > Gameplay: your own controls.  The keys (on a phone, the touch steering),
-        Auto-Pause and (1.9) a controller's buttons.  (1.9: in rows.)"""
+        """Settings > Controls ("Gameplay" till 1.9): your own controls.  The keys and the mouse
+        (on a phone, the touch steering and vibration), and a controller's buttons and stick.
+        (1.9: in rows; Auto-Pause went to UI, and the emotes' buttons to a page of their own.)"""
         ui = self.ui
         controls = self.app.settings.gameplay
 
         def build(s):
             f, ty = self.row_font(ui, s), ui.fnt(0.021, s)
-            auto = ("Auto-Pause", self.switch(f, "toggle_auto_pause", lambda: controls.auto_pause))
             if ANDROID:
-                play = self.rows(ui, s, [self.heading(ui, s, "Play"), auto,
+                play = self.rows(ui, s, [self.heading(ui, s, "Play"),
                                          ("Vibration", self.switch(f, "toggle_vibration", lambda: controls.vibration))])
                 return Grid([[play, self.touch_section(ui, s, state)]], gap_x=self.column_gap(s))
 
@@ -1540,47 +1557,87 @@ class Renderer:
             for action in controls.ACTIONS:
                 rows.append([Text(action.title(), f, theme.GOLD, align="right"),
                              bind(f"p1_{action}"), bind(f"p2_{action}")])
+            sides = controls.SIDES
             left = self.rows(ui, s, [
                 self.heading(ui, s, "Keys"),
                 Grid(rows, gap_x=int(BASE_W * 0.012 * s), gap_y=self.vgap(ui, s, 0.5)),
                 Text("Click a key, then press the new one.", ty, theme.PARCHMENT),
-                self.heading(ui, s, "Play"),
-                auto])
+                self.heading(ui, s, "Mouse"),
+                ("Mouse Steering", self.switch(f, "toggle_mouse_steer", lambda: controls.mouse_steer,
+                                               tip=TIPS["toggle_mouse_steer"])),
+                ("Mouse Plays", Cycle("cycle_mouse_side", lambda: sides[controls.mouse_side], f, sides,
+                                      tip=TIPS["cycle_mouse_side"])),
+                self.heading(ui, s, "Emotes"),
+                ("", Button("open_emotes", "Emote Buttons", f, (theme.ORANGE, theme.ORANGE_HOVER),
+                            tip=TIPS["open_emotes"]))])
             return Grid([[left, self.pad_section(ui, s, state, f, ty)]], gap_x=self.column_gap(s, 0.08))
 
-        ui.screen_menu(state, screen, build, title="玩法 Gameplay", mark="玩", reset="Reset to Default")
+        ui.screen_menu(state, screen, build, title="控制 Controls", mark="控", reset="Reset to Default")
+
+    PAD_NAMES = {"pause": "Pause", "list": "Talisman list", "up": "Up", "down": "Down", "left": "Left",
+                 "right": "Right"}
+
+    def pad_bind(self, state, action, font, name):
+        """A controller button for a match action (1.9): click it, then press the button."""
+        controls, pads = self.app.settings.gameplay, self.app.gamepads
+        samples = ["Press a button", "Triangle", "Options", "D-pad right"]
+        return KeyButton(f"pad_{action}", lambda: pads.label(getattr(controls, "pad_" + action)), font,
+                         lambda: state.listening_pad == action, samples,
+                         tip=f"{name}\nThe controller button for it in a match"
+                             f"{' (online; keys 1-5 send them too)' if action.startswith('emote') else ''}.\n"
+                             "• Click, then press the button on the controller\n"
+                             "• A button that's already used swaps over\n~ Esc cancels")
 
     def pad_section(self, ui, s, state, font, small):
-        """Gameplay settings' Controller section (1.9): which side the first controller plays when two
-        play here, its buttons for Pause and the talisman list, and the five emotes'."""
+        """Controls' Controller section (1.9): which side the first controller plays when two play
+        here, which stick steers and how much of its travel is ignored, and its buttons for the
+        paddle's four directions, Pause and the talisman list.  (The emotes' are on their page.)"""
         controls, pads = self.app.settings.gameplay, self.app.gamepads
-        sides = ["Red", "Blue"]
-        from core.emotes import EMOTES
-        names = {"pause": "Pause", "list": "Talisman list",
-                 **{f"emote_{i + 1}": f"Emote: {text}" for i, (text, _) in enumerate(EMOTES)}}
-        samples = ["Press a button", "Triangle", "Options", "D-pad right"]
-
-        def bind(action):
-            return KeyButton(f"pad_{action}", lambda: pads.label(getattr(controls, "pad_" + action)), font,
-                             lambda: state.listening_pad == action, samples,
-                             tip=f"{names[action]}\nThe controller button for it in a match"
-                                 f"{' (online: keys 1-5 send them too)' if action.startswith('emote') else ''}.\n"
-                                 "• Click, then press the button on the controller\n"
-                                 "• A button that's already used swaps over\n~ Esc cancels")
+        sides, sticks, zones = controls.SIDES, controls.PAD_STICKS, controls.PAD_DEADZONES
+        stick_tip = lambda: options_tip("Steer With", "Which stick steers your paddle in a match.",
+                                        [(name, "") for name in sticks], controls.pad_stick,
+                                        "The direction buttons below steer too, at full speed")
+        zone_tip = lambda: options_tip("Dead Zone", "How far the stick must move before the paddle does.",
+                                       [("Small", "the slightest push moves it"), ("Normal", ""),
+                                        ("Large", "for a stick that drifts when let go")], controls.pad_deadzone)
         status = Text(lambda: (", ".join(p.name for p in pads.order()) + " connected") if pads.pads else
                       "No controller connected", small, theme.PARCHMENT,
                       samples=["No controller connected", "Xbox 360 Controller, Xbox 360 Controller connected"])
+        bind = lambda action: (self.PAD_NAMES[action], self.pad_bind(state, action, font, self.PAD_NAMES[action]))
         return self.rows(ui, s, [
             self.heading(ui, s, "Controller"),
-            ("First controller", Cycle("cycle_pad_first", lambda: sides[controls.pad_first], font, sides,
-                                       tip="First controller\nWith two players here, the side the first controller "
+            ("First Controller", Cycle("cycle_pad_first", lambda: sides[controls.pad_first], font, sides,
+                                       tip="First Controller\nWith two players here, the side the first controller "
                                            "plays; the second plays the other.  The keyboard works for either.\n"
                                            "• On your own (against the AI, or online) any controller plays your paddle")),
-            ("Pause", bind("pause")),
-            ("Talisman list", bind("list")),
-            self.heading(ui, s, "Emotes (online)", sub=True),
-            *[(text, bind(f"emote_{i + 1}")) for i, (text, _) in enumerate(EMOTES)],
+            ("Steer With", Cycle("cycle_pad_stick", lambda: sticks[controls.pad_stick], font, sticks, tip=stick_tip)),
+            ("Dead Zone", Cycle("cycle_pad_deadzone", lambda: zones[controls.pad_deadzone], font, zones, tip=zone_tip)),
+            self.heading(ui, s, "Buttons", sub=True),
+            bind("up"), bind("down"), bind("left"), bind("right"), bind("pause"), bind("list"),
             status])
+
+    def draw_emote_settings_menu(self, state, screen):
+        """Settings > Controls > Emotes (1.9): the controller button for each quick emote, beside
+        the key that sends it."""
+        ui = self.ui
+        from core.emotes import EMOTES
+
+        def build(s):
+            f, ty = self.row_font(ui, s), ui.fnt(0.022, s)
+            rows = [[Space(), Text("Key", f, theme.GOLD), Text("Controller", f, theme.GOLD)]]
+            for i, (text, _) in enumerate(EMOTES):
+                rows.append([Text(text, f, theme.PARCHMENT, align="right"), Text(str(i + 1), f, theme.GOLD_BRIGHT),
+                             self.pad_bind(state, f"emote_{i + 1}", f, f"Emote: {text}")])
+            notes = Stack([Text("Online only: each shows in a bubble by your side of the court, on both screens.",
+                                ty, theme.PARCHMENT),
+                           Text("Click a controller button, then press the new one.  Friend's Emotes in UI "
+                                "settings hides your friend's.", ty, theme.PARCHMENT)],
+                          gap=int(ui.gap * 0.4 * s))
+            return Stack([self.heading(ui, s, "Emotes (online)"),
+                          Grid(rows, gap_x=int(BASE_W * 0.02 * s), gap_y=self.vgap(ui, s, 0.5)), notes],
+                         gap=self.vgap(ui, s, 0.8))
+
+        ui.screen_menu(state, screen, build, title="表情 Emotes", mark="笑", reset="Reset to Default")
 
     # ── Power-ups ──────────────────────────────────────────────────────────────
 
@@ -1942,6 +1999,10 @@ class Renderer:
         font = self.fnt(0.022)
         hint = "Space: next highlight      S: save this one      Esc: stop" if state.mode == "reel" else \
                "Space: skip      S: save this moment      Esc: back to the match"
+        if self.using_pad():            # a controller's buttons for them (1.9)
+            a, x, b = (self.app.gamepads.label(n) for n in ("a", "x", "b"))
+            hint = f"{a}: next highlight      {x}: save this one      {b}: stop" if state.mode == "reel" else \
+                   f"{a}: skip      {x}: save this moment      {b}: back to the match"
         if ANDROID:                     # a phone has the buttons, and Back
             hint = "Save keeps this one      Skip or Back stops the highlights" if state.mode == "reel" else \
                    "Save keeps this moment      Skip or Back returns to the match"
@@ -2150,6 +2211,7 @@ class Renderer:
                 self.heading(ui, s, "In a Match"),
                 ("HUD", Cycle("cycle_hud", lambda: i.hud_options[i.hud], f, list(i.hud_options), tip=hud_tip)),
                 ("AI Banter", flag("ai_banter")),
+                ("Auto-Pause", flag("auto_pause")),
                 ("Friend's Emotes", flag("friend_emotes")),
                 ("Instant Replay", Cycle("cycle_instant_replay", lambda: i.instant_replay_options[i.instant_replay], f,
                                          list(i.instant_replay_options), tip=replay_tip))])
@@ -2330,7 +2392,7 @@ class Renderer:
         """While a controller works the menus: what A and B do, at the top right (clear of every
         screen's buttons)."""
         nav = self.app.navigator
-        if not nav.active or nav.via != "pad" or not self.app.gamepads.pads:
+        if not nav.active or not self.using_pad():
             return
         font, size = self.ui.fnt(0.026), 44
         x, y = BASE_W - 40, 44
@@ -2959,24 +3021,34 @@ class Renderer:
                 gfxdraw.circle(screen, int(x), int(y), r - w, tint)
 
     def draw_wind(self, screen, powerups):
-        """Wind Gust: leaves blowing up or down the court, swaying as they go."""
-        force = powerups.wind_force() if hasattr(powerups, "wind_force") else 0.0
+        """Wind Gust: leaves blowing across the court the way the wind does (any way, since 1.9),
+        swaying as they go."""
+        wx, wy = powerups.wind_vector() if hasattr(powerups, "wind_vector") else (0.0, 0.0)
+        force = math.hypot(wx, wy)
         leaves = self._leaves
         dt = min(self.app.dt, 1 / 20)
         if force:
-            way = 1 if force > 0 else -1
-            for _ in range(int(abs(force) / PowerUps.WIND * 48 * dt * 10) + (1 if random.random() < abs(force) / PowerUps.WIND * 0.5 else 0)):
-                leaves.append([random.uniform(0, BASE_W), -20 if way > 0 else BASE_H + 20,
-                               random.uniform(-60, 60), way * random.uniform(300, 520),
+            ux, uy = wx / force, wy / force         # which way it blows
+            for _ in range(int(force / PowerUps.WIND * 48 * dt * 10) + (1 if random.random() < force / PowerUps.WIND * 0.5 else 0)):
+                # in from the edges the wind blows from: the top or bottom, or a side, as much as it
+                # blows that way
+                if random.random() < abs(uy) / (abs(ux) + abs(uy)):
+                    x, y = random.uniform(0, BASE_W), -20 if uy > 0 else BASE_H + 20
+                else:
+                    x, y = -20 if ux > 0 else BASE_W + 20, random.uniform(0, BASE_H)
+                speed, drift = random.uniform(300, 520), random.uniform(-60, 60)
+                leaves.append([x, y, ux * speed - uy * drift, uy * speed + ux * drift,
                                random.uniform(0, math.tau), random.uniform(-4, 4), random.choice(self.LEAF_COLOURS),
-                               random.uniform(10, 17), random.uniform(0, math.tau)])
+                               random.uniform(10, 17), random.uniform(0, math.tau), -uy, ux])
         keep = []
         t = self.app.fx.time
         for leaf in leaves:
-            leaf[0] += (leaf[2] + math.sin(t * 2.5 + leaf[8]) * 90) * dt
-            leaf[1] += leaf[3] * dt
+            sway = math.sin(t * 2.5 + leaf[8]) * 90         # (side to side, across the way it blows)
+            across = leaf[9:11] if len(leaf) > 9 else (1.0, 0.0)
+            leaf[0] += (leaf[2] + sway * across[0]) * dt
+            leaf[1] += (leaf[3] + sway * across[1]) * dt
             leaf[4] += leaf[5] * dt
-            if -40 < leaf[1] < BASE_H + 40:
+            if -40 < leaf[0] < BASE_W + 40 and -40 < leaf[1] < BASE_H + 40:
                 keep.append(leaf)
                 x, y, a, col, size = leaf[0], leaf[1], leaf[4], leaf[6], leaf[7]
                 ca, sa = math.cos(a), math.sin(a)
@@ -3506,7 +3578,10 @@ class Renderer:
             self.text(screen, text, font, theme.GOLD_BRIGHT, center=rect.center)
         if game.settings.powerups and game.p1.score + game.p2.score == 0 and not ANDROID:   # (no Tab on a phone)
             font = self.fnt(0.024)
-            text = "Hold Tab to see every power-up in play"
+            held = "Tab"
+            if self.using_pad():                # (a controller's button for it, 1.9)
+                held = self.app.gamepads.label(self.app.settings.gameplay.pad_list)
+            text = f"Hold {held} to see every power-up in play"
             plate = pygame.Rect(0, 0, font.size(text)[0] + 50, 50)
             plate.center = (BASE_W // 2, int(BASE_H * 0.84))
             screen.blit(self.art.inset(plate.w, plate.h), plate)

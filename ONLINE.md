@@ -47,7 +47,7 @@ server's address stays filled in for when it's back. The login is kept in your s
 
 - Either of you can pause (Esc); it pauses for both, and the match waits while either of you is
   in a menu. Clicking away from the game (to type to your friend, say) pauses it for both of
-  you too, and it carries on by itself once you're both back. Turn **Auto-Pause** off (Gameplay
+  you too, and it carries on by itself once you're both back. Turn **Auto-Pause** off (UI
   settings) if you'd rather your clicking away didn't pause it.
 - Only the host's **Match Settings** count, so only the host has them. The host can change them
   from Pause > Settings > Match, and the changes come in at the next serve.

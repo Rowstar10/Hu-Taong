@@ -1,7 +1,7 @@
 """Quick emotes, online (1.9, Rowan's 1.9 plan, phase 3, step 13a).
 
 "Nice shot!", "Oops", "Good game", Hu Tao laughing and Hu Tao thinking: keys 1-5, or the controller
-buttons set in Gameplay settings.  Each shows in a bubble by the sender's side of the court, on both
+buttons set in Controls > Emote Buttons.  Each shows in a bubble by the sender's side of the court, on both
 screens, with a few seconds' wait before you can send another.  Settings > UI can mute your friend's.
 (The two Hu Tao ones are her ghost, as the game draws the ball: laughing, and thinking.)
 

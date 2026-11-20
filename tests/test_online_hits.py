@@ -255,7 +255,7 @@ class HostChecks(HostedMatch):
                 continue                                # off the court, or not a save the friend would claim
             g.x0, g.y0, g.x1, g.y1 = px, py, px + g.width, py + g.height
             g.speed = base * (PowerUps.SWIFT if power == "swift" else 1.0)
-            top = g.speed / PowerUps.SWIFT if power == "swift" else math.inf
+            top = g.speed / PowerUps.SWIFT * engines.push_pace(capped) if power == "swift" else math.inf   # (as the guest's: 1.9)
             if capped:
                 top = min(top, engines.cap_drive(serve))
             gvx, gvy, gbx, gby = GuestMatchState.bounce_off(g, 2, normal, bx, by, r, bvx, bvy, pvx, pvy, serve = serve,

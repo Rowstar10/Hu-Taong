@@ -134,8 +134,10 @@ class TwinSplit(Match):
 
 class Wind(Match):
     def test_gust_strength(self):
-        self.pu.wind = {"left": 5.0, "dir": 1, "t": math.pi / 2 / 2.3}    # the height of a gust
+        self.pu.wind = {"left": 5.0, "angle": math.pi / 2, "t": math.pi / 2 / 2.3}    # the height of a gust, down
         self.assertAlmostEqual(self.pu.wind_force(), 500.0, delta = 1)
+        self.pu.wind["angle"] = 0.7
+        self.assertAlmostEqual(math.hypot(*self.pu.wind_vector()), 500.0, delta = 1, msg = "as strong any way")
 
 
 class Firecracker(Match):

@@ -133,9 +133,9 @@ KINDS = (
          "• Whoever wins it, Red or Blue\n"
          "• It can win the match outright"),
     Kind("wind", "Wind Gust", "风", "Wild", 10,
-         "For 10 seconds a gusting wind blows up or down the court, bending the ball's path.",
-         "A wind blows across the court for 10 seconds.\n"
-         "• It bends the ball's path up or down, in gusts\n"
+         "For 10 seconds a gusting wind blows across the court, any way at all, bending the ball's path.",
+         "A wind blows across the court for 10 seconds, any way at all.\n"
+         "• It bends the ball's path the way it blows, in gusts, without speeding it up\n"
          "• Leaves blowing across the court show which way\n"
          "• It doesn't push the paddles"),
     Kind("cracker", "Firecracker", "爆", "Wild", 5,
@@ -216,6 +216,8 @@ class PowerUps:
     CURVE = 2000                            # Curveball: px/s^2 the ball bends at, from a full-speed sweep...
     CURVE_FADE = 1.3                        # ...fading away at this rate as it flies (per second)
     WIND = 500                              # Wind Gust: px/s^2 at the height of a gust (360 was too gentle to notice)
+    WIND_ACROSS = 0.35                      # ...and it never tips the ball steeper than this share of its speed across
+                                            # the court (about 70 degrees), nor turns it back (1.9)
     CRACKER_TOP = 2600                      # Firecracker: its bang shoots the ball off at double speed, up to this (3600 was unreturnable)
     PORTAL_R = 72                           # Portal Pair: a portal's radius (1.6's were 80; 1.7's 96; 1.8's grew
                                             #    from 72 to 120 and collapsed, until Rowan's second playtest)
@@ -308,7 +310,7 @@ class PowerUps:
         self.shape_shift = False # Shape Shift: sizes drift until the point ends
         self.curve_on = False    # Curveball until the point ends
         self.double = False      # Double or Nothing: the point being played is worth 2
-        self.wind = None         # Wind Gust: {"left", "dir" (1 down, -1 up), "t"}
+        self.wind = None         # Wind Gust: {"left", "angle" (radians: 0 right, pi/2 down), "t"}
         self.cracker = None      # Firecracker: {"fuse": seconds to the bang, "taker": who took it}
         self.lantern = None      # Lantern Night: {"age", "left": seconds of play, "lifting": seconds left of the dawn, or None}
         self.blasts = []         # Firecracker explosions for the renderer: [x, y, age]
@@ -414,17 +416,33 @@ class PowerUps:
         """Curveball is on: for the whole match (Settings), or from the power-up until the point ends."""
         return self.settings.mode_curveball or self.curve_on
 
-    def wind_force(self):
-        """Wind Gust: the wind's push on the ball now, px/s^2 (down is positive), gusting."""
+    def wind_vector(self):
+        """Wind Gust: the wind's push on the ball now, (x, y) in px/s^2 (right and down are
+        positive), gusting.  (Up or down only until 1.9: now any way at all.)"""
         if not self.wind:
-            return 0.0
+            return 0.0, 0.0
         w = self.wind
         ease = min(1.0, (BY_KEY["wind"].seconds - w["left"]) / 0.8, w["left"] / self.WIND_DIES)
-        return w["dir"] * self.WIND * ease * (0.65 + 0.35 * math.sin(w["t"] * 2.3))
+        strength = self.WIND * ease * (0.65 + 0.35 * math.sin(w["t"] * 2.3))
+        return strength * math.cos(w["angle"]), strength * math.sin(w["angle"])
+
+    def wind_force(self):
+        """The wind's push up or down (down positive): its own number in a replay's rows."""
+        return self.wind_vector()[1]
+
+    @staticmethod
+    def wind_way(angle):
+        """Which way a wind at this angle blows, in words ("down", "up and to the left"...)."""
+        x, y = math.cos(angle), math.sin(angle)
+        across = "to the right" if x > 0.38 else "to the left" if x < -0.38 else ""
+        down = "down" if y > 0.38 else "up" if y < -0.38 else ""
+        if down and across:
+            return f"{down} and {across}"
+        return down or across.replace("to the ", "")
 
     def ball_accel(self):
-        """What pulls the ball up or down as it flies: the wind (for the AI's reckoning)."""
-        return self.wind_force()
+        """What pushes the ball as it flies: the wind, (x, y) (for the AI's reckoning)."""
+        return self.wind_vector()
 
     def lantern_level(self):
         """Lantern Night: 0 (day) to 1 (full night), easing in and out.  Always night if it's on
@@ -620,7 +638,7 @@ class PowerUps:
         if self.double:
             items.append(("double", UNTIL_POINT, "This point is worth 2"))
         if self.wind:
-            items.append(("wind", self.wind["left"], "Wind blowing " + ("down" if self.wind["dir"] > 0 else "up")))
+            items.append(("wind", self.wind["left"], "Wind blowing " + self.wind_way(self.wind["angle"])))
         if self.cracker:
             items.append(("cracker", self.cracker["fuse"], "Firecracker: bangs when its fuse burns down"))
         if self.lantern:
@@ -830,7 +848,8 @@ class PowerUps:
         elif key == "double":
             self.double = True
         elif key == "wind":
-            self.wind = {"left": kind.seconds, "dir": random.choice((-1, 1)), "t": 0.0}
+            # any way at all (1.9, Rowan: "the gusts of wind aren't just up or down, but in any direction")
+            self.wind = {"left": kind.seconds, "angle": random.uniform(0, math.tau), "t": 0.0}
         elif key == "cracker":
             self.cracker = {"fuse": kind.seconds, "taker": owner}      # lit as it's taken
         elif key == "lantern":
@@ -893,23 +912,19 @@ class PowerUps:
             self.wind["t"] += dt
             if self.wind["left"] <= 0:
                 self.wind = None
-        push = self.wind_force()
+        ax, ay = self.wind_vector()
         fade = math.exp(-self.CURVE_FADE * dt)
         for b in self.balls():
-            if b.stuck:
-                continue
+            if b.stuck or getattr(b, "transit", None):
+                continue                    # (held still inside a portal or black hole: 1.9)
             curve = getattr(b, "curve", 0.0)
             if curve:
                 b.vy += curve * dt
                 b.curve = curve * fade if abs(curve * fade) > 20 else 0.0
-            if push:
+            if ax or ay:
                 # the wind turns the ball's path but doesn't speed it up (any speed it added would
                 # come straight back out of the next paddle hit, as a faster shot)
-                speed = math.hypot(b.vx, b.vy)
-                b.vy += push * dt
-                turned = math.hypot(b.vx, b.vy)
-                if turned:
-                    b.vx, b.vy = b.vx * speed / turned, b.vy * speed / turned
+                b.vx, b.vy = self.blow(b.vx, b.vy, ax, ay, dt)
 
     # ---------------- Firecracker ----------------
 
@@ -921,6 +936,11 @@ class PowerUps:
         before 1.6's playtest; a fuse you can watch is easier to play round.)"""
         cracker = self.cracker
         if not cracker:
+            return
+        if getattr(self.game.ball, "transit", None):
+            # Inside a portal or a black hole, out of sight, its fuse waits till it's out.  (Rowan's
+            # 1.9 clip: it banged inside a collapsing Black Hole, and the ball flew off unseen and
+            # scored.)
             return
         cracker["fuse"] -= dt
         if cracker["fuse"] > 0:
@@ -1306,6 +1326,19 @@ class PowerUps:
         return vx, vy
 
     @classmethod
+    def blow(cls, vx, vy, ax, ay, dt):
+        """The wind turning a ball's path (bend), but never past WIND_ACROSS: it can't send the
+        ball straight up or down the court, where it would bounce between the walls and never
+        reach a paddle, nor turn it back the way it came (1.9: the wind blows any way now)."""
+        nx, ny = cls.bend(vx, vy, ax, ay, dt)
+        speed = math.hypot(nx, ny)
+        least = cls.WIND_ACROSS * speed
+        if vx and (abs(nx) < least or (nx > 0) != (vx > 0)):
+            nx = math.copysign(least, vx)
+            ny = math.copysign(math.sqrt(max(0.0, speed * speed - nx * nx)), ny or vy or 1.0)
+        return nx, ny
+
+    @classmethod
     def falls_in(cls, hole, x, y, vx, vy, dt, r = 0.0):
         """Does a ball of radius r centred at (x, y) touch this hole's heart in the next `dt` (so a
         fast one can't skip across it)?"""
@@ -1475,9 +1508,9 @@ class PowerUps:
         hole["way"], hole["flash"] = angle, 1.0
         app.fx.spark(hole["x"], hole["y"], 26, (190, 130, 255), speed = 240, life = .4)
 
-    def hole_path(self, x, y, vx, vy, r, line_x, judged = 1.0, field = 0.0, most = 3.0):
+    def hole_path(self, x, y, vx, vy, r, line_x, judged = 1.0, field = (0.0, 0.0), most = 3.0):
         """Where a ball flying from (x, y) at (vx, vy) reaches x = line_x, pulled by the black holes
-        (each taken as `judged` times as strong as it is) and pushed by `field` (the wind):
+        (each taken as `judged` times as strong as it is) and pushed by `field` (the wind, (x, y)):
         (seconds, y, False), or (seconds, None, True) if it falls into a hole first, or None if it
         doesn't get there within `most` seconds.  For the AI."""
         holes = [dict(hole, power = hole["power"] * judged) for hole in self.pulling()]      # (each drifting on: below)
@@ -1492,8 +1525,8 @@ class PowerUps:
                 if can and self.falls_in(hole, x, y, vx, vy, step, r):
                     return t, None, True
             vx, vy, pulled = self.gravity(holes, x, y, vx, vy, step, entry, serve)
-            if field:
-                vx, vy = self.bend(vx, vy, 0.0, field, step)
+            if field[0] or field[1]:
+                vx, vy = self.blow(vx, vy, field[0], field[1], step)
             x, y = x + vx * step, y + vy * step
             if y < r:
                 y, vy = 2 * r - y, abs(vy)

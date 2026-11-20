@@ -1,4 +1,5 @@
 import math
+from game import engines
 from config import DYNAMIC, KINEMATIC, STATIC, MAX_CPF, BASE_W, BASE_H
 
 class Physics:
@@ -213,8 +214,16 @@ class Physics:
         if rvn > 0:
             return
 
-        # How each was moving just before the knock (a paddle's end hit plays off the ball's own speed)
-        data["before"] = {a: (a.vx, a.vy), b: (b.vx, b.vy)}
+        # A paddle's push counts at the ball's pace (engines.push_pace, 1.9): the ball goes a little
+        # slower, while the paddle still moves at its own speed
+        ka = Physics.push_pace(a) if a.is_paddle and b.is_ball else 1.0
+        kb = Physics.push_pace(b) if b.is_paddle and a.is_ball else 1.0
+        if ka != 1.0 or kb != 1.0:
+            rvn = min(0.0, (a.vx * ka - b.vx * kb) * nx + (a.vy * ka - b.vy * kb) * ny)
+
+        # How each was moving just before the knock (a paddle's end hit plays off the ball's own
+        # speed), a paddle's push as the ball feels it
+        data["before"] = {a: (a.vx * ka, a.vy * ka), b: (b.vx * kb, b.vy * kb)}
 
         # Restitution & Impulse
         res = (a.restitution + b.restitution) / 2
@@ -270,6 +279,13 @@ class Physics:
         Physics.positional_shove(a, b, nx, ny)
         call_contacts(a, b)
         
+    @staticmethod
+    def push_pace(paddle):
+        """How much this paddle's push counts, by its match's rules (engines.push_pace)."""
+        rules = getattr(getattr(paddle, "game", None), "settings", None)
+        capped = bool(getattr(rules, "speed_cap", False)) and getattr(rules, "physics", engines.CURRENT) != engines.CLASSIC
+        return engines.push_pace(capped)
+
     @staticmethod
     def clamp_to_world(obj):
         if obj.is_ball:

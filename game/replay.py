@@ -28,9 +28,10 @@ RATE = 60                    # frames a second
 MOST_FRAMES = RATE * 60 * 30 # half an hour; a longer match keeps its last half hour
 MAGIC = b"HUTAONG-REPLAY 1\n"
 KIND_KEYS = [kind.key for kind in KINDS]
-ROWS = 4        # the rows' layout: 2 from 1.7 (each portal's size), 3 from 1.8 (each portal's flash, and
+ROWS = 5        # the rows' layout: 2 from 1.7 (each portal's size), 3 from 1.8 (each portal's flash, and
                 # the blue ball's visibility), 4 from 1.8's second playtest (each black hole's size, and how
-                # far it has collapsed); none said in a header means 1
+                # far it has collapsed), 5 from 1.9 (the wind's push across, at the very end: older readers
+                # stop before it and see the wind blow only up or down); none said in a header means 1
 NO_AIM = 9.0                        # (Sticky Goo's aim, in a row, when it hasn't locked: 1.8)
 HOLE_FIELDS = 10                    # a black hole's numbers in a row (1.8; 15 in layout 3)
 RENAMED = {"chaos": "shape"}        # power-ups since renamed: Chaos Mode + is Shape Shift (1.6)
@@ -283,6 +284,8 @@ class Recorder:
             values += [hole["x"], hole["y"], hole["kind"], hole.get("power", 1.0), hole.get("age", 0.0),
                        hole.get("flash", 0.0), hole["dying"] if hole.get("dying") is not None else -1.0,
                        hole.get("spin", 1), hole.get("size", 1.0), collapse if collapse is not None else -1.0]
+        # then (1.9) the wind's push across the court (its push up or down is with the spin, above)
+        values.append(pu.wind_vector()[0] if hasattr(pu, "wind_vector") else 0.0)
         return array("f", values).tobytes()
 
     def track_pass(self):
@@ -553,6 +556,7 @@ class ViewPowerUps:
         self.flags = 0
         self.alpha = 1.0
         self.wind, self.night, self.cracker, self.portals = 0.0, 0.0, 0.0, []
+        self.wind_x = 0.0                       # (1.9: the wind blows any way)
         self.blasts = []
         self.ploughs = []
         self.closing = []
@@ -582,6 +586,9 @@ class ViewPowerUps:
 
     def wind_force(self):
         return self.wind
+
+    def wind_vector(self):
+        return self.wind_x, self.wind
 
     def lantern_level(self):
         return self.night
@@ -803,6 +810,7 @@ class ReplayView:
                         hole["size"], hole["collapse"] = v[8], None if v[9] < 0 else v[9]
                     pu.holes.append(hole)
                 pos += fields
+        pu.wind_x = a[pos] if pos < len(a) else 0.0         # (1.9: the wind across; older rows have none)
         self.objects = [*self.stones, *[p for p in (self.p1, self.p2) if p is not self.bench], ball, *self.extra_balls]
 
 

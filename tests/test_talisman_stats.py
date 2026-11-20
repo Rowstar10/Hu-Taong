@@ -67,7 +67,7 @@ class Counting(unittest.TestCase):
         g.stop()
 
     def test_practice_doesnt_count(self):
-        g = match(powerups = True, practice = True)
+        g = match(powerups = True, vs_wall = True)          # (Practice vs AI against the wall)
         g.powerups.spawn("giant")
         g.powerups.collect(g.powerups.pickups[-1], g.p1)
         self.assertEqual(stats.talismans, {})

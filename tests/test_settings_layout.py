@@ -85,21 +85,37 @@ class EveryPage(Base):
                 self.assertGreaterEqual(min(r.h for r in switches), 48)
 
     def test_rows_line_up(self):
-        """In a column, each row's control starts at the same place, and its name ends just before."""
+        """In a column, each row's control is centred on the same line, and its name ends just before.
+        (Rowan, 1.9: the switches hung left of the arrow selectors, and looked untidy; they sit
+        centred under them now.)"""
         columns = {("match",): ("cycle_win_score_left", "toggle_win_by_two", "toggle_middle_wall",
                                 "cycle_countdown_left", "cycle_ai_left", "toggle_adaptive_ai", "cycle_court_left"),
-                   ("display",): ("cycle_res_left", "cycle_mode_left", "apply", "cycle_max_fps_left",
+                   ("display",): ("cycle_res_left", "cycle_mode_left", "cycle_max_fps_left",
                                   "toggle_show_fps", "cycle_effects_left", "toggle_screen_shake", "toggle_ball_trail"),
-                   ("interface",): ("cycle_hud_left", "toggle_ai_banter", "toggle_friend_emotes",
+                   ("interface",): ("cycle_hud_left", "toggle_ai_banter", "toggle_auto_pause", "toggle_friend_emotes",
                                     "cycle_instant_replay_left"),
-                   ("gameplay",): ("cycle_pad_first_left", "pad_pause", "pad_list", "pad_emote_1", "pad_emote_5"),
-                   ("audio",): ("toggle_paddle_sounds", "toggle_score_sounds", "toggle_menu_sounds",
-                                "mute_master_volume", "mute_music_volume", "mute_sfx_volume")}
+                   ("gameplay",): ("cycle_pad_first_left", "cycle_pad_stick_left", "pad_up", "pad_pause", "pad_list"),
+                   ("audio",): ("toggle_paddle_sounds", "toggle_score_sounds", "toggle_menu_sounds")}
+
+        def centre(boxes, key):
+            if key.endswith("_left") and key.startswith("cycle_"):
+                return (boxes[key].left + boxes[key[:-5] + "_right"].right) / 2      # (the whole cycle)
+            return boxes[key].centerx
         for path, keys in columns.items():
             with self.subTest(page = "/".join(path)):
                 boxes = harness.every_box(open_page(*path))
-                lefts = {boxes[k].left for k in keys}
-                self.assertEqual(len(lefts), 1, {k: boxes[k].left for k in keys})
+                middles = [centre(boxes, k) for k in keys]
+                self.assertLess(max(middles) - min(middles), 3, dict(zip(keys, middles)))
+        boxes = harness.every_box(open_page("audio"))
+        self.assertEqual(len({boxes[k].left for k in ("mute_master_volume", "mute_music_volume", "mute_sfx_volume")}), 1)
+
+    def test_a_lone_button_is_centred(self):
+        """(Rowan, 1.9: Choose Talismans sat a little to the right.)  A button with no name of its
+        own sits in the middle of its section, as the section's other lone things do."""
+        boxes = harness.every_box(open_page("match"))
+        modes = (boxes["cycle_mode_chaos"].left + boxes["cycle_mode_switch"].right) / 2
+        self.assertLess(abs(boxes["open_powerups"].centerx - modes), 3)
+        self.assertLess(abs(boxes["open_ball_paddles"].centerx - modes), 3)
 
     def test_cycles_share_a_width(self):
         """A column's cycles are as wide as each other, so their arrows line up too."""
@@ -225,8 +241,8 @@ class Scrolling(Base):
     def test_the_highlight_scrolls_to_what_it_moves_to(self):
         page = self.page
         app.navigator.snapshot()
-        nav.active, nav.via, nav.key = True, "pad", "open_powerups"
-        self.assertNotIn("open_powerups", page.ui_hitboxes, "(out of sight to start with)")
+        nav.active, nav.via, nav.key = True, "pad", self.hidden
+        self.assertNotIn(self.hidden, page.ui_hitboxes, "(out of sight to start with)")
         nav.reveal()
         self.assertGreater(page.scroll_target, 0, "it scrolls down to it")
         settle_scroll(page)
@@ -255,7 +271,12 @@ class Scrolling(Base):
         nav.active, nav.via, nav.key = True, "pad", "back"
         nav.move(0, -1, via = "pad")
         self.assertIn(nav.key, page.ui_whole, "up from Back: onto the page")
-        nav.move(0, 1, via = "pad")
+        for _ in range(8):              # down again: on down the page to Back or Reset, never round to the top
+            before = nav.targets()[nav.key].top
+            nav.move(0, 1, via = "pad")
+            if nav.key in ("back", "reset_defaults"):
+                break
+            self.assertGreater(nav.targets()[nav.key].top, before)
         self.assertIn(nav.key, ("back", "reset_defaults"))
         nav.key = "open_ball_paddles"               # the last control on the page, out of sight
         nav.move(0, 1, via = "pad")

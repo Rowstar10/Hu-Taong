@@ -181,7 +181,7 @@ class FromMatches(unittest.TestCase):
 
 
 class InAMatch(unittest.TestCase):
-    """The match screen wires it up; Practice doesn't count."""
+    """The match screen wires it up; practice (against the wall, or scoring off) doesn't count."""
     def setUp(self):
         ach.reset()
         ach.on_earn = lambda key: None
@@ -220,7 +220,7 @@ class InAMatch(unittest.TestCase):
         self.assertIn("into_the_void", ach.earned)
 
     def test_not_in_practice(self):
-        g = self.game(powerups = True, practice = True, practice_wall = False)
+        g = self.game(powerups = True, scoring = False)     # (Practice vs AI with scoring off)
         self.collapse(g)
         self.assertNotIn("into_the_void", ach.earned)
 

@@ -94,7 +94,8 @@ class WhatGoesWhere(unittest.TestCase):
         keys = harness.every_box(open_screen("match"))
         on, choose = keys["toggle_powerups"], keys["open_powerups"]
         self.assertGreater(choose.top, on.bottom - 1, "below it")
-        self.assertLess(abs(choose.left - on.left), 4, "in line with it (1.9: in the column of controls)")
+        self.assertLess(abs(choose.centerx - (keys["cycle_mode_chaos"].left + keys["cycle_mode_switch"].right) / 2), 3,
+                        "centred in its section (Rowan, 1.9: it sat a little to the right)")
         self.assertLess(keys["cycle_powerup_rate_left"].bottom, keys["cycle_at_once_left"].top + 1)
 
     def test_choose_talismans_has_no_switch_or_spawn_rate(self):
@@ -125,8 +126,11 @@ class WhatGoesWhere(unittest.TestCase):
 
     def test_gameplay_is_your_controls(self):
         keys = open_screen("gameplay").ui_hitboxes
-        for key in ("key_p1_up", "key_p2_right", "toggle_auto_pause"):
+        for key in ("key_p1_up", "key_p2_right", "toggle_mouse_steer", "pad_up", "cycle_pad_stick_left",
+                    "open_emotes"):
             self.assertIn(key, keys)
+        self.assertNotIn("toggle_auto_pause", keys, "(1.9, Rowan: Auto-Pause to UI)")
+        self.assertFalse([k for k in keys if k.startswith("pad_emote")], "(1.9: the emotes have a page)")
 
     def test_display_has_the_effects(self):
         keys = open_screen("display").ui_hitboxes
@@ -137,7 +141,8 @@ class WhatGoesWhere(unittest.TestCase):
         keys = set(open_screen("interface").ui_hitboxes) - set(FOOTER)
         self.assertEqual(keys, {"toggle_tooltips", "toggle_hide_cursor", "cycle_hud_left", "cycle_hud_right",
                                 "toggle_ai_banter", "cycle_instant_replay_left", "cycle_instant_replay_right",
-                                "toggle_friend_emotes"})             # (1.9: online, the friend's emotes)
+                                "toggle_friend_emotes",              # (1.9: online, the friend's emotes)
+                                "toggle_auto_pause"})                # (1.9, Rowan: from Gameplay)
 
 
 class Layout(unittest.TestCase):
@@ -216,8 +221,13 @@ class Clicks(unittest.TestCase):
         click(screen, "key_p1_up")
         screen.handle_event(pygame.event.Event(pygame.KEYDOWN, key = pygame.K_i, mod = 0, unicode = "i", scancode = 0))
         self.assertEqual(s.gameplay.p1_up, pygame.K_i)
+        click(screen, "toggle_mouse_steer")
+        self.assertTrue(s.gameplay.mouse_steer)
+        s.gameplay.reset()
+        screen = open_screen("interface")
         click(screen, "toggle_auto_pause")
-        self.assertFalse(s.gameplay.auto_pause)
+        self.assertFalse(s.interface.auto_pause)
+        s.interface.reset()
 
     def test_resets_keep_to_their_own_screen(self):
         s.gameplay.bind("p1_up", pygame.K_i)

@@ -3,11 +3,11 @@ import pygame
 from core.states.base_state import State
 
 class InterfaceSettingsState(State):
-    """Settings > UI: menus, the HUD and tooltips."""
+    """Settings > UI: menus, the HUD, tooltips and (1.9, from Gameplay) Auto-Pause."""
     NAME = "interface"
     is_menu = True
 
-    TOGGLES = ("tooltips", "ai_banter", "hide_cursor", "friend_emotes")
+    TOGGLES = ("tooltips", "ai_banter", "hide_cursor", "friend_emotes", "auto_pause")
     CYCLES = {"hud": "hud_options", "instant_replay": "instant_replay_options"}
 
     def draw(self, screen):

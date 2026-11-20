@@ -11,7 +11,7 @@ bounce_off) both play hits by these numbers, so the two agree.
 """
 import math
 
-from config import MAX_BALL_SPEEDUP, MAX_BOUNCE_ANGLE
+from config import MAX_BALL_SPEEDUP, MAX_BOUNCE_ANGLE, BALL_PACE
 
 CURRENT, CLASSIC, V09 = 0, 1, 2
 
@@ -43,9 +43,20 @@ def v09_floor(serve):
     return V09_FLOOR * serve_speed(serve)
 
 
+def push_pace(capped):
+    """How much a paddle's push into the ball counts (1.9): BALL_PACE, so the ball goes a little slower
+    than 1.8's while the paddles keep their speed, but in full under the Speed Cap, where the cap limits
+    drives already and a paddle follows its own shot: pushed for less, a ball could never outrun the
+    paddle pushing it, which was held behind it (1.8's "moves like a turtle")."""
+    return 1.0 if capped else BALL_PACE
+
+
 def cap_drive(serve):
-    """The Speed Cap: the fastest a paddle counts as moving into the ball when it knocks it."""
-    return CAP_DRIVE * serve_speed(serve)
+    """The Speed Cap: the fastest a paddle counts as moving into the ball when it knocks it, for a
+    ball served at `serve`.  (Since the ball went at BALL_PACE, 1.9, the limit is the one measured for
+    the Ball Speed setting, as in 1.8: a capped knock is as fast as it was, so a paddle pushing its
+    own shot along isn't held back any more than it was, and every capped shot is still in reach.)"""
+    return CAP_DRIVE * serve_speed(serve / BALL_PACE)
 
 
 def v09_off_the_end(offset, ny, speed, forward):

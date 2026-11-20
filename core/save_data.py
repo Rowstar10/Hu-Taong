@@ -14,7 +14,7 @@ MODES = ["mode_chaos", "chaos_timing", "mode_switch", "switch_timing", "mode_cur
          "mode_lantern_night", "mode_twin_ball", "mode_talisman_rush", "mode_black_hole"]
 GAMEPLAY = ["paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "ball_speed",
             "winning_score_index", "win_by_two", "ai_difficulty", "adaptive_ai",
-            "vs_ai", "play_as_blue", "practice", "practice_wall", "practice_scoring", "practice_talisman", "middle_wall", "ai_style", "pace", "physics", "speed_cap",
+            "vs_ai", "play_as_blue", "vs_wall", "scoring", "middle_wall", "ai_style", "pace", "physics", "speed_cap",
             "powerups", "powerup_rate", "talismans_at_once", "court", "online_host_blue"] + MODES + ["pu_" + kind.key for kind in POWERUP_KINDS]
 DISPLAY = ["max_fps", "show_fps", "dim", "rotate_backgrounds", "background", "rotate_every", "parallax", "court_dim_level"]
 OLD_COURT_DIM = [0, 60, 100, 150]     # before the Court Dim slider: Off, Light, Medium, Strong (out of 255)
@@ -23,15 +23,17 @@ INTERFACE = ["tooltips", "ai_banter", "screen_shake", "ball_trail", "auto_pause"
              "hud", "effects", "countdown", "instant_replay",
              "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right",
              "pad_first", "pad_pause", "pad_list", "pad_emote_1", "pad_emote_2", "pad_emote_3", "pad_emote_4",
-             "pad_emote_5", "friend_emotes"]
+             "pad_emote_5", "friend_emotes",
+             "pad_up", "pad_down", "pad_left", "pad_right", "pad_stick", "pad_deadzone", "mouse_steer", "mouse_side"]
 if ANDROID:
     INTERFACE += ["touch_steer", "touch_sensitivity", "vibration"]
 INDEX_FIELDS = {"winning_score_index", "ai_difficulty", "max_fps", "background",
                 "ai_style", "chaos_timing", "switch_timing", "physics", "hud", "effects", "countdown", "fade", "ambience",
                 "instant_replay",
-                "rotate_every", "parallax", "powerup_rate", "talismans_at_once", "play_mode", "court", "practice_talisman",
+                "rotate_every", "parallax", "powerup_rate", "talismans_at_once", "play_mode", "court",
                 "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right",
-                "touch_steer", "touch_sensitivity", "pad_first"}  # whole numbers only
+                "touch_steer", "touch_sensitivity", "pad_first", "pad_stick", "pad_deadzone",
+                "mouse_side"}  # whole numbers only
 SOUND = ["master_volume", "sfx_volume", "music_volume", "paddle_hit_sound", "score_sound",
          "master_muted", "sfx_muted", "music_muted"]
 ONLINE = ["own_server", "server_address", "server_user", "server_password"]
@@ -61,6 +63,8 @@ def _limits(app):
                   touch_steer = (0, len(g.touch_steer_options) - 1),
                   touch_sensitivity = (0, len(g.touch_sensitivity_options) - 1),
                   pad_first = (0, 1),
+                  pad_stick = (0, len(g.PAD_STICKS) - 1), pad_deadzone = (0, len(g.PAD_DEADZONES) - 1),
+                  mouse_side = (0, 1),
                   fade = (0, len(a.fade_options) - 1),
                   play_mode = (0, 2),
                   ambience = (0, len(a.ambience_options) - 1),

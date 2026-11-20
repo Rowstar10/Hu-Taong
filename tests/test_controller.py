@@ -68,6 +68,7 @@ class Base(unittest.TestCase):
     def tearDown(self):
         pads.pads.clear()
         pads.listen = None
+        pads.using = "keys"
         nav.active, nav.key = False, None
         app.keys_down.clear()
         g.reset()
@@ -142,7 +143,12 @@ class Steering(Base):
     def test_labelled_controller(self):
         plug("Xbox 360 Controller")
         game = self.match(vs_ai = True)
-        self.assertEqual(game.p1.controls_label, "Controller")
+        pads.using = "pad"
+        game.label_pads()
+        self.assertEqual(game.p1.controls_label, "Left stick", "(1.9: the stick it steers with)")
+        pads.using = "keys"
+        game.label_pads()
+        self.assertEqual(game.p1.controls_label, "W A S D", "the keys again, once they're what's used")
 
 
 class InAMatch(Base):
@@ -193,6 +199,38 @@ class Menus(Base):
         press("dpad_right")
         press("dpad_left")
         self.assertEqual(nav.key, "stats")
+
+    def test_it_wraps_round(self):
+        """Rowan, 1.9 phase 3: "navigating menus would be a lot easier if you could loop around from
+        the bottom to the top, top to bottom, left to right, and right to left in just one movement"."""
+        plug("Xbox 360 Controller")
+        show("main_menu")
+        nav.active, nav.via, nav.key = True, "pad", "prompt_quit"
+        press("dpad_right")
+        self.assertEqual(nav.key, "play", "right from the last goes round to the first")
+        press("dpad_left")
+        self.assertEqual(nav.key, "prompt_quit", "and left from the first to the last")
+        show("settings")
+        nav.active, nav.via, nav.key = True, "pad", "back"
+        press("dpad_down")
+        self.assertEqual(nav.key, "display", "down from the bottom: the top, in line with it")
+        press("dpad_up")
+        self.assertEqual(nav.key, "back", "up from the top: the bottom")
+        nav.key = "interface"
+        press("dpad_right")
+        self.assertEqual(nav.key, "match", "the row's other end, not the Reset button below")
+
+    def test_wrapping_on_a_page_that_scrolls(self):
+        plug("Xbox 360 Controller")
+        state = show("settings", "match")
+        self.assertGreater(state.max_scroll, 0, "(the Match page scrolls)")
+        state.scroll = state.scroll_target = state.scroll_at = state.max_scroll     # (at the bottom)
+        frame()
+        nav.active, nav.via, nav.key = True, "pad", "back"
+        press("dpad_down")
+        top = min(nav.targets().values(), key = lambda r: r.top).top
+        self.assertLessEqual(nav.targets()[nav.key].top, top + nav.BAND, "round to the top of the page")
+        self.assertLess(state.scroll_target, state.max_scroll, "and it scrolls up to show it")
 
     def test_b_goes_back(self):
         plug("Xbox 360 Controller")
@@ -255,6 +293,98 @@ class Rebinding(Base):
     def test_a_button_already_used_swaps(self):
         g.bind_pad("pause", "back")
         self.assertEqual((g.pad_pause, g.pad_list), ("back", "start"))
+
+
+class MoreControls(Base):
+    """Rowan, 1.9 phase 3: "have more custom controls for the controller".  The paddle's four
+    directions can be set to any buttons, which stick steers can be chosen, and how much of its
+    travel is ignored (the dead zone)."""
+
+    def game(self, **rules):
+        m.reset()
+        m.vs_ai, m.powerups = True, False
+        for name, value in rules.items():
+            setattr(m, name, value)
+        game = Hu_Taong(app)
+        game.start()
+        self.addCleanup(game.stop)
+        return game
+
+    def test_the_directions_can_be_set(self):
+        plug("Xbox 360 Controller")
+        screen = show("settings", "gameplay")
+        from tests.test_settings_menus import click
+        click(screen, "pad_up")
+        press("leftshoulder")
+        self.assertEqual(g.pad_up, "leftshoulder")
+        self.assertEqual(g.pad_emote_4, "dpad_up", "the emote that had it swaps")
+        game = self.game()
+        press("leftshoulder")
+        self.assertEqual(pads.steer_paddle(game.p1), (0.0, -game.p1.speed), "it steers up now")
+        press("leftshoulder", up = True)
+        press("dpad_up")
+        self.assertIsNone(pads.steer_paddle(game.p1), "and the D-pad's up doesn't")
+        press("dpad_up", up = True)
+
+    def test_which_stick_steers(self):
+        plug("Xbox 360 Controller")
+        game = self.game()
+        right = (pygame.CONTROLLER_AXIS_RIGHTX, pygame.CONTROLLER_AXIS_RIGHTY)
+        pads.pads[500].axes[right[1]] = 1.0
+        self.assertIsNone(pads.steer_paddle(game.p1), "the left stick, by default")
+        g.pad_stick = 1
+        self.assertEqual(pads.steer_paddle(game.p1), (0.0, game.p1.speed))
+        stick(0, -1.0)
+        self.assertEqual(pads.steer_paddle(game.p1), (0.0, game.p1.speed), "(not the left now)")
+        g.pad_stick = 2
+        stick(0, -0.6)
+        self.assertEqual(pads.steer_paddle(game.p1)[1], game.p1.speed, "either: the one pushed further")
+        stick(0, -1.0)
+        pads.pads[500].axes[right[1]] = 0.0
+        self.assertEqual(pads.steer_paddle(game.p1)[1], -game.p1.speed)
+        stick(0, 0)
+
+    def test_the_dead_zone(self):
+        plug("Xbox 360 Controller")
+        game = self.game()
+        stick(0, 0.2)
+        self.assertIsNone(pads.steer_paddle(game.p1), "Normal ignores a small push")
+        g.pad_deadzone = 0
+        self.assertIsNotNone(pads.steer_paddle(game.p1), "Small doesn't")
+        stick(0, 0.35)
+        g.pad_deadzone = 2
+        self.assertIsNone(pads.steer_paddle(game.p1), "Large ignores more")
+        stick(0, 0)
+
+    def test_on_the_controls_page_and_saved(self):
+        screen = show("settings", "gameplay")
+        from tests.test_settings_menus import click
+        for key in ("pad_up", "pad_down", "pad_left", "pad_right", "cycle_pad_stick_right", "cycle_pad_deadzone_right"):
+            self.assertIn(key, screen.ui_hitboxes)
+        click(screen, "cycle_pad_stick_right")
+        click(screen, "cycle_pad_deadzone_left")
+        self.assertEqual((g.pad_stick, g.pad_deadzone), (1, 0))
+        saved = save_data.collect(app)["interface"]
+        self.assertEqual((saved["pad_stick"], saved["pad_deadzone"], saved["pad_up"]), (1, 0, "dpad_up"))
+
+    def test_emotes_have_a_page_of_their_own(self):
+        """Rowan: "Move the emotes section into its own settings menu inside control settings"."""
+        plug("Xbox 360 Controller")
+        screen = show("settings", "gameplay")
+        from tests.test_settings_menus import click
+        self.assertFalse([k for k in screen.ui_hitboxes if k.startswith("pad_emote")])
+        click(screen, "open_emotes")
+        harness.settle(app)
+        frame()
+        page = app.state_manager.current()
+        self.assertEqual(page.NAME, "emote_settings")
+        for n in range(1, 6):
+            self.assertIn(f"pad_emote_{n}", page.ui_hitboxes)
+        click(page, "pad_emote_1")
+        press("rightstick")
+        self.assertEqual(g.pad_emote_1, "rightstick")
+        g.reset_emotes()
+        self.assertEqual((g.pad_emote_1, g.pad_emote_5), ("y", "rightshoulder"))
 
     def test_esc_cancels(self):
         plug("Xbox 360 Controller")
@@ -322,16 +452,111 @@ class Prompts(Base):
             app.renderer.pad_badge = real
         self.assertEqual(sorted(drawn), ["a", "b"])
 
-    def test_match_setup_says_controller(self):
+    def test_match_setup_says_the_stick(self):
         plug("Xbox 360 Controller")
         m.vs_ai = True
+        pads.using = "pad"
         red, blue = app.renderer.setup_controls("W A S D", "Arrow Keys")
-        self.assertEqual((red, blue), ("Controller", "Arrow Keys"))
+        self.assertEqual((red, blue), ("Left stick", "Arrow Keys"))
+
+
+class FollowsWhatYouUse(Base):
+    """Rowan, 1.9 phase 3: "Make sure everything to do with controls displayed on screen
+    automatically updates for whatever form of controls they are currently using, so arrow
+    keys/wasd for keyboard and mouse, and left/right joystick for controller"."""
+
+    def key(self, key = pygame.K_w):
+        for e in pads.translate(pygame.event.Event(pygame.KEYDOWN, key = key, mod = 0, unicode = "", scancode = 0)):
+            app.state_manager.handle_event(e)
+
+    def test_the_last_thing_used_decides(self):
+        plug("Xbox 360 Controller")
+        show("main_menu")
+        self.assertFalse(app.renderer.using_pad(), "plugged in, but not used yet")
+        press("dpad_down")
+        self.assertTrue(app.renderer.using_pad())
+        self.key(pygame.K_DOWN)
+        self.assertFalse(app.renderer.using_pad(), "the keyboard since")
+        stick(0.9, 0)
+        self.assertTrue(app.renderer.using_pad(), "a push on the stick counts")
+        pads.translate(pygame.event.Event(pygame.MOUSEMOTION, pos = (10, 10), rel = (4, 0), buttons = (0, 0, 0)))
+        self.assertFalse(app.renderer.using_pad(), "and so does the mouse")
+        stick(0, 0)
+
+    def test_match_setup_on_your_own(self):
+        plug("Xbox 360 Controller")
+        m.vs_ai = True
+        self.assertEqual(app.renderer.setup_controls("W A S D", "Arrow Keys"), ("W A S D", "Arrow Keys"))
+        pads.using = "pad"
+        g.pad_stick = 1
+        self.assertEqual(app.renderer.setup_controls("W A S D", "Arrow Keys")[0], "Right stick")
+        pads.using = "keys"
+        g.mouse_steer = True
+        self.assertEqual(app.renderer.setup_controls("W A S D", "Arrow Keys")[0], "W A S D or mouse")
+
+    def test_match_setup_two_players(self):
+        plug("Xbox 360 Controller")
+        m.vs_ai = False
+        self.assertEqual(app.renderer.setup_controls("W A S D", "Arrow Keys"), ("Left stick", "Arrow Keys"),
+                         "the side the controller plays shows its stick")
+        plug("Xbox 360 Controller", "Xbox 360 Controller")
+        self.assertEqual(app.renderer.setup_controls("W A S D", "Arrow Keys"),
+                         ("Pad 1, left stick", "Pad 2, left stick"))
+
+    def test_match_setup_caption_follows_without_laying_out_again(self):
+        """(Match Setup's layout is built once; its caption must still change as you switch.)"""
+        plug("Xbox 360 Controller")
+        m.vs_ai = True
+        show("match_setup")
+        seen = []
+        real = app.renderer.setup_controls
+        app.renderer.setup_controls = lambda *a: (seen.append(real(*a)), seen[-1])[1]
+        try:
+            frame()
+            pads.using = "pad"
+            frame()
+        finally:
+            del app.renderer.setup_controls
+        self.assertIn(("W A S D", "Arrow Keys"), seen)
+        self.assertEqual(seen[-1], ("Left stick", "Arrow Keys"))
+
+    def test_tooltips(self):
+        plug("Xbox 360 Controller")
+        pads.using = "pad"
+        tips = app.renderer.tips
+        r = pygame.Rect(0, 0, 10000, 10000)
+        tips.offer(r, "Start Match\nClick to play.\n~ Enter")
+        self.assertEqual(tips.offered, "Start Match\nPress to play.")
+        pads.using = "keys"
+        tips.offer(r, "Start Match\nClick to play.\n~ Enter")
+        self.assertEqual(tips.offered, "Start Match\nClick to play.\n~ Enter")
+
+    def test_in_a_match_each_paddle_says_what_moves_it(self):
+        plug("Xbox 360 Controller")
+        m.reset()
+        m.vs_ai, m.powerups = True, False
+        game = Hu_Taong(app)
+        game.start()
+        game.countdown, game.paused = None, False
+        game.label_pads()
+        self.assertEqual(game.p1.controls_label, "W A S D")
+        stick(0, 0.9)
+        game.update(1 / 60)
+        game.label_pads()
+        self.assertEqual(game.p1.controls_label, "Left stick")
+        stick(0, 0)
+        app.keys_down.add(g.p1_up)
+        game.update(1 / 60)
+        game.label_pads()
+        self.assertEqual(game.p1.controls_label, "W A S D")
+        app.keys_down.clear()
+        game.stop()
 
 
 class EveryControlReachable(Base):
     """On every menu screen, the highlight reaches every control with the four directions."""
-    SCREENS = [("main_menu",), ("match_setup",), ("settings",), ("settings", "gameplay"), ("settings", "display"),
+    SCREENS = [("main_menu",), ("match_setup",), ("settings",), ("settings", "gameplay"),
+               ("settings", "gameplay", "emote_settings"), ("settings", "display"),
                ("settings", "audio"), ("settings", "interface"), ("settings", "match"),
                ("settings", "match", "powerups"), ("settings", "match", "ball_paddles"), ("stats",),
                ("stats", "achievements"), ("stats", "replays"), ("online",), ("game", "pause"),

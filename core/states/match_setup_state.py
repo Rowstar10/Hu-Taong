@@ -18,19 +18,12 @@ class MatchSetupState(MatchControls, State):
         self.set_state("game", mute = True)
 
     def handle_practice_key(self, key):
-        """Practice's choices (1.9): against the wall or the AI, scoring on or off, and a talisman."""
+        """Practice vs AI's two choices (1.9): against the AI or a wall, and scoring on or off."""
         m = self.app.settings.match
         if key in ("practice_wall", "practice_ai"):
-            m.practice_wall = key == "practice_wall"
-            if m.practice_talisman not in m.practice_talismans():
-                m.practice_talisman = 0             # (Soul Swap, against the wall)
+            m.vs_wall = key == "practice_wall"
         if key in ("practice_scoring_on", "practice_scoring_off"):
-            m.practice_scoring = key == "practice_scoring_on"
-        for suffix, step in (("_left", -1), ("_right", 1)):
-            if key == "cycle_practice_talisman" + suffix:
-                offered = m.practice_talismans()
-                here = offered.index(m.practice_talisman) if m.practice_talisman in offered else 0
-                m.practice_talisman = offered[(here + step) % len(offered)]
+            m.scoring = key == "practice_scoring_on"
 
     def handle_event(self, event):
         super().handle_event(event)
@@ -46,20 +39,15 @@ class MatchSetupState(MatchControls, State):
             mouse_pos = self.app.window_to_base(event.pos)
             key = self.hit_test(mouse_pos)
 
-            practising = gameplay.practice
             if key == "opponent_ai":
-                gameplay.vs_ai, gameplay.practice = True, False
+                gameplay.vs_ai = True
             if key == "opponent_human":
-                gameplay.vs_ai, gameplay.practice = False, False
-            if key == "opponent_practice":
-                gameplay.practice = True
+                gameplay.vs_ai = False
             if key == "opponent_online":
                 self.push_state("online")
-            self.handle_practice_key(key)
-            if gameplay.practice != practising:
-                self._laid = None                   # Practice's choices come or go: lay out again
 
-            if gameplay.vs_ai or gameplay.practice:     # the paddle choice only matters against the AI (or alone)
+            if gameplay.vs_ai:      # the paddle choice and Practice's only matter against the AI
+                self.handle_practice_key(key)
                 if key == "side_red":
                     gameplay.play_as_blue = False
                 if key == "side_blue":

@@ -35,8 +35,9 @@ def worst(physics, cap):
 
 class ChargeShot(unittest.TestCase):
     def test_out_of_reach_without_the_cap(self):
-        """The problem, as Rowan found it (so the check below would see it)."""
-        for physics in (engines.CURRENT, engines.V09):
+        """The problem, as Rowan found it (so the check below would see it).  (Since 1.9's slower ball,
+        v0.9's worst charge shot is just within reach without the cap; Current's still isn't.)"""
+        for physics in (engines.CURRENT,):
             short, seconds, speed, shot = worst(physics, False)
             with self.subTest(physics = m.PHYSICS[physics]):
                 self.assertGreater(short, 0, f"reachable after all: {seconds:.2f} s, {speed:.0f} px/s, {shot}")
@@ -66,7 +67,7 @@ class Knocks(unittest.TestCase):
         limit = engines.cap_drive(500)
         capped = self.drive(engines.CURRENT, True, 2000.0)
         self.court.close()
-        at_limit = self.drive(engines.CURRENT, False, limit)
+        at_limit = self.drive(engines.CURRENT, False, limit / engines.push_pace(False))   # (uncapped, a push counts at the ball's pace: 1.9)
         self.assertAlmostEqual(capped, at_limit, delta = 1)
         self.court.close()
         self.assertGreater(self.drive(engines.CURRENT, False, 2000.0), capped + 300, "and without it, harder")
@@ -75,7 +76,8 @@ class Knocks(unittest.TestCase):
         under = engines.cap_drive(500) * 0.8
         capped = self.drive(engines.V09, True, under)
         self.court.close()
-        self.assertAlmostEqual(capped, self.drive(engines.V09, False, under), delta = 0.01)
+        # (1.9: without the cap a push counts at the ball's pace, engines.push_pace; under it, in full)
+        self.assertAlmostEqual(capped, self.drive(engines.V09, False, under / engines.push_pace(False)), delta = 0.01)
 
     def test_no_difference_to_classic(self):
         capped = self.drive(engines.CLASSIC, True, 1500.0)

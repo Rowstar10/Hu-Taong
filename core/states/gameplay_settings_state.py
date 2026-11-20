@@ -3,13 +3,15 @@ import pygame
 from core.states.base_state import State
 
 class GameplaySettingsState(State):
-    """Settings > Gameplay: your own controls.  The keys, Auto-Pause, and on a phone the touch
-    steering and vibration."""
+    """Settings > Controls ("Gameplay" till 1.9): your own controls.  The keys, a controller's
+    buttons and stick, the mouse, and on a phone the touch steering and vibration.  (Auto-Pause
+    moved to UI in 1.9, and the emotes' buttons to a page of their own: EmoteSettingsState.)"""
     NAME = "gameplay"
     is_menu = True
 
-    TOGGLES = ("auto_pause", "vibration")
-    CYCLES = {"touch_steer": "touch_steer_options", "touch_sensitivity": "touch_sensitivity_options"}  # (a phone's)
+    TOGGLES = ("vibration", "mouse_steer")
+    CYCLES = {"touch_steer": "touch_steer_options", "touch_sensitivity": "touch_sensitivity_options",  # (a phone's)
+              "pad_stick": "PAD_STICKS", "pad_deadzone": "PAD_DEADZONES", "mouse_side": "SIDES"}
 
     def __init__(self, app):
         super().__init__(app)
@@ -27,6 +29,9 @@ class GameplaySettingsState(State):
     def draw(self, screen):
         super().draw(screen)
         self.app.renderer.draw_gameplay_settings_menu(self, screen)
+
+    def reset(self):
+        self.confirm_reset("Reset controls?", self.app.reset_gameplay_settings)
 
     def handle_event(self, event):
         controls = self.app.settings.gameplay
@@ -81,8 +86,12 @@ class GameplaySettingsState(State):
                     self.listening_pad = action
                     self.app.gamepads.listen = (action, done)
 
+            if key == "open_emotes":
+                self.stop_listening_pad()
+                self.push_state("emote_settings")
+
             if key == "reset_defaults":
-                self.confirm_reset("Reset gameplay settings?", self.app.reset_gameplay_settings)
+                self.reset()
 
             if key == "back":
                 self.pop_state()

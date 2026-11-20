@@ -8,6 +8,7 @@ from core.settings import Settings
 from core.stats import Stats
 from core.achievements import Achievements
 from core.gamepad import Gamepads, Navigator
+from core.mouse_steer import MouseSteer
 from core.emotes import Emotes
 from core.sound_manager import SoundManager
 from core.state_manager import StateManager
@@ -48,6 +49,7 @@ class App:
         self.achievements.on_earn = self.earned
         self.navigator = Navigator(self)          # the menus' highlight, for a controller or the arrow keys (1.9)
         self.gamepads = Gamepads(self)            # controllers (1.9)
+        self.mouse_steer = MouseSteer(self)       # the mouse steering a paddle, if Controls says (1.9)
         self.emotes = Emotes(self)                # online quick emotes (1.9)
         self.choose_file = files.ask      # the Save / Open dialog (tests swap in their own)
         self.net = None                   # an online session (core/net.py) while hosting or joining
@@ -361,7 +363,7 @@ class App:
     def focused(self):
         """Is the player here?  The window is in front, or Auto-Pause is off (then clicking away
         doesn't count).  Online, the match only plays while both players are."""
-        return self.has_focus or not self.settings.gameplay.auto_pause
+        return self.has_focus or not self.settings.interface.auto_pause
 
     def in_match(self):
         """True while a match is on screen with nothing laid over it."""
@@ -534,7 +536,7 @@ class App:
                     self.touch.reset()
                 self.keys_down.clear()
                 # online, clicking away (to chat, say) mustn't stop the match for both players
-                if self.settings.gameplay.auto_pause and self.in_match() and not self.net:
+                if self.settings.interface.auto_pause and self.in_match() and not self.net:
                     self.state_manager.push_state("pause", mute = True, auto = True)
             if event.type == pygame.WINDOWFOCUSGAINED:
                 self.has_focus = True     # an auto-pause sees it and resumes (PauseState.update)

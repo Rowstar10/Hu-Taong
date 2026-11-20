@@ -14,6 +14,7 @@ import random
 import unittest
 
 from tests import harness
+from config import BALL_PACE                                    # noqa: E402  (the ball's pace, 1.9)
 
 app = harness.app()
 
@@ -74,7 +75,7 @@ class Drifting(Match):
             sizes = [f[i] for f in seen]
             self.assertGreater(max(sizes) - min(sizes), 10, f"{name} kept its size")
         self.assertEqual({f[3] for f in seen} | {f[4] for f in seen}, {self.s.paddle_speed})
-        self.assertEqual({f[5] for f in seen}, {self.s.ball_speed})
+        self.assertEqual({f[5] for f in seen}, {self.s.ball_speed * BALL_PACE})
         self.assertEqual({f[6] for f in seen}, {(500.0, 300.0)}, "the ball in play kept its speed")
 
     def test_the_paddles_together_the_ball_on_its_own(self):
@@ -118,7 +119,7 @@ class Drifting(Match):
         self.assertGreater(max(f[0] for f in seen) - min(f[0] for f in seen), 10)
         self.assertGreater(max(f[2] for f in seen) - min(f[2] for f in seen), 10)
         self.assertEqual({f[3] for f in seen} | {f[4] for f in seen}, {self.s.paddle_speed})
-        self.assertEqual({f[5] for f in seen}, {self.s.ball_speed})
+        self.assertEqual({f[5] for f in seen}, {self.s.ball_speed * BALL_PACE})
         self.assertFalse(self.pu.spawnable(BY_KEY["shape"]), "no Shape Shift on top of Constant drift")
 
     def test_recorded_for_replays_and_online(self):
