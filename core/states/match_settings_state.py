@@ -3,10 +3,12 @@ import pygame
 from core.states.base_state import State
 from core.states.game_state import GameState
 from core.states.match_controls import MatchControls
+from core.states.scrolling import Scrolling
 
-class MatchSettingsState(MatchControls, State):
+class MatchSettingsState(Scrolling, MatchControls, State):
     """Settings > Match: the rules of a match, the same for both players.  Online only the host
-    has it (its rules are the match's); opened mid-match, changes come in at the next serve."""
+    has it (its rules are the match's); opened mid-match, changes come in at the next serve.
+    (1.9: it scrolls, where the screen is too small for it at a size that reads.)"""
     NAME = "match"
     is_menu = True
 
@@ -21,6 +23,8 @@ class MatchSettingsState(MatchControls, State):
         self.app.renderer.draw_match_settings_menu(self, screen)
 
     def handle_event(self, event):
+        if self.scroll_event(event):
+            return
         super().handle_event(event)
         m = self.app.settings.match
 

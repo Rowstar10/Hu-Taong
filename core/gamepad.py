@@ -334,6 +334,7 @@ class Navigator:
     the mouse).  It shows only while it's being used: the mouse moving puts it away."""
 
     FIRST = ("resume", "play", "start_match", "confirm", "back")      # where it starts, if it can
+    SKIP = ("scrollbar",)           # dragged, not pressed: the highlight passes it by
 
     def __init__(self, app):
         self.app = app
@@ -341,6 +342,7 @@ class Navigator:
         self.via = "keys"               # "pad" or "keys": what's moving it (for the prompts)
         self.key = None
         self.seen = (None, {}, {})      # the top screen as last drawn: (screen, its controls, sliders' values)
+        self.unrolled = {}              # a scrolling page's controls, as if scrolled to the bottom (see targets)
 
     def state(self):
         return self.app.state_manager.current()
@@ -350,15 +352,28 @@ class Navigator:
         starts drawing the next, so the highlight works from the last whole frame.)"""
         state = self.state()
         self.seen = (state, dict(getattr(state, "ui_hitboxes", {})), dict(getattr(state, "ui_values", {})))
+        self.unrolled = dict(getattr(state, "ui_unrolled", None) or {})
 
-    def targets(self):
+    def shown(self):
+        """The controls on show: where the highlight is drawn, and where it presses."""
         state = self.state()
         if not getattr(state, "is_menu", False):
             return {}
         seen_state, boxes, _ = self.seen
         if seen_state is not state:
             boxes = getattr(state, "ui_hitboxes", {})
-        return {k: r for k, r in boxes.items() if r.w > 0 and r.h > 0}
+        return {k: r for k, r in boxes.items() if r.w > 0 and r.h > 0 and k not in self.SKIP}
+
+    def targets(self):
+        """Every control it can go to, and where, for finding the next one.  On a page that scrolls
+        (1.9) that's every one on the page, on show or not, placed as if the page were scrolled to
+        the bottom: so they keep their order, and Back and Reset stay below them all."""
+        targets = self.shown()
+        state = self.state()
+        unrolled = self.unrolled if self.seen[0] is state else getattr(state, "ui_unrolled", None)
+        if targets and unrolled:
+            targets.update(unrolled)
+        return targets
 
     def values(self):
         seen_state, _, values = self.seen
@@ -370,6 +385,17 @@ class Navigator:
             self.key = self.first(targets)
         return targets.get(self.key)
 
+    def on_show(self):
+        """The highlighted control where it's drawn now, or None (while it scrolls into sight)."""
+        if self.rect() is None:
+            return None
+        return self.shown().get(self.key)
+
+    def reveal(self):
+        reveal = getattr(self.state(), "reveal", None)
+        if reveal is not None and self.key is not None:
+            reveal(self.key)
+
     def first(self, targets):
         for key in self.FIRST:
             if key in targets:
@@ -380,7 +406,7 @@ class Navigator:
 
     def point(self):
         """Where the highlight is, as the mouse would be (the screens' hover and tooltips follow it)."""
-        r = self.rect() if self.active else None
+        r = self.on_show() if self.active else None
         return r.center if r is not None else None
 
     def wake(self, via):
@@ -414,23 +440,25 @@ class Navigator:
                 best, score = key, s
         if best is not None:
             self.key = best
+            self.reveal()
             self.app.sound_manager.play("click.wav", multiplier = 0.4)
         return []
 
     def nudge(self, dx):
         """Left or right on a slider moves it a step (as a click there would)."""
         values = self.values()
-        if not dx or self.key not in values:
+        r = self.on_show()
+        if not dx or self.key not in values or r is None:
             return []
-        r = self.targets()[self.key]
         value = max(0.0, min(1.0, values[self.key] + 0.05 * dx))
         return self.click((r.left + value * r.width, r.centery))
 
     def activate(self, via = "keys"):
         if self.wake(via) and self.via == "pad" and self.rect() is None:
             return []
-        r = self.rect()
+        r = self.on_show()
         if r is None:
+            self.reveal()               # out of sight: scroll to it first
             return []
         return self.click(r.center)
 
@@ -465,7 +493,7 @@ class Navigator:
     def draw(self, screen):
         if not self.active:
             return
-        r = self.rect()
+        r = self.on_show()
         if r is None:
             return
         from render import theme

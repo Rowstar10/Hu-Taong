@@ -4,7 +4,8 @@ Each of Master, Music and SFX Volume has a Mute button.  Muting silences it but 
 where it was, so unmuting brings back that level; the mute is saved between sessions.
 
 Rowan's playtest of 1.7 (2026-11-17): the mute buttons are speaker icons, not the words, and sit
-to the left of their sliders.
+to the left of their sliders.  (1.9's settings rework: Reset moves to the end of the row, after
+the level, as on every settings row.)
 """
 import json
 import unittest
@@ -90,7 +91,7 @@ class MuteButtons(unittest.TestCase):
         for name in ("master", "music", "sfx"):
             mute, reset = boxes[f"mute_{name}_volume"], boxes[f"reset_{name}_volume"]
             self.assertLess(mute.right, boxes[f"{name}_volume_slider"].left, f"{name}: left of the slider")
-            self.assertLessEqual(reset.right, mute.left, f"{name}: Reset stays at the left end")
+            self.assertGreaterEqual(reset.left, boxes[f"{name}_volume_slider"].right, f"{name}: Reset at the end (1.9)")
             self.assertEqual(mute.w, mute.h, f"{name}: a square button")
 
     def test_reset_unmutes(self):

@@ -42,7 +42,7 @@ def open_screen(name):
 
 
 def click(screen, key):
-    screen.draw(app.virtual)
+    harness.show(screen, key)
     x, y = screen.ui_hitboxes[key].center
     pos = (x / app.sx, y / app.sy)
     screen.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button = 1, pos = pos))
@@ -83,7 +83,7 @@ class WhatGoesWhere(unittest.TestCase):
             self.assertEqual(leaked, [], f"match settings on the {name} screen")
 
     def test_the_match_screen_has_the_rules(self):
-        keys = open_screen("match").ui_hitboxes
+        keys = harness.every_box(open_screen("match"))
         for key in ("cycle_mode_chaos", "cycle_mode_switch", "toggle_mode_twin_ball", "cycle_win_score_left",
                     "toggle_win_by_two", "toggle_middle_wall", "cycle_countdown_left", "cycle_ai_left",
                     "cycle_ai_style_left", "toggle_adaptive_ai", "cycle_court_left", "toggle_powerups",
@@ -91,10 +91,10 @@ class WhatGoesWhere(unittest.TestCase):
             self.assertIn(key, keys)
 
     def test_choose_talismans_under_power_ups(self):
-        keys = open_screen("match").ui_hitboxes
+        keys = harness.every_box(open_screen("match"))
         on, choose = keys["toggle_powerups"], keys["open_powerups"]
         self.assertGreater(choose.top, on.bottom - 1, "below it")
-        self.assertLess(abs(choose.centerx - on.centerx), 4, "in line with it")
+        self.assertLess(abs(choose.left - on.left), 4, "in line with it (1.9: in the column of controls)")
         self.assertLess(keys["cycle_powerup_rate_left"].bottom, keys["cycle_at_once_left"].top + 1)
 
     def test_choose_talismans_has_no_switch_or_spawn_rate(self):
@@ -164,7 +164,7 @@ def laid_out(node):
     yield node
     for value in vars(node).values():
         for item in (value if isinstance(value, list) else [value]):
-            for child in (item if isinstance(item, list) else [item]):
+            for child in (item if isinstance(item, (list, tuple)) else [item]):
                 if isinstance(child, Node):
                     yield from laid_out(child)
 
@@ -177,11 +177,11 @@ class Summaries(unittest.TestCase):
     def test_under_their_buttons(self):
         from render.ui.layout import Text, _val
         screen = open_screen("match")
-        body, _ = screen._laid
+        body = screen._laid[0]
         texts = {_val(n.text): n.rect for n in laid_out(body) if isinstance(n, Text) and isinstance(_val(n.text), str)}
         talismans = next(r for t, r in texts.items() if "talismans switched on" in t)
-        sizes = next(r for t, r in texts.items() if t.startswith("Ball ") and "Pace" in t)
-        boxes = screen.ui_hitboxes
+        sizes = next(r for t, r in texts.items() if t.startswith("Ball ") and "Paddles" in t)
+        boxes = harness.every_box(screen)
         self.assertGreaterEqual(talismans.top, boxes["open_powerups"].bottom)
         self.assertGreaterEqual(sizes.top, boxes["open_ball_paddles"].bottom)
 

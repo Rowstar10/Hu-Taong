@@ -4,7 +4,7 @@ Every version of Hu Taong, newest first. Toki Hub shows each version's section o
 
 ## 1.9 — 2026-11-18
 
-Controller support, online quick emotes, a Practice mode, talisman stats, achievements, sounds for every surface the ball bounces off and for every talisman, computer players that go back round a ball that's got past them, a harder Hard and Insane, and three game modes renamed.
+Controller support, online quick emotes, a Practice mode, talisman stats, achievements, sounds for every surface the ball bounces off and for every talisman, computer players that go back round a ball that's got past them, a harder Hard and Insane, three game modes renamed, and tidier settings pages.
 
 ### Added
 - Controllers (Xbox, PlayStation, Nintendo and most others). In a match the left stick or D-pad steers your paddle, as finely as you push the stick. On your own, any controller plays your paddle; with two players here, the first controller takes the side set in Gameplay settings and a second takes the other, and the keyboard still works for either. Start pauses and Back shows the talisman list; both can be changed in Gameplay settings. In the menus, the D-pad or stick moves a highlight from control to control, A presses it, B goes back, left and right move a slider and the right stick scrolls. Prompts name the buttons the way your controller labels them. Pulling the controller out mid-match pauses it.
@@ -30,6 +30,13 @@ Controller support, online quick emotes, a Practice mode, talisman stats, achiev
 - A Black Hole that collapses lets the ball out alone, heading for the goal it can score in. It burst out as Twin Balls before.
 - Computer players only go for a talisman when they can get back in time for the ball, and give up the chase sooner. They used to set off thinking the ball had to reach the far wall and come back at the same speed, and lost points for it.
 - The pause menu's Reset shows an arrow, down while Reset Point and Reset Match are hidden and up while they show.
+- The settings pages are laid out afresh. Each section has a small heading, and each setting sits on its own row with its name beside its control, lined up down the page, with more room between them. On/off switches read just ON or OFF, as the row names them. Nothing has moved to another page.
+- Match settings, from the Settings menu or the pause menu, is no longer shrunk to fit. It scrolls instead: with the mouse wheel, by dragging the scrollbar, by sliding a finger on a phone, or with the controller's right stick, and the menus' highlight scrolls to whatever it moves to. From the pause menu, "Changes come in at the next serve" stays at the top.
+- Display's sections are Window, Frame Rate, Effects, Background and Dimming. Parallax sits with the background, and the Effects setting is called Amount on its row.
+- Audio's three volumes sit together, each with its mute button, then its level, then Reset. Paddle, score and menu sounds each have a row, and the music's own settings sit under the jukebox.
+- Ball & Paddles has its sliders on the left, and Physics and the Speed Cap on the right, above Randomise and Reset.
+- Gameplay settings has the keys and Auto-Pause on the left and the controller's buttons on the right, with the emotes' buttons under their own heading.
+- Choose Talismans has a little more room between its tiles.
 
 ### Fixed
 - On Shuffle, the jukebox's Next button plays a random track. It played the next one in the list.

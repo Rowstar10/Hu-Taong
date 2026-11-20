@@ -334,7 +334,8 @@ class EveryControlReachable(Base):
     SCREENS = [("main_menu",), ("match_setup",), ("settings",), ("settings", "gameplay"), ("settings", "display"),
                ("settings", "audio"), ("settings", "interface"), ("settings", "match"),
                ("settings", "match", "powerups"), ("settings", "match", "ball_paddles"), ("stats",),
-               ("stats", "achievements"), ("stats", "replays"), ("online",), ("game", "pause")]
+               ("stats", "achievements"), ("stats", "replays"), ("online",), ("game", "pause"),
+               ("game", "pause", "match")]          # (1.9: a page that scrolls, as the Match page does too)
 
     def test_each_screen(self):
         sm = app.state_manager

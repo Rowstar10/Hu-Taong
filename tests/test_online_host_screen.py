@@ -66,7 +66,7 @@ class HostScreen(unittest.TestCase):
     def test_match_settings(self):
         from render.ui.layout import Button, _val
         from tests.test_settings_menus import laid_out
-        body, _ = self.screen._laid
+        body = self.screen._laid[0]
         button = next(n for n in laid_out(body) if isinstance(n, Button) and n.key == "online_settings")
         self.assertEqual(_val(button.text), "Match Settings")
         self.click("online_settings")

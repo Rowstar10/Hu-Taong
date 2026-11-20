@@ -153,24 +153,25 @@ class Text(Node):
 
 
 class Label(Node):
-    """A section heading between two plum blossoms."""
+    """A section heading between two plum blossoms.  (`flower`: smaller ones for a sub-heading.)"""
 
     FLOWER = 26
 
-    def __init__(self, text, font):
+    def __init__(self, text, font, flower=None):
         super().__init__()
         self.text, self.font = text, font
+        self.flower = flower or self.FLOWER
 
     def measure(self):
-        self.w = self.font.size(self.text)[0] + 2 * (self.FLOWER + 12)
+        self.w = self.font.size(self.text)[0] + 2 * (self.flower + 12)
         self.h = self.font.size("Ag")[1]
         return self.w, self.h
 
     def draw(self, ui):
         cx, cy = self.rect.center
         ui.renderer.text(ui.screen, self.text, self.font, theme.GOLD, center=(cx, cy))
-        half = self.w // 2 - self.FLOWER // 2
-        flower = ui.art.blossom(self.FLOWER)
+        half = self.w // 2 - self.flower // 2
+        flower = ui.art.blossom(self.flower)
         ui.screen.blit(flower, flower.get_rect(center=(cx - half, cy)))
         ui.screen.blit(flower, flower.get_rect(center=(cx + half, cy)))
 
@@ -269,6 +270,8 @@ class CycleToggle(Node):
 class KeyButton(Node):
     """A key binding.  While it waits for a new key it glows and asks for one."""
 
+    stretch = True          # in a Form, as wide as the widest of its kind
+
     def __init__(self, key, text, font, listening, samples, tip=None):
         super().__init__()
         self.key, self.text, self.font, self.listening, self.samples = key, text, font, listening, samples
@@ -290,6 +293,8 @@ class KeyButton(Node):
 class Cycle(Node):
     """[<]  value  [>]  -- the value box is as wide as the widest option.  With `pick` the value
     box itself is clickable too (its hitbox is `pick`), e.g. to open a list of every option."""
+
+    stretch = True          # in a Form, as wide as the widest of its kind
 
     def __init__(self, key, text, font, samples, color=theme.PARCHMENT, tip=None, pick=None):
         super().__init__()
@@ -333,16 +338,19 @@ class Cycle(Node):
 
 
 class Slider(Node):
-    """[Reset]  [speaker]  ----o----  label   (the speaker mutes it: an icon, 1.7)"""
+    """[Reset]  [speaker]  ----o----  label   (the speaker mutes it: an icon, 1.7)
+    With `reset_last`:  [speaker]  ----o----  label  [Reset]   (a settings row, 1.9)"""
 
     def __init__(self, key, value, color, font, label, label_sample,
-                 reset_key=None, reset_font=None, track_w=None, tip=None, mute_key=None, muted=None):
+                 reset_key=None, reset_font=None, track_w=None, tip=None, mute_key=None, muted=None,
+                 reset_last=False):
         super().__init__()
         self.key, self.value, self.color, self.tip = key, value, color, tip
         self.font, self.label, self.label_sample = font, label, label_sample
         self.reset_key, self.reset_font = reset_key, reset_font
         self.mute_key, self.muted = mute_key, muted    # muted: the knob keeps its place, the bar empties
         self.track_w = track_w or int(BASE_W * 0.18)
+        self.reset_last = reset_last
 
     def measure(self):
         self.gap = int(BASE_W * 0.012)
@@ -360,9 +368,14 @@ class Slider(Node):
         self.label_w = max(self.font.size(t)[0] for t in samples) + 28
         self.label_h = self.font.size("Ag")[1] + 6
         self.pad = self.knob_r + self.gap // 2      # the knob overhangs both ends of the track
-        self.w = self.reset_w + self.pad + self.track_w + self.pad + self.label_w
-        if self.mute_key:
-            self.w += self.gap + self.mute_w
+        if self.reset_last:
+            self.w = self.mute_w + self.pad + self.track_w + self.pad + self.label_w
+            if self.reset_key:
+                self.w += self.gap + self.reset_w
+        else:
+            self.w = self.reset_w + self.pad + self.track_w + self.pad + self.label_w
+            if self.mute_key:
+                self.w += self.gap + self.mute_w
         self.h = max(2 * self.knob_r + 2, self.reset_h, self.label_h, self.mute_h)
         return self.w, self.h
 
@@ -370,12 +383,18 @@ class Slider(Node):
         super().place(x, y, w, h)
         r = self.rect
         self.reset_rect = pygame.Rect(r.left, r.centery - self.reset_h // 2, self.reset_w, self.reset_h)
-        self.mute_rect = pygame.Rect(self.reset_rect.right + (self.gap if self.reset_key else 0),
-                                     r.centery - self.mute_h // 2, self.mute_w, self.mute_h)
-        x0 = (self.mute_rect.right if self.mute_key else self.reset_rect.right) + self.pad
+        if self.reset_last:
+            self.mute_rect = pygame.Rect(r.left, r.centery - self.mute_h // 2, self.mute_w, self.mute_h)
+            x0 = (self.mute_rect.right if self.mute_key else r.left) + self.pad
+        else:
+            self.mute_rect = pygame.Rect(self.reset_rect.right + (self.gap if self.reset_key else 0),
+                                         r.centery - self.mute_h // 2, self.mute_w, self.mute_h)
+            x0 = (self.mute_rect.right if self.mute_key else self.reset_rect.right) + self.pad
         self.track = pygame.Rect(x0, r.centery - self.track_h // 2, self.track_w, self.track_h)
         self.plate = pygame.Rect(self.track.right + self.pad, r.centery - self.label_h // 2,
                                  self.label_w, self.label_h)
+        if self.reset_last:
+            self.reset_rect.left = self.plate.right + self.gap
         # grab area is as tall as the knob, not just the thin track
         self.grab = self.track.inflate(0, 2 * self.knob_r - self.track_h)
 
@@ -623,6 +642,72 @@ class Grid(Node):
                 c.draw(ui)
 
 
+class Form(Node):
+    """Settings as rows (1.9's settings rework): each row's name right-aligned in one column and
+    its control left-aligned in the next, so the rows line up.  A row is (name, control), the name
+    a str or a node; a lone node (a heading, a note, a picture) spans both columns, centred, and a
+    heading (a Label) gets `section_gap` more room above it.  The cycles and key buttons in a form
+    are all as wide as the widest, so their arrows line up too.  Pointing at a row's name explains
+    its control, as pointing at the control does.  `name_w`: at least this wide a name column
+    (so forms side by side can share one)."""
+
+    def __init__(self, rows, font, gap_x, gap_y, section_gap=0, color=theme.GOLD, name_w=0):
+        super().__init__()
+        self.rows = []
+        for row in rows:
+            if isinstance(row, tuple):
+                name, control = row
+                if isinstance(name, str):
+                    name = Text(name, font, color, align="right")
+                self.rows.append((name, control))
+            elif row is not None:
+                self.rows.append((None, row))
+        self.gap_x, self.gap_y, self.section_gap, self.min_name_w = gap_x, gap_y, section_gap, name_w
+
+    def _above(self, i):
+        return self.section_gap if i and isinstance(self.rows[i][1], Label) else 0
+
+    def measure(self):
+        for name, control in self.rows:
+            control.measure()
+            if name is not None:
+                name.measure()
+        paired = [(n, c) for n, c in self.rows if n is not None]
+        stretch = [c for _, c in paired if getattr(c, "stretch", False)]
+        wide = max((c.w for c in stretch), default=0)
+        for c in stretch:
+            c.w = wide
+        self.name_w = max([self.min_name_w] + [n.w for n, _ in paired])
+        self.control_w = max((c.w for _, c in paired), default=0)
+        self.pair_w = self.name_w + self.gap_x + self.control_w if paired else 0
+        self.w = max([self.pair_w] + [c.w for n, c in self.rows if n is None])
+        self.row_h = [max(c.h, n.h if n is not None else 0) for n, c in self.rows]
+        self.h = (sum(self.row_h) + self.gap_y * max(0, len(self.rows) - 1)
+                  + sum(self._above(i) for i in range(len(self.rows))))
+        return self.w, self.h
+
+    def place(self, x, y, w, h):
+        super().place(x, y, w, h)
+        r = self.rect
+        left = r.left + (self.w - self.pair_w) // 2
+        cy = r.top
+        for i, ((name, control), rh) in enumerate(zip(self.rows, self.row_h)):
+            cy += self._above(i)
+            if name is None:
+                control.place(r.left, cy, self.w, rh)
+            else:
+                name.place(left, cy, self.name_w, rh)
+                control.place(left + self.name_w + self.gap_x, cy, control.w, rh)
+            cy += rh + self.gap_y
+
+    def draw(self, ui):
+        for name, control in self.rows:
+            control.draw(ui)
+            if name is not None:
+                name.draw(ui)
+                ui.offer_tip(name.rect, control.tip)
+
+
 class Frame(Node):
     """Lacquered panel with padding around a single child (used by overlays)."""
 
@@ -662,6 +747,10 @@ class UILayout:
     PANEL_SIDE = 60
     FOOTER_Y = 1004
 
+    # A page that may scroll (1.9) shrinks no smaller than this to fit; past it, it scrolls
+    SCROLL_SCALE = 0.95
+    SCROLL_BAR = 14                 # the scrollbar's width, by the panel's right edge
+
     def __init__(self, app):
         self.app = app
         self.art = app.art
@@ -674,6 +763,7 @@ class UILayout:
         self.screen = None
         self.state = None
         self.mouse = (0, 0)
+        self.clip = None            # while a scrolling page draws: the part of it on show
 
     @property
     def renderer(self):
@@ -703,30 +793,63 @@ class UILayout:
         return self._dim_surf
 
     # ---------- Full-screen menus ----------
-    def screen_menu(self, state, screen, builder, *, title, mark, reset=None, back=True):
-        """Title board, a lacquered panel holding the body, and a footer of Back and Reset."""
+    def screen_menu(self, state, screen, builder, *, title, mark, reset=None, back=True, pinned=None,
+                    scroll=False):
+        """Title board, a lacquered panel holding the body, and a footer of Back and Reset.
+        `scroll` (1.9): rather than shrink past SCROLL_SCALE to fit, the body scrolls (the screen's
+        state works it: core/states/scrolling.py).  `pinned(scale)`: a node that stays put at the
+        top of the panel, over the scrolling part."""
         laid = getattr(state, "_laid", None)
         if laid is None:
-            laid = state._laid = self._fit_screen(builder, reset, back)
-        body, footer = laid
+            laid = state._laid = self._fit_screen(builder, reset, back, pinned, scroll)
+        body, footer, page = laid
 
         self._begin(state, screen)
         self.renderer.draw_frame(screen, title, mark)
-        body.draw(self)
+        if page is None:
+            body.draw(self)
+            if getattr(state, "ui_unrolled", None):
+                state.ui_unrolled = state.ui_whole = None       # (laid out afresh, and fits now)
+                state.max_scroll = 0
+        else:
+            self._draw_scrolling(state, screen, body, page)
         for node in footer:
             node.draw(self)
 
-    def _fit_screen(self, builder, reset, back):
+    def _fit_screen(self, builder, reset, back, pinned=None, scroll=False):
         p = self.PANEL
         top, bottom = p.top + self.PANEL_TOP, p.bottom - self.PANEL_BOTTOM
+        page = None
 
-        for scale in self.SCALES:
+        scales = [s for s in self.SCALES if not scroll or s >= self.SCROLL_SCALE]
+        for scale in scales:
             body = builder(scale)
             body.measure()
-            fits = body.h <= bottom - top and body.w <= p.width - 2 * self.PANEL_SIDE
-            if fits or scale == self.SCALES[-1]:
-                body.place(p.left, top, p.width, bottom - top)
+            room = bottom - top
+            note = None
+            if pinned is not None:
+                note = pinned(scale)
+                note.measure()
+                room -= note.h + self.gap
+            fits = body.h <= room and body.w <= p.width - 2 * self.PANEL_SIDE
+            if fits:
                 break
+        if note is not None:
+            note.place(p.left, top, p.width, note.h)
+        if fits or not scroll:
+            if note is not None:
+                body.place(p.left, top + note.h + self.gap, p.width, room)
+                body = Stack([note, body])        # (drawn together; each already placed)
+            else:
+                body.place(p.left, top, p.width, room)
+        else:
+            view = pygame.Rect(p.left + 4, bottom - room, p.width - 8, room)
+            page = _Scroll(view, note, max(0, body.h - view.height + self.gap))
+            page.track = pygame.Rect(p.right - self.PANEL_SIDE // 2 - self.SCROLL_BAR // 2, view.top + 6,
+                                     self.SCROLL_BAR, view.height - 12)
+            body.place(page.x, view.top + self.gap // 2, page.w, body.h)
+
+        footer = []
 
         footer = []
         if back:
@@ -741,7 +864,7 @@ class UILayout:
             node.measure()
             node.place(p.right - node.w, self.FOOTER_Y - node.h // 2, node.w, node.h)
             footer.append(node)
-        return body, footer
+        return body, footer, page
 
     # ---------- Overlays ----------
     def overlay(self, state, screen, builder, *, dim=True, pad=None, mark=None):
@@ -764,10 +887,68 @@ class UILayout:
                 frame.place(0, 0, BASE_W, BASE_H)
                 return frame
 
+    # ---------- A page that scrolls (1.9) ----------
+    def _draw_scrolling(self, state, screen, body, page):
+        """Draw the part of the body on show, and keep its controls' hitboxes to that part.  The
+        state learns how far it can scroll, and where every control is, on show or not (so the
+        menus' highlight can go to one out of sight: core/gamepad.py Navigator)."""
+        state.max_scroll = page.max_scroll
+        state.scroll_view, state.scroll_track = page.view, page.track
+        at = int(round(max(0.0, min(page.max_scroll, getattr(state, "scroll", 0.0)))))
+        if at != page.at:
+            body.place(page.x, page.view.top + self.gap // 2 - at, page.w, body.h)
+            page.at = at
+        state.scroll_at = at
+
+        before = set(state.ui_hitboxes)
+        screen.set_clip(page.view)
+        self.clip = page.view
+        body.draw(self)
+        self.clip = None
+        screen.set_clip(None)
+
+        whole = {}
+        for key in [k for k in state.ui_hitboxes if k not in before]:
+            rect = whole[key] = state.ui_hitboxes[key]
+            shown = rect.clip(page.view)
+            if shown.w and shown.h:
+                state.ui_hitboxes[key] = shown
+            else:
+                del state.ui_hitboxes[key]
+        state.ui_whole = whole                              # where each is now, on show or not
+        state.ui_unrolled = {k: r.move(0, at - page.max_scroll) for k, r in whole.items()}  # as if at the bottom
+
+        if page.note is not None:
+            page.note.draw(self)
+        if page.max_scroll > 0:
+            self._draw_scrollbar(state, screen, page, at)
+
+    def _draw_scrollbar(self, state, screen, page, at):
+        track = page.track
+        handle_h = max(48, track.height * page.view.height // (page.view.height + page.max_scroll))
+        handle = pygame.Rect(track.x, track.y + (track.height - handle_h) * at // page.max_scroll,
+                             track.width, handle_h)
+        state.scroll_handle = handle
+        hot = track.inflate(16, 0).collidepoint(self.mouse) or getattr(state, "dragging_scroll", False)
+        screen.blit(self.art.inset(track.w, track.h), track)
+        pygame.draw.rect(screen, theme.GOLD_BRIGHT if hot else theme.GOLD, handle.inflate(-4, -4), border_radius=5)
+        state.ui_hitboxes["scrollbar"] = track.inflate(16, 0)
+
     def offer_tip(self, rect, tip):
-        if tip and rect.collidepoint(self.mouse):
+        if tip and rect.collidepoint(self.mouse) and (self.clip is None or self.clip.collidepoint(self.mouse)):
             self.renderer.tips.offer(rect, _val(tip))
 
     def _begin(self, state, screen):
         self.screen, self.state = screen, state
         self.mouse = self.app.pointer()
+
+
+class _Scroll:
+    """A scrolling page's layout: the part on show (`view`), how far it scrolls, the note pinned
+    above it, the scrollbar's track, and where the body was last placed (`at`, scrolled by)."""
+
+    def __init__(self, view, note, max_scroll):
+        self.view, self.note, self.max_scroll = view, note, max_scroll
+        self.x, self.w = UILayout.PANEL.left, UILayout.PANEL.width
+        self.at = 0
+        self.track = None

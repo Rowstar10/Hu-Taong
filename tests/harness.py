@@ -37,6 +37,25 @@ JUKEBOX = {"music_mode", "music_seek", "music_pause", "cycle_music_left", "cycle
 
 
 def buttons(state, app):
-    """Draw a menu screen once and answer the buttons on it (not counting the jukebox's controls)."""
+    """Draw a menu screen once and answer the buttons on it (not counting the jukebox's controls).
+    On a page that scrolls (1.9), those out of sight too."""
     state.draw(app.virtual)
-    return set(state.ui_hitboxes) - JUKEBOX
+    return (set(state.ui_hitboxes) | set(getattr(state, "ui_whole", None) or {})) - JUKEBOX - {"scrollbar"}
+
+
+def every_box(state):
+    """The hitboxes of a screen as last drawn, and on a page that scrolls (1.9) where those out of
+    sight are."""
+    boxes = dict(getattr(state, "ui_whole", None) or {})
+    boxes.update({k: r for k, r in state.ui_hitboxes.items() if k not in boxes})
+    return boxes
+
+
+def show(state, key):
+    """Draw a screen with the control `key` on show: a page that scrolls (1.9) scrolls to it."""
+    target = app().virtual
+    state.draw(target)
+    if key not in state.ui_hitboxes and hasattr(state, "reveal"):
+        state.reveal(key)
+        state.scroll = state.scroll_target
+        state.draw(target)

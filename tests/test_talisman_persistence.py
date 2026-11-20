@@ -221,7 +221,7 @@ class Settings(unittest.TestCase):
         sm.push_state("match", mute = True)
         harness.settle(app)
         screen = sm.current()
-        screen.draw(app.virtual)
+        harness.show(screen, "cycle_at_once_right")
         x, y = screen.ui_hitboxes["cycle_at_once_right"].center
         pos = (x / app.sx, y / app.sy)
         screen.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button = 1, pos = pos))

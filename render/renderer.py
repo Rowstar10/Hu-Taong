@@ -20,7 +20,7 @@ from game import courts
 from game.powerups import BY_KEY as POWERUPS, FAMILY_COLOURS, FAMILY_NOTES, KINDS as POWERUP_KINDS, PowerUps
 from render.ui.layout import Node, Space
 from render.ui.layout import (Stack, Grid, Text, Label, Title, Button, Toggle, CycleToggle, KeyButton,
-                              Cycle, Slider, Slot, Space, TrackBar, Icon, Picture, TextField)
+                              Cycle, Slider, Slot, Space, TrackBar, Icon, Picture, TextField, Form)
 
 # What each control does, shown when the mouse rests on it.  First line: the title.  Then one
 # short line on what it does, and bullets for the details (see Tooltips for the markers).
@@ -424,6 +424,30 @@ class Renderer:
     def toggle(self, ui_font, key, name, flag, tip=None):
         return Toggle(key, lambda: f"{name}: {'ON' if flag() else 'OFF'}", ui_font, flag,
                       [f"{name}: ON", f"{name}: OFF"], tip=tip or TIPS.get(key))
+
+    # The settings pages, as rows (1.9, Rowan's 1.9 plan, phase 3, step 13b): a small heading over
+    # each section, then each setting on a row of its own, its name in a right-aligned column and
+    # its control beside it.  See render/ui/layout.py Form.
+
+    def row_font(self, ui, s):
+        return ui.fnt(0.027, s)
+
+    def rows(self, ui, s, rows):
+        """A column of a settings page: headings, and (name, control) rows that line up."""
+        return Form(rows, self.row_font(ui, s), gap_x=int(BASE_W * 0.012 * s), gap_y=self.vgap(ui, s, 0.5),
+                    section_gap=self.vgap(ui, s, 1.1))
+
+    def heading(self, ui, s, text, sub=False):
+        if sub:
+            return Label(text, ui.fnt(0.025, s), flower=max(12, int(18 * s)))
+        return Label(text, ui.fnt(0.03, s), flower=max(14, int(24 * s)))
+
+    def switch(self, font, key, flag, tip=None):
+        """A row's on/off: its seal, and ON or OFF (the row says what it is)."""
+        return Toggle(key, lambda: "ON" if flag() else "OFF", font, flag, ["ON", "OFF"], tip=tip or TIPS.get(key))
+
+    def column_gap(self, s, share=0.06):
+        return int(BASE_W * share * s)
 
     def fnt(self, frac, bold=True):
         """Shorthand: proportional UI font by BASE_H fraction."""
@@ -1331,27 +1355,20 @@ class Renderer:
 
     def draw_match_settings_menu(self, state, screen):
         """Settings > Match: the rules of a match, the same for both players (online, only the host
-        has it)."""
+        has it).  (1.9: in rows, at a size that reads, so it scrolls; from the pause menu, the note
+        that changes come in at the next serve stays at the top.)"""
         ui = self.ui
         g = self.app.settings.match
 
         def build(s):
-            f, sm, ty = ui.fnt(0.032, s), ui.fnt(0.028, s), ui.fnt(0.023, s)
+            f, ty = self.row_font(ui, s), ui.fnt(0.022, s)
             win_texts = ["Endless Mode" if v == "Endless Mode" else f"First to {v}" for v in g.winning_scores]
             win_col = lambda: theme.FLAME if g.winning_scores[g.winning_score_index] == "Endless Mode" else theme.PARCHMENT
-            seconds = [f"Countdown: {n} s" for n in g.countdown_options]
+            seconds = [f"{n} s" for n in g.countdown_options]
             countdown_tip = lambda: options_tip("Countdown", "How long the countdown before each serve lasts.",
                                                 [(f"{n} second{'s' if n != 1 else ''}", "") for n in g.countdown_options],
                                                 g.countdown)
-            rules = self.section(ui, s, "Match Rules",
-                                 Cycle("cycle_win_score", lambda: win_texts[g.winning_score_index], f, win_texts, win_col,
-                                       tip="Points to Win\nThe score that wins the match.\n• Endless Mode never ends"),
-                                 self.toggle(sm, "toggle_win_by_two", "Win by Two", lambda: g.win_by_two),
-                                 self.toggle(sm, "toggle_middle_wall", "Middle Wall", lambda: g.middle_wall),
-                                 Cycle("cycle_countdown", lambda: seconds[g.countdown], sm, seconds, tip=countdown_tip))
-
-            levels = [f"Level: {d}" for d in g.ai_difficulties]
-            styles = [f"Style: {d}" for d in g.ai_styles]
+            levels, styles = list(g.ai_difficulties), list(g.ai_styles)
             level_notes = ["slow to react, often misreads the ball", "reacts late and rarely aims",
                            "a fair match", "quick, aims its returns", "reads everything; rarely misses"]
             ai_col = lambda: (theme.GREEN if g.ai_difficulty == 0 else
@@ -1360,66 +1377,91 @@ class Renderer:
                                          list(zip(g.ai_difficulties, level_notes)), g.ai_difficulty)
             style_tip = lambda: options_tip("AI Style", "What the AI tries to do.",
                                             [(name, STYLE_TIPS[name]) for name in g.ai_styles], g.ai_style)
-            ai = self.section(ui, s, "AI",
-                              Cycle("cycle_ai", lambda: levels[g.ai_difficulty], f, levels, ai_col, tip=ai_tip),
-                              Cycle("cycle_ai_style", lambda: styles[g.ai_style], f, styles, tip=style_tip),
-                              self.toggle(sm, "toggle_adaptive_ai", "Adaptive AI", lambda: g.adaptive_ai))
-
             names = g.court_options
             court_tip = lambda: self.court_tip(g.court)
-            court = self.section(ui, s, "Court",
-                                 Cycle("cycle_court", lambda: names[g.court], f, names, tip=court_tip),
-                                 Picture(int(256 * s), int(144 * s),
-                                         lambda screen, rect: self.draw_court_preview(screen, rect, g.court), tip=court_tip))
 
-            rates = [f"Spawn: {r}" for r in g.powerup_rate_options]
+            left = self.rows(ui, s, [
+                self.heading(ui, s, "Match Rules"),
+                ("Points to Win", Cycle("cycle_win_score", lambda: win_texts[g.winning_score_index], f, win_texts,
+                                        win_col, tip="Points to Win\nThe score that wins the match.\n"
+                                                     "• Endless Mode never ends")),
+                ("Win by Two", self.switch(f, "toggle_win_by_two", lambda: g.win_by_two)),
+                ("Middle Wall", self.switch(f, "toggle_middle_wall", lambda: g.middle_wall)),
+                ("Countdown", Cycle("cycle_countdown", lambda: seconds[g.countdown], f, seconds, tip=countdown_tip)),
+                self.heading(ui, s, "AI"),
+                ("Level", Cycle("cycle_ai", lambda: levels[g.ai_difficulty], f, levels, ai_col, tip=ai_tip)),
+                ("Style", Cycle("cycle_ai_style", lambda: styles[g.ai_style], f, styles, tip=style_tip)),
+                ("Adaptive AI", self.switch(f, "toggle_adaptive_ai", lambda: g.adaptive_ai)),
+                self.heading(ui, s, "Court"),
+                ("Court", Cycle("cycle_court", lambda: names[g.court], f, names, tip=court_tip)),
+                Picture(int(320 * s), int(180 * s),
+                        lambda screen, rect: self.draw_court_preview(screen, rect, g.court), tip=court_tip)])
+
+            rates = list(g.powerup_rate_options)
             rate_tip = lambda: options_tip("Spawn Rate", "How often a new talisman appears.",
                                            [("Rare", "every 14-22 s"), ("Normal", "every 8-14 s"),
                                             ("Frequent", "every 4-8 s")],
                                            g.powerup_rate, "CHAOS brings one every 1.5-3 s, whatever this is set to")
-            at_once = [f"At Once: {n}" for n in g.at_once_options]
+            at_once = [str(n) for n in g.at_once_options]
             at_once_tip = lambda: options_tip(
                 "Talismans at Once", "How many talismans can be in play at once: their effects, and any waiting "
                 "on the court.  A new one only turns up while there's room.",
                 [(str(n), None) for n in g.at_once_options], g.talismans_at_once,
                 "Safety Teleport, Double or Nothing, Lantern Night and Open Court don't count, nor do game "
                 "modes.  CHAOS lifts the limit")
-            # (Choose Talismans under Power-Ups, Rowan's playtest: the switch and what it switches on together)
-            talismans = self.section(ui, s, "Talismans",
-                                     Grid([[self.toggle(sm, "toggle_powerups", "Power-Ups", lambda: g.powerups),
-                                            Cycle("cycle_powerup_rate", lambda: rates[g.powerup_rate], sm, rates, tip=rate_tip)],
-                                           [Button("open_powerups", "Choose Talismans", sm, (theme.ORANGE, theme.ORANGE_HOVER),
-                                                   tip=TIPS["open_powerups"]),
-                                            Cycle("cycle_at_once", lambda: at_once[g.talismans_at_once], sm, at_once,
-                                                  tip=at_once_tip)]],
-                                          gap_x=int(BASE_W * 0.012 * s), gap_y=self.vgap(ui, s, 0.35)),
-                                     Text(lambda: f"{sum(getattr(g, 'pu_' + k.key) for k in POWERUP_KINDS)} of "
-                                                  f"{len(POWERUP_KINDS)} talismans switched on", ty, theme.PARCHMENT,
-                                          samples=[f"{len(POWERUP_KINDS)} of {len(POWERUP_KINDS)} talismans switched on"]))
 
             def sizes():
                 return (f"Ball {int(g.ball_diameter)} px, speed {int(g.ball_speed)}   -   "
-                        f"Paddles {int(g.paddle_height)} x {int(g.paddle_width)}, speed {int(g.paddle_speed)}   -   "
-                        f"Pace {g.pace:.2f}x")
+                        f"Paddles {int(g.paddle_height)} x {int(g.paddle_width)}, speed {int(g.paddle_speed)}")
             def physics():
-                return f"Physics: {g.PHYSICS[g.physics]}   -   Speed Cap {'on' if g.speed_cap else 'off'}"
-            ball = self.section(ui, s, "Ball & Paddles",
-                                Button("open_ball_paddles", "Ball & Paddles", sm, (theme.GREEN, theme.GREEN_HOVER),
-                                       tip=TIPS["open_ball_paddles"]),
-                                Text(sizes, ty, theme.PARCHMENT,
-                                     samples=["Ball 100 px, speed 800   -   Paddles 300 x 60, speed 2000   -   Pace 1.50x"]),
-                                Text(physics, ty, theme.PARCHMENT,
-                                     samples=[f"Physics: {p}   -   Speed Cap off" for p in g.PHYSICS]))
+                return (f"Pace {g.pace:.2f}x   -   Physics: {g.PHYSICS[g.physics]}   -   "
+                        f"Speed Cap {'on' if g.speed_cap else 'off'}")
+            # (Choose Talismans under Power-Ups, Rowan's playtest: the switch and what it switches on together)
+            right = self.rows(ui, s, [
+                *self.mode_rows(ui, s, f, g),
+                self.heading(ui, s, "Talismans"),
+                ("Power-Ups", self.switch(f, "toggle_powerups", lambda: g.powerups)),
+                ("Spawn Rate", Cycle("cycle_powerup_rate", lambda: rates[g.powerup_rate], f, rates, tip=rate_tip)),
+                ("At Once", Cycle("cycle_at_once", lambda: at_once[g.talismans_at_once], f, at_once, tip=at_once_tip)),
+                ("", Button("open_powerups", "Choose Talismans", f, (theme.ORANGE, theme.ORANGE_HOVER),
+                            tip=TIPS["open_powerups"])),
+                Text(lambda: f"{sum(getattr(g, 'pu_' + k.key) for k in POWERUP_KINDS)} of "
+                             f"{len(POWERUP_KINDS)} talismans switched on", ty, theme.PARCHMENT,
+                     samples=[f"{len(POWERUP_KINDS)} of {len(POWERUP_KINDS)} talismans switched on"]),
+                self.heading(ui, s, "Ball & Paddles"),
+                Button("open_ball_paddles", "Ball & Paddles", f, (theme.GREEN, theme.GREEN_HOVER),
+                       tip=TIPS["open_ball_paddles"]),
+                Text(sizes, ty, theme.PARCHMENT,
+                     samples=["Ball 100 px, speed 800   -   Paddles 300 x 60, speed 2000"]),
+                Text(physics, ty, theme.PARCHMENT,
+                     samples=[f"Pace 1.50x   -   Physics: {p}   -   Speed Cap off" for p in g.PHYSICS])])
+            return Grid([[left, right]], gap_x=self.column_gap(s))
 
-            wide = int(BASE_W * 0.05 * s)
-            body = [Grid([[rules, ai, court]], gap_x=wide),
-                    self.modes_section(ui, s, sm, g),
-                    Grid([[talismans, ball]], gap_x=wide)]
-            if state.note:      # changing the match being played: say so first
-                body.insert(0, Text(state.note, sm, theme.FLAME))
-            return Stack(body, gap=self.vgap(ui, s, 1.2))
+        pinned = (lambda s: Text(state.note, self.row_font(ui, s), theme.FLAME)) if state.note else None
+        ui.screen_menu(state, screen, build, title="对局 Match", mark="战", reset="Reset to Default",
+                       pinned=pinned, scroll=True)
 
-        ui.screen_menu(state, screen, build, title="对局 Match", mark="战", reset="Reset to Default")
+    def mode_rows(self, ui, s, font, m):
+        """Settings > Match's Modes, as rows (1.9): an on/off for each, and for Shape Shift and Soul
+        Swap one button that cycles Off and each of their versions.  (Match Setup has them as a
+        block of buttons: modes_section.)"""
+        def mode(key):
+            return (m.MODE_NAMES[key], self.switch(font, f"toggle_mode_{key}", lambda: getattr(m, "mode_" + key),
+                                                   tip=self.MODE_TIPS[key]))
+
+        both = ["OFF", *m.CHAOS_TIMINGS, *m.SWITCH_TIMINGS]      # (the two as wide as each other)
+
+        def cycled(key, versions, glyphs):
+            texts = ["OFF"] + list(versions)
+            level = lambda: (getattr(m, "mode_" + key) and getattr(m, key + "_timing") + 1) or 0
+            button = CycleToggle(f"cycle_mode_{key}", texts, font, level, glyphs, tip=self.MODE_TIPS[key])
+            button.samples = both
+            return (m.MODE_NAMES[key], button)
+
+        return [self.heading(ui, s, "Modes"),
+                cycled("chaos", m.CHAOS_TIMINGS, "关乱狂"), cycled("switch", m.SWITCH_TIMINGS, "关换狂"),
+                mode("black_hole"), mode("curveball"), mode("lantern_night"), mode("twin_ball"),
+                mode("talisman_rush")]
 
     PHYSICS_NOTES = ("1.7's: a hit's speed comes from how hard the paddle drives into the ball, eased "
                      "towards a top speed",
@@ -1430,89 +1472,87 @@ class Renderer:
 
     def draw_ball_paddles_menu(self, state, screen):
         """Settings > Match > Ball & Paddles: their sizes and speeds, the game's pace, and (1.8) the
-        physics and the Speed Cap."""
+        physics and the Speed Cap.  (1.9: in rows.)"""
         ui = self.ui
         g = self.app.settings.match
 
         def build(s):
-            sm, ty = ui.fnt(0.028, s), ui.fnt(0.023, s)
+            f, ty = self.row_font(ui, s), ui.fnt(0.023, s)
             G = theme.GREEN
             track_w = int(BASE_W * 0.17 * s)
             label_sample = f"{g.paddle_height_max} x {g.paddle_width_max}"  # widest label; shared so tracks line up
 
             def slider(key, reset, value, lo, rng, label):
-                return Slider(key, lambda: (value() - lo) / rng, theme.EMBER, sm, label, label_sample,
-                              reset_key=reset, reset_font=ty, track_w=track_w, tip=TIPS[key])
+                return Slider(key, lambda: (value() - lo) / rng, theme.EMBER, f, label, label_sample,
+                              reset_key=reset, reset_font=ty, track_w=track_w, tip=TIPS[key], reset_last=True)
 
-            ball_speed = self.section(ui, s, "Ball Speed", slider(
-                "ball_speed_slider", "reset_ball_speed", lambda: g.ball_speed,
-                g.ball_speed_min, g.ball_speed_range, lambda: str(int(g.ball_speed))))
-            paddle_speed = self.section(ui, s, "Paddle Speed", slider(
-                "paddle_speed_slider", "reset_paddle_speed", lambda: g.paddle_speed,
-                g.paddle_speed_min, g.paddle_speed_range, lambda: str(int(g.paddle_speed))))
-            ball_size = self.section(ui, s, "Ball Diameter", slider(
-                "ball_diameter_slider", "reset_ball_diameter", lambda: g.ball_diameter,
-                g.ball_diameter_min, g.ball_diameter_range, lambda: str(int(g.ball_diameter))))
-            paddle_size = self.section(ui, s, "Paddle Size", slider(
-                "paddle_size_slider", "reset_paddle_size", lambda: g.paddle_height,
-                g.paddle_height_min, g.paddle_height_range,
-                lambda: f"{int(g.paddle_height)} x {int(g.paddle_width)}"))
-            pace = self.section(ui, s, "Game Pace", slider(
-                "pace_slider", "reset_pace", lambda: g.pace, g.pace_min, g.pace_range, lambda: f"{g.pace:.2f}x"))
-
-            rand = Button("randomise_all", "Randomise Ball & Paddles", sm, (G, theme.GREEN_HOVER), tip=TIPS["randomise_all"])
-            unrand = Button("reset_ball_and_paddles", "Reset Ball & Paddles", sm, (theme.BLUE, theme.BLUE_HOVER),
-                            tip=TIPS["reset_ball_and_paddles"])
-            names = [f"Physics: {p}" for p in g.PHYSICS]
+            names = list(g.PHYSICS)
             physics_tip = lambda: options_tip("Physics", "How a ball comes off a paddle.",
                                               list(zip(g.PHYSICS, self.PHYSICS_NOTES)), g.physics,
                                               "Changes come in at the next serve")
-            physics = self.section(ui, s, "Physics", Stack([
-                Cycle("cycle_physics", lambda: names[g.physics], sm, names, tip=physics_tip),
-                self.toggle(sm, "toggle_speed_cap", "Speed Cap", lambda: g.speed_cap)],
-                vertical=False, gap=int(BASE_W * 0.02 * s)))
-            return Stack([Grid([[ball_speed, paddle_speed],
-                                [ball_size, paddle_size],
-                                [pace, Stack([rand, unrand], gap=self.vgap(ui, s, 0.5))]],
-                               gap_x=int(BASE_W * 0.06 * s), gap_y=self.vgap(ui, s, 1.6)),
-                          physics], gap=self.vgap(ui, s, 1.6))
+            rand = Button("randomise_all", "Randomise Ball & Paddles", f, (G, theme.GREEN_HOVER), tip=TIPS["randomise_all"])
+            unrand = Button("reset_ball_and_paddles", "Reset Ball & Paddles", f, (theme.BLUE, theme.BLUE_HOVER),
+                            tip=TIPS["reset_ball_and_paddles"])
+            sliders = self.rows(ui, s, [
+                self.heading(ui, s, "Speeds"),
+                ("Ball Speed", slider("ball_speed_slider", "reset_ball_speed", lambda: g.ball_speed,
+                                      g.ball_speed_min, g.ball_speed_range, lambda: str(int(g.ball_speed)))),
+                ("Paddle Speed", slider("paddle_speed_slider", "reset_paddle_speed", lambda: g.paddle_speed,
+                                        g.paddle_speed_min, g.paddle_speed_range, lambda: str(int(g.paddle_speed)))),
+                ("Game Pace", slider("pace_slider", "reset_pace", lambda: g.pace, g.pace_min, g.pace_range,
+                                     lambda: f"{g.pace:.2f}x")),
+                self.heading(ui, s, "Sizes"),
+                ("Ball Diameter", slider("ball_diameter_slider", "reset_ball_diameter", lambda: g.ball_diameter,
+                                         g.ball_diameter_min, g.ball_diameter_range, lambda: str(int(g.ball_diameter)))),
+                ("Paddle Size", slider("paddle_size_slider", "reset_paddle_size", lambda: g.paddle_height,
+                                       g.paddle_height_min, g.paddle_height_range,
+                                       lambda: f"{int(g.paddle_height)} x {int(g.paddle_width)}"))])
+            physics = self.rows(ui, s, [
+                self.heading(ui, s, "Physics"),
+                ("Physics", Cycle("cycle_physics", lambda: names[g.physics], f, names, tip=physics_tip)),
+                ("Speed Cap", self.switch(f, "toggle_speed_cap", lambda: g.speed_cap)),
+                Space(0, self.vgap(ui, s, 1.6)),
+                Stack([rand, unrand], gap=self.vgap(ui, s, 0.5))])      # (Reset under Randomise: Rowan, 1.6)
+            return Grid([[sliders, physics]], gap_x=self.column_gap(s))
 
         ui.screen_menu(state, screen, build, title="球拍 Ball & Paddles", mark="球", reset="Reset to Default")
 
     def draw_gameplay_settings_menu(self, state, screen):
-        """Settings > Gameplay: your own controls.  The keys (on a phone, the touch steering) and
-        Auto-Pause."""
+        """Settings > Gameplay: your own controls.  The keys (on a phone, the touch steering),
+        Auto-Pause and (1.9) a controller's buttons.  (1.9: in rows.)"""
         ui = self.ui
         controls = self.app.settings.gameplay
 
         def build(s):
-            sm, ty = ui.fnt(0.028, s), ui.fnt(0.02, s)
-            last = self.toggle(sm, "toggle_vibration", "Vibration", lambda: controls.vibration) if ANDROID else None
-            play = self.section(ui, s, "Play", *[node for node in (
-                self.toggle(sm, "toggle_auto_pause", "Auto-Pause", lambda: controls.auto_pause), last) if node])
+            f, ty = self.row_font(ui, s), ui.fnt(0.021, s)
+            auto = ("Auto-Pause", self.switch(f, "toggle_auto_pause", lambda: controls.auto_pause))
             if ANDROID:
-                return Grid([[play, self.touch_section(ui, s, state)]], gap_x=int(BASE_W * 0.06 * s))
+                play = self.rows(ui, s, [self.heading(ui, s, "Play"), auto,
+                                         ("Vibration", self.switch(f, "toggle_vibration", lambda: controls.vibration))])
+                return Grid([[play, self.touch_section(ui, s, state)]], gap_x=self.column_gap(s))
 
             samples = ["Press a key", "Right Shift", "Backspace"]
             def bind(field):
-                return KeyButton(f"key_{field}", lambda: key_name(getattr(controls, field)), sm,
+                return KeyButton(f"key_{field}", lambda: key_name(getattr(controls, field)), f,
                                  lambda: state.listening == field, samples, tip=TIPS["key"])
 
-            rows = [[Space(), Text("Red", sm, (255, 112, 92)), Text("Blue", sm, (112, 162, 255))]]
+            rows = [[Space(), Text("Red", f, (255, 112, 92)), Text("Blue", f, (112, 162, 255))]]
             for action in controls.ACTIONS:
-                rows.append([Text(action.title(), sm, theme.GOLD, align="right"),
+                rows.append([Text(action.title(), f, theme.GOLD, align="right"),
                              bind(f"p1_{action}"), bind(f"p2_{action}")])
-            keys = self.section(ui, s, "Keys",
-                                Grid(rows, gap_x=int(BASE_W * 0.01 * s), gap_y=int(ui.gap * 0.6 * s)),
-                                Text("Click a key, then press the new one.", ty, theme.PARCHMENT))
-            return Grid([[keys, Stack([play, self.pad_section(ui, s, state, sm, ty)], gap=self.vgap(ui, s, 1.4))]],
-                        gap_x=int(BASE_W * 0.08 * s))
+            left = self.rows(ui, s, [
+                self.heading(ui, s, "Keys"),
+                Grid(rows, gap_x=int(BASE_W * 0.012 * s), gap_y=self.vgap(ui, s, 0.5)),
+                Text("Click a key, then press the new one.", ty, theme.PARCHMENT),
+                self.heading(ui, s, "Play"),
+                auto])
+            return Grid([[left, self.pad_section(ui, s, state, f, ty)]], gap_x=self.column_gap(s, 0.08))
 
         ui.screen_menu(state, screen, build, title="玩法 Gameplay", mark="玩", reset="Reset to Default")
 
     def pad_section(self, ui, s, state, font, small):
         """Gameplay settings' Controller section (1.9): which side the first controller plays when two
-        play here, and its buttons for Pause and the talisman list."""
+        play here, its buttons for Pause and the talisman list, and the five emotes'."""
         controls, pads = self.app.settings.gameplay, self.app.gamepads
         sides = ["Red", "Blue"]
         from core.emotes import EMOTES
@@ -1527,18 +1567,20 @@ class Renderer:
                                  f"{' (online: keys 1-5 send them too)' if action.startswith('emote') else ''}.\n"
                                  "• Click, then press the button on the controller\n"
                                  "• A button that's already used swaps over\n~ Esc cancels")
-        rows = [[Text("First controller", font, theme.GOLD, align="right"),
-                 Cycle("cycle_pad_first", lambda: sides[controls.pad_first], font, sides,
-                       tip="First controller\nWith two players here, the side the first controller plays; the "
-                           "second plays the other.  The keyboard works for either.\n• On your own (against the AI, "
-                           "or online) any controller plays your paddle")]]
-        for action in controls.PAD_ACTIONS:
-            rows.append([Text(names[action], font, theme.GOLD, align="right"), bind(action)])
         status = Text(lambda: (", ".join(p.name for p in pads.order()) + " connected") if pads.pads else
                       "No controller connected", small, theme.PARCHMENT,
                       samples=["No controller connected", "Xbox 360 Controller, Xbox 360 Controller connected"])
-        return self.section(ui, s, "Controller", Grid(rows, gap_x=int(BASE_W * 0.01 * s), gap_y=int(ui.gap * 0.6 * s)),
-                            status)
+        return self.rows(ui, s, [
+            self.heading(ui, s, "Controller"),
+            ("First controller", Cycle("cycle_pad_first", lambda: sides[controls.pad_first], font, sides,
+                                       tip="First controller\nWith two players here, the side the first controller "
+                                           "plays; the second plays the other.  The keyboard works for either.\n"
+                                           "• On your own (against the AI, or online) any controller plays your paddle")),
+            ("Pause", bind("pause")),
+            ("Talisman list", bind("list")),
+            self.heading(ui, s, "Emotes (online)", sub=True),
+            *[(text, bind(f"emote_{i + 1}")) for i, (text, _) in enumerate(EMOTES)],
+            status])
 
     # ── Power-ups ──────────────────────────────────────────────────────────────
 
@@ -1573,77 +1615,63 @@ class Renderer:
             across = 4
             rows = [tiles[i:i + across] for i in range(0, len(tiles), across)]
             rows[-1] += [Space() for _ in range(across - len(rows[-1]))]
-            grid = Grid(rows, gap_x=int(BASE_W * 0.012 * s), gap_y=self.vgap(ui, s, 0.35))
+            grid = Grid(rows, gap_x=int(BASE_W * 0.016 * s), gap_y=self.vgap(ui, s, 0.5))
             grid.measure()
             details = _PowerDetails(max(grid.w, int(BASE_W * 0.6)), ui.fnt(0.028, s), ui.fnt(0.022, s), s)
-            return Stack([head, legend, grid, details], gap=self.vgap(ui, s, 0.6))
+            return Stack([head, legend, grid, details], gap=self.vgap(ui, s, 0.8))
 
         ui.screen_menu(state, screen, build, title="法宝 Power-Ups", mark="宝", reset="Reset to Default")
 
     # ── Display settings ───────────────────────────────────────────────────────
 
     def draw_display_settings_menu(self, state, screen):
+        """Settings > Display.  (1.9: in rows, two columns; Parallax with the background.)"""
         ui = self.ui
         d = self.app.settings.display
         app = self.app
 
         def build(s):
-            f, sm = ui.fnt(0.032, s), ui.fnt(0.028, s)
+            f = self.row_font(ui, s)
             O = theme.ORANGE
-
             res_texts = [f"{w} x {h}" for (w, h) in app.resolutions]
             mode_texts = [m.capitalize() for m in app.display_modes]
+            fps_texts = [str(o) for o in d.max_fps_options]
 
-            resolution = self.section(
-                ui, s, "Resolution",
-                Cycle("cycle_res", lambda: res_texts[state.res_index], f, res_texts, tip=TIPS["cycle_res"]),
-                Cycle("cycle_mode", lambda: mode_texts[state.display_mode_index], f, mode_texts,
-                      tip=TIPS["cycle_mode"]),
-                Button("apply", "Apply", sm, (O, theme.ORANGE_HOVER), tip=TIPS["apply"]))
+            window = [] if ANDROID else [    # a phone's screen has one size, and is always full
+                self.heading(ui, s, "Window"),
+                ("Resolution", Cycle("cycle_res", lambda: res_texts[state.res_index], f, res_texts,
+                                     tip=TIPS["cycle_res"])),
+                ("Mode", Cycle("cycle_mode", lambda: mode_texts[state.display_mode_index], f, mode_texts,
+                               tip=TIPS["cycle_mode"])),
+                ("", Button("apply", "Apply", f, (O, theme.ORANGE_HOVER), tip=TIPS["apply"]))]
+            left = self.rows(ui, s, [
+                *window,
+                self.heading(ui, s, "Frame Rate"),
+                ("Maximum FPS", Cycle("cycle_max_fps", lambda: str(d.max_fps_options[d.max_fps]), f, fps_texts,
+                                      tip=TIPS["cycle_max_fps"])),
+                ("Show FPS", self.switch(f, "toggle_show_fps", lambda: d.show_fps)),
+                self.heading(ui, s, "Effects"),
+                ("Amount", Cycle("cycle_effects", lambda: d.effects_options[d.effects], f, list(d.effects_options),
+                                 tip=TIPS["cycle_effects"])),
+                ("Screen Shake", self.switch(f, "toggle_screen_shake", lambda: d.screen_shake)),
+                ("Ball Trail", self.switch(f, "toggle_ball_trail", lambda: d.ball_trail))])
 
-            max_fps = self.section(
-                ui, s, "Maximum FPS",
-                Cycle("cycle_max_fps", lambda: str(d.max_fps_options[d.max_fps]), f,
-                      [str(o) for o in d.max_fps_options], tip=TIPS["cycle_max_fps"]),
-                self.toggle(sm, "toggle_show_fps", "Show FPS", lambda: d.show_fps))
-
-            rotate_texts = [f"Change: {o}" for o in d.rotate_options]
-            parallax_texts = [f"Parallax: {o}" for o in d.parallax_options]
-
-            background = self.section(
-                ui, s, "Background",
+            track_w = int(BASE_W * 0.15 * s)
+            right = self.rows(ui, s, [
+                self.heading(ui, s, "Background"),
                 Slot("background_thumb", int(256 * s), int(144 * s), tip=TIPS["background_thumb"]),
-                self.toggle(sm, "toggle_rotate_bg", "Rotate", lambda: d.rotate_backgrounds),
-                Cycle("cycle_rotate_every", lambda: rotate_texts[d.rotate_every], sm, rotate_texts,
-                      tip=TIPS["cycle_rotate_every"]))
-
-            dim = Stack([
-                self.section(
-                    ui, s, "Dim Overlay",
-                    Slider("dim_slider", lambda: d.dim, theme.EMBER, sm, lambda: f"{int(100 * d.dim)}%", "100%",
-                           track_w=int(BASE_W * 0.17 * s), tip=TIPS["dim_slider"]),
-                    Cycle("cycle_parallax", lambda: parallax_texts[d.parallax], sm, parallax_texts,
-                          tip=TIPS["cycle_parallax"])),
-                self.section(
-                    ui, s, "Court Dim",
-                    Slider("court_dim_slider", lambda: d.court_dim_level, theme.EMBER, sm,
-                           lambda: f"{int(100 * d.court_dim_level)}%", "100%",
-                           track_w=int(BASE_W * 0.17 * s), tip=TIPS["court_dim_slider"]))],
-                gap=self.vgap(ui, s, 1.4))
-
-            effects_texts = [f"Effects: {o}" for o in d.effects_options]
-            effects = self.section(
-                ui, s, "Effects",
-                Cycle("cycle_effects", lambda: effects_texts[d.effects], sm, effects_texts, tip=TIPS["cycle_effects"]),
-                self.toggle(sm, "toggle_screen_shake", "Screen Shake", lambda: d.screen_shake),
-                self.toggle(sm, "toggle_ball_trail", "Ball Trail", lambda: d.ball_trail))
-
-            if ANDROID:                        # a phone's screen has one size, and is always full
-                return Grid([[background, dim, Stack([max_fps, effects], gap=self.vgap(ui, s, 1.4))]],
-                            gap_x=int(BASE_W * 0.06 * s))
-            return Grid([[resolution, max_fps, effects],
-                         [background, dim, Space()]],
-                        gap_x=int(BASE_W * 0.06 * s), gap_y=self.vgap(ui, s, 2.2))
+                ("Rotate", self.switch(f, "toggle_rotate_bg", lambda: d.rotate_backgrounds)),
+                ("Change Every", Cycle("cycle_rotate_every", lambda: d.rotate_options[d.rotate_every], f,
+                                       list(d.rotate_options), tip=TIPS["cycle_rotate_every"])),
+                ("Parallax", Cycle("cycle_parallax", lambda: d.parallax_options[d.parallax], f,
+                                   list(d.parallax_options), tip=TIPS["cycle_parallax"])),
+                self.heading(ui, s, "Dimming"),
+                ("Dim Overlay", Slider("dim_slider", lambda: d.dim, theme.EMBER, f, lambda: f"{int(100 * d.dim)}%",
+                                       "100%", track_w=track_w, tip=TIPS["dim_slider"])),
+                ("Court Dim", Slider("court_dim_slider", lambda: d.court_dim_level, theme.EMBER, f,
+                                     lambda: f"{int(100 * d.court_dim_level)}%", "100%",
+                                     track_w=track_w, tip=TIPS["court_dim_slider"]))])
+            return Grid([[left, right]], gap_x=self.column_gap(s, 0.08))
 
         ui.screen_menu(state, screen, build, title="画面 Display", mark="画", reset="Reset to Default")
 
@@ -1673,54 +1701,53 @@ class Renderer:
     # ── Audio settings ─────────────────────────────────────────────────────────
 
     def draw_audio_settings_menu(self, state, screen):
+        """Settings > Audio.  (1.9: in rows; the volumes in one block, the sound switches each on
+        a row, and the music's own settings under the jukebox.)"""
         ui = self.ui
         sound = self.app.sound_manager
         audio = self.app.settings.audio
 
         def build(s):
-            f, sm, ty = ui.fnt(0.032, s), ui.fnt(0.028, s), ui.fnt(0.023, s)
-            B = theme.BLUE
-            track_w = int(BASE_W * 0.16 * s)
+            f, ty = self.row_font(ui, s), ui.fnt(0.022, s)
+            track_w = int(BASE_W * 0.15 * s)
 
-            def volume(header, key, value):
+            def volume(key, value):
                 name = key.split("_")[0]          # master, music or sfx
-                return self.section(ui, s, header, Slider(
-                    key + "_slider", value, theme.EMBER, sm, lambda: f"{int(round(100 * value()))}%", "100%",
-                    reset_key="reset_" + key, reset_font=ty, track_w=track_w, tip=TIPS[key + "_slider"],
-                    mute_key="mute_" + key, muted=lambda: getattr(sound, name + "_muted")))
+                return Slider(key + "_slider", value, theme.EMBER, f, lambda: f"{int(round(100 * value()))}%", "100%",
+                              reset_key="reset_" + key, reset_font=ty, track_w=track_w, tip=TIPS[key + "_slider"],
+                              mute_key="mute_" + key, muted=lambda: getattr(sound, name + "_muted"), reset_last=True)
 
             mood_notes = {"menu":    "Relaxed music for the menus",
                           "game":    "Upbeat music for matches",
                           "victory": "Triumphant music",
                           "defeat":  "Downbeat music"}
 
-            volumes = Stack([
-                volume("Master Volume", "master_volume", lambda: sound.master_volume),
-                volume("Music Volume",  "music_volume",  lambda: sound.music_volume),
-                volume("SFX Volume",    "sfx_volume",    lambda: sound.sfx_volume),
-                Stack([self.toggle(sm, "toggle_paddle_sounds", "Paddle Sounds", lambda: sound.paddle_hit_sound),
-                       self.toggle(sm, "toggle_score_sounds",  "Score Sound",   lambda: sound.score_sound),
-                       self.toggle(sm, "toggle_menu_sounds",   "Menu Sounds",   lambda: audio.menu_sounds)],
-                      vertical=False, gap=int(BASE_W * 0.01 * s))],
-                gap=self.vgap(ui, s, 1.4))
+            left = self.rows(ui, s, [
+                self.heading(ui, s, "Volume"),
+                ("Master", volume("master_volume", lambda: sound.master_volume)),
+                ("Music", volume("music_volume", lambda: sound.music_volume)),
+                ("Sound Effects", volume("sfx_volume", lambda: sound.sfx_volume)),
+                self.heading(ui, s, "Sounds"),
+                ("Paddle Sounds", self.switch(f, "toggle_paddle_sounds", lambda: sound.paddle_hit_sound)),
+                ("Score Sound", self.switch(f, "toggle_score_sounds", lambda: sound.score_sound)),
+                ("Menu Sounds", self.switch(f, "toggle_menu_sounds", lambda: audio.menu_sounds))])
 
-            fades = [f"Track Fade: {o}" for o in audio.fade_options]
-            ambience = [f"Ambience: {o}" for o in audio.ambience_options]
-
-            jukebox = self.section(
-                ui, s, "Jukebox",
-                *self.jukebox_controls(state, f, sm, track_w),
+            right = self.rows(ui, s, [
+                self.heading(ui, s, "Jukebox"),
+                *self.jukebox_controls(state, f, f, track_w),
                 Text(lambda: mood_notes[sound.mood], ty, theme.GOLD, samples=list(mood_notes.values())),
-                self.toggle(sm, "toggle_even_volume", "Even Out Volume", lambda: audio.even_volume),
-                Cycle("cycle_fade", lambda: fades[audio.fade], sm, fades,
-                      tip=lambda: options_tip("Track Fade", "How long one track takes to fade into the next.",
-                                              [("Quick", "0.4 s"), ("Smooth", "1 s"), ("Slow", "2.5 s")], audio.fade)),
-                Cycle("cycle_ambience", lambda: ambience[audio.ambience], sm, ambience,
-                      tip=lambda: options_tip("Ambience", "Crackling spirit fire and crickets under the music.",
-                                              [("Off", ""), ("Menus", "in the menus only"),
-                                               ("Everywhere", "in matches too")], audio.ambience)))
-
-            return Grid([[volumes, jukebox]], gap_x=int(BASE_W * 0.04 * s))
+                self.heading(ui, s, "Music"),
+                ("Even Out Volume", self.switch(f, "toggle_even_volume", lambda: audio.even_volume)),
+                ("Track Fade", Cycle("cycle_fade", lambda: audio.fade_options[audio.fade], f, list(audio.fade_options),
+                                     tip=lambda: options_tip("Track Fade", "How long one track takes to fade into the next.",
+                                                             [("Quick", "0.4 s"), ("Smooth", "1 s"), ("Slow", "2.5 s")],
+                                                             audio.fade))),
+                ("Ambience", Cycle("cycle_ambience", lambda: audio.ambience_options[audio.ambience], f,
+                                   list(audio.ambience_options),
+                                   tip=lambda: options_tip("Ambience", "Crackling spirit fire and crickets under the music.",
+                                                           [("Off", ""), ("Menus", "in the menus only"),
+                                                            ("Everywhere", "in matches too")], audio.ambience)))])
+            return Grid([[left, right]], gap_x=self.column_gap(s))
 
         ui.screen_menu(state, screen, build, title="音频 Audio", mark="音", reset="Reset to Default")
 
@@ -2099,18 +2126,16 @@ class Renderer:
     # ── UI settings ("interface") ──────────────────────────────────────────────
 
     def draw_interface_settings_menu(self, state, screen):
-        """Settings > UI: menus, the HUD and tooltips."""
+        """Settings > UI: menus, the HUD and tooltips.  (1.9: in rows.)"""
         ui = self.ui
         i = self.app.settings.interface
 
         def build(s):
-            f, sm = ui.fnt(0.032, s), ui.fnt(0.028, s)
+            f = self.row_font(ui, s)
 
-            def flag(name, attr):
-                return self.toggle(sm, f"toggle_{attr}", name, lambda: getattr(i, attr))
+            def flag(attr):
+                return self.switch(f, f"toggle_{attr}", lambda: getattr(i, attr))
 
-            huds = [f"HUD: {o}" for o in i.hud_options]
-            replays = [f"Replays: {o}" for o in i.instant_replay_options]
             hud_tip = lambda: options_tip("HUD", "What the match shows besides the scores.",
                                           [("Full", "rally count and ball speed too"), ("Minimal", "just the scores")], i.hud)
             replay_tip = lambda: options_tip("Instant Replay", "When a match's best moments replay by themselves.",
@@ -2118,22 +2143,24 @@ class Renderer:
                                               ("Great Points", "straight after a point with a great moment"),
                                               ("After the Match", "the highlights, before the win screen"),
                                               ("Both", "")], i.instant_replay)
-            menus = self.section(ui, s, "Menus",
-                                 flag("Tooltips", "tooltips"),
-                                 flag("Hide Mouse", "hide_cursor") if not ANDROID else Space())
-            match = self.section(ui, s, "In a Match",
-                                 Cycle("cycle_hud", lambda: huds[i.hud], f, huds, tip=hud_tip),
-                                 flag("AI Banter", "ai_banter"),
-                                 flag("Friend's Emotes", "friend_emotes"),
-                                 Cycle("cycle_instant_replay", lambda: replays[i.instant_replay], f, replays, tip=replay_tip))
-            return Grid([[menus, match]], gap_x=int(BASE_W * 0.1 * s))
+            menus = self.rows(ui, s, [self.heading(ui, s, "Menus"),
+                                      ("Tooltips", flag("tooltips")),
+                                      ("Hide Mouse", flag("hide_cursor")) if not ANDROID else None])
+            match = self.rows(ui, s, [
+                self.heading(ui, s, "In a Match"),
+                ("HUD", Cycle("cycle_hud", lambda: i.hud_options[i.hud], f, list(i.hud_options), tip=hud_tip)),
+                ("AI Banter", flag("ai_banter")),
+                ("Friend's Emotes", flag("friend_emotes")),
+                ("Instant Replay", Cycle("cycle_instant_replay", lambda: i.instant_replay_options[i.instant_replay], f,
+                                         list(i.instant_replay_options), tip=replay_tip))])
+            return Grid([[menus, match]], gap_x=self.column_gap(s, 0.1))
 
         ui.screen_menu(state, screen, build, title="界面 UI", mark="界", reset="Reset to Default")
 
     def touch_section(self, ui, s, state):
         """On a phone, the Gameplay screen's Touch section, in place of the keys."""
         i = self.app.settings.gameplay
-        f, sm, ty = ui.fnt(0.032, s), ui.fnt(0.028, s), ui.fnt(0.02, s)
+        f, ty = self.row_font(ui, s), ui.fnt(0.02, s)
         steer, feel = i.touch_steer_options, i.touch_sensitivity_options
         steer_tip = lambda: options_tip("Steering", "How a finger moves your paddle.",
                                         [("Drag", "it moves as your finger moves, from wherever you touch"),
@@ -2142,16 +2169,15 @@ class Renderer:
         feel_tip = lambda: options_tip("Sensitivity", "How far Drag moves the paddle for each move of your finger.",
                                        [(name, "") for name in feel], i.touch_sensitivity,
                                        "Follow always goes to your finger")
-        rows = Grid([[Text("Steering", sm, theme.GOLD, align="right"),
-                      Cycle("cycle_touch_steer", lambda: steer[i.touch_steer], f, steer, tip=steer_tip)],
-                     [Text("Sensitivity", sm, theme.GOLD, align="right"),
-                      Cycle("cycle_touch_sensitivity", lambda: feel[i.touch_sensitivity], f, feel, tip=feel_tip)]],
-                    gap_x=int(BASE_W * 0.012 * s), gap_y=int(ui.gap * 0.8 * s))
         notes = Stack([Text("Against the AI or online, the whole screen steers your paddle.", ty, theme.PARCHMENT),
                        Text("Two players on one phone: each has their own half.", ty, theme.PARCHMENT),
                        Text("Back, or the button at the bottom, pauses a match.", ty, theme.PARCHMENT)],
                       gap=int(ui.gap * 0.4 * s))
-        return self.section(ui, s, "Touch", rows, notes)
+        return self.rows(ui, s, [
+            self.heading(ui, s, "Touch"),
+            ("Steering", Cycle("cycle_touch_steer", lambda: steer[i.touch_steer], f, steer, tip=steer_tip)),
+            ("Sensitivity", Cycle("cycle_touch_sensitivity", lambda: feel[i.touch_sensitivity], f, feel, tip=feel_tip)),
+            notes])
 
     # ── Game feel (purely visual) ──────────────────────────────────────────────
 
