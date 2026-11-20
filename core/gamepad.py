@@ -38,7 +38,7 @@ BUTTONS = {name: getattr(pygame, "CONTROLLER_BUTTON_" + name.upper(), None) for 
             "leftshoulder", "rightshoulder", "dpad_up", "dpad_down", "dpad_left", "dpad_right")}
 NAME_OF = {code: name for name, code in BUTTONS.items() if code is not None}
 DPAD = {"dpad_up": (0, -1), "dpad_down": (0, 1), "dpad_left": (-1, 0), "dpad_right": (1, 0)}
-FIXED = ("a", "b", "dpad_up", "dpad_down", "dpad_left", "dpad_right")     # menus' own: not for actions
+FIXED = ("a", "dpad_up", "dpad_down", "dpad_left", "dpad_right")     # not for actions: steering, and A selects
 
 # What each family of controller calls its buttons
 _LETTERS = {"a": "A", "b": "B", "x": "X", "y": "Y", "start": "Start", "back": "Back", "guide": "Guide",
@@ -199,6 +199,8 @@ class Gamepads:
                 return [key_event(pygame.KEYDOWN, pygame.K_ESCAPE), key_event(pygame.KEYUP, pygame.K_ESCAPE)]
             if action == "list":
                 self.app.keys_down.add(pygame.K_TAB)        # (the HUD's talisman list, while held)
+            if action and action.startswith("emote_"):
+                self.app.emotes.send(int(action[6:]) - 1)   # (online only)
             return []
         if name in DPAD:
             self.held = (DPAD[name], time.perf_counter() + REPEAT_FIRST)

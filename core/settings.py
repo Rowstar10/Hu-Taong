@@ -303,8 +303,10 @@ class GameplaySettings:
         self.touch_sensitivity_options = ["Low", "Normal", "High", "Very High"]
         self.reset()
 
-    PAD_ACTIONS = ("pause", "list")         # a controller's buttons in a match (1.9): Pause, the talisman list
-    PAD_DEFAULTS = {"pause": "start", "list": "back"}
+    # A controller's buttons in a match (1.9): Pause, the talisman list, and online the five emotes
+    PAD_ACTIONS = ("pause", "list", "emote_1", "emote_2", "emote_3", "emote_4", "emote_5")
+    PAD_DEFAULTS = {"pause": "start", "list": "back", "emote_1": "y", "emote_2": "x", "emote_3": "b",
+                    "emote_4": "leftshoulder", "emote_5": "rightshoulder"}
 
     def reset(self):
         self.auto_pause = True       # pause a match when the window loses focus
@@ -527,5 +529,6 @@ class InterfaceSettings:
         self.tooltips = True
         self.ai_banter = True
         self.hide_cursor = True      # hide the mouse during a match until it moves
+        self.friend_emotes = True    # online, your friend's quick emotes show (1.9)
         self.hud = 0
         self.instant_replay = 2      # the highlights after the match

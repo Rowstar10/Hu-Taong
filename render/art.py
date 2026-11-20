@@ -535,6 +535,42 @@ class Art:
         pygame.draw.circle(out, (250, 150, 150), U(.76, .45), s * .045)
         return shrink(out, w, h / 4)
 
+    def emote_ghost(self, w, mood):
+        """Hu Tao's ghost for a quick emote (1.9): "laugh" (eyes shut tight, mouth wide) or "think"
+        (eyes to one side, a small mouth, a hand at its chin)."""
+        return self.get(("emote_ghost", w, mood), self._emote_ghost, w, mood)
+
+    def _emote_ghost(self, w, mood):
+        s = w * 4
+        h = int(s * 1.1)
+        out = blank(s, h)
+        U = lambda x, y: (x * s, y * h)
+        body = bezier(U(.5, .05), U(.82, .05), U(.95, .32), U(.92, .55))
+        body += bezier(U(.92, .55), U(.9, .76), U(.8, .86), U(.66, .9))
+        body += bezier(U(.66, .9), U(.52, .96), U(.34, 1.0), U(.12, .95))
+        body += bezier(U(.12, .95), U(.3, .88), U(.28, .8), U(.2, .68))
+        body += bezier(U(.2, .68), U(.1, .5), U(.16, .05), U(.5, .05))
+        shape = blank(s, h)
+        pygame.draw.polygon(shape, (255, 255, 255, 255), body)
+        fill = v_gradient(s, h, [(0, (255, 255, 255, 255)), (.6, (240, 244, 255, 255)), (1, (190, 204, 240, 255))])
+        fill.blit(shape, (0, 0), special_flags=CUT)
+        out.blit(fill, (0, 0))
+        red, line = (214, 44, 44), max(3, int(s * .035))
+        if mood == "laugh":
+            for x in (.37, .67):                                   # eyes shut tight: ^ ^
+                pygame.draw.lines(out, red, False, [U(x - .08, .37), U(x, .29), U(x + .08, .37)], line)
+            pygame.draw.polygon(out, red, [U(.36, .45), U(.68, .44), U(.62, .6), U(.52, .64), U(.42, .6)])
+            pygame.draw.polygon(out, (255, 150, 150), [U(.45, .56), U(.58, .55), U(.52, .61)])
+        else:
+            for x in (.42, .7):                                    # eyes looking up and aside
+                pygame.draw.ellipse(out, red, (*U(x - .05, .28), s * .1, s * .07))
+            pygame.draw.line(out, red, U(.46, .5), U(.6, .48), line)
+            pygame.draw.circle(out, (250, 250, 255), U(.3, .62), s * .07)          # a little hand at its chin
+            pygame.draw.circle(out, (200, 210, 235), U(.3, .62), s * .07, max(2, line // 2))
+        pygame.draw.circle(out, (250, 150, 150), U(.26, .47), s * .045)
+        pygame.draw.circle(out, (250, 150, 150), U(.8, .45), s * .045)
+        return shrink(out, w, h / 4)
+
     # ---------- Spinning seal ----------
 
     def sigil(self, size):

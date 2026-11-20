@@ -590,6 +590,8 @@ class HostSession:
         focus = extra.get("focus")
         if isinstance(focus, int):
             self.guest_focus = bool(focus)
+        if "emote" in extra:
+            self.app.emotes.receive(self, extra["emote"])          # the friend's quick emote (1.9)
         for claim in extra.get("claims", []) if isinstance(extra.get("claims"), list) else []:
             if isinstance(claim, dict) and isinstance(claim.get("id"), int) and claim["id"] not in self.acks \
                     and claim["id"] not in self.claims_seen:
@@ -640,7 +642,10 @@ class HostSession:
                                     for p in (game.p1, game.p2)],
                          "pace": game.settings.pace, "switch_each_point": game.settings.switch_each_point,
                          "switching": game.settings.switching,
-                         "court": game.court.name, "rows": ROWS}}
+                         "court": game.court.name, "rows": ROWS,
+                         "chaos": bool(game.settings.mode_talisman_rush)}}     # (1.9: Utter CHAOS)
+        if getattr(self, "emote", None):
+            info["emote"] = self.emote                  # your latest quick emote (1.9)
         head = pack_json(info)
         self.snap_seq += 1
         self.link.send(SNAP, struct.pack("<IH", self.snap_seq, len(head)) + head + row)
@@ -825,6 +830,8 @@ class GuestSession:
         extra["focus"] = 1 if self.app.focused() else 0     # clicked away: the match pauses for both
         if self.claims:
             extra["claims"] = self.claims[-4:]
+        if getattr(self, "emote", None):
+            extra["emote"] = self.emote                 # your latest quick emote (1.9)
         if self.snaps:
             extra["echo"] = self.snaps[-1][2].get("echo")
             if "hclock" in self.snaps[-1][2]:
@@ -867,6 +874,8 @@ class GuestSession:
             self.ping = max(0.0, time.perf_counter() - echo)
             self.trips.append((time.perf_counter(), self.ping))
         self.info = info
+        if "emote" in info:
+            self.app.emotes.receive(self, info["emote"])           # the host's quick emote (1.9)
         for pair in info.get("acks", []):
             if isinstance(pair, list) and len(pair) == 2 and isinstance(pair[0], int):
                 self.acks[pair[0]] = pair[1]

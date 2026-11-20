@@ -22,7 +22,8 @@ AUDIO = ["play_mode", "even_volume", "fade", "menu_sounds", "ambience"]
 INTERFACE = ["tooltips", "ai_banter", "screen_shake", "ball_trail", "auto_pause", "hide_cursor",
              "hud", "effects", "countdown", "instant_replay",
              "p1_up", "p1_down", "p1_left", "p1_right", "p2_up", "p2_down", "p2_left", "p2_right",
-             "pad_first", "pad_pause", "pad_list"]
+             "pad_first", "pad_pause", "pad_list", "pad_emote_1", "pad_emote_2", "pad_emote_3", "pad_emote_4",
+             "pad_emote_5", "friend_emotes"]
 if ANDROID:
     INTERFACE += ["touch_steer", "touch_sensitivity", "vibration"]
 INDEX_FIELDS = {"winning_score_index", "ai_difficulty", "max_fps", "background",

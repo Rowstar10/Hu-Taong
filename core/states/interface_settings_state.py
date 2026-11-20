@@ -7,7 +7,7 @@ class InterfaceSettingsState(State):
     NAME = "interface"
     is_menu = True
 
-    TOGGLES = ("tooltips", "ai_banter", "hide_cursor")
+    TOGGLES = ("tooltips", "ai_banter", "hide_cursor", "friend_emotes")
     CYCLES = {"hud": "hud_options", "instant_replay": "instant_replay_options"}
 
     def draw(self, screen):

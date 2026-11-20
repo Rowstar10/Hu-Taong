@@ -111,6 +111,7 @@ class GameState(State):
         if shown:
             ball.x0, ball.y0, ball.x1, ball.y1 = kept
         self.app.hud.draw(self, screen, game)
+        self.app.renderer.draw_emotes(screen)
         
     def handle_event(self, event):
         super().handle_event(event)

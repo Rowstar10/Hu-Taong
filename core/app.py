@@ -8,6 +8,7 @@ from core.settings import Settings
 from core.stats import Stats
 from core.achievements import Achievements
 from core.gamepad import Gamepads, Navigator
+from core.emotes import Emotes
 from core.sound_manager import SoundManager
 from core.state_manager import StateManager
 from core.states.base_state import State
@@ -47,6 +48,7 @@ class App:
         self.achievements.on_earn = self.earned
         self.navigator = Navigator(self)          # the menus' highlight, for a controller or the arrow keys (1.9)
         self.gamepads = Gamepads(self)            # controllers (1.9)
+        self.emotes = Emotes(self)                # online quick emotes (1.9)
         self.choose_file = files.ask      # the Save / Open dialog (tests swap in their own)
         self.net = None                   # an online session (core/net.py) while hosting or joining
         save_data.load(self)
@@ -544,6 +546,7 @@ class App:
                 self.restart_bg_timer()
 
             # ---------- State-Specific Events ----------
+            self.emotes.key(event)            # (keys 1-5 online: 1.9)
             self.state_manager.handle_event(event)
 
         # ---------- Warm sprites while nobody is playing (menus, a serve countdown, a goal) ----------
@@ -560,6 +563,7 @@ class App:
             self.online_requests()
         self.state_manager.update(self.dt)
         self.gamepads.update(self.dt)
+        self.emotes.update(self.dt)
         if self.touch:
             self.touch.update(self.dt)
         if self.net:

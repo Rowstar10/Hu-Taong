@@ -840,6 +840,7 @@ class GuestMatchState(State):
         renderer.draw_world(screen, self.view)
         self.app.hud.draw(self, screen, self.view, live=True)
         renderer.draw_ping(screen, net.ping)
+        renderer.draw_emotes(screen)
 
     def handle_event(self, event):
         super().handle_event(event)

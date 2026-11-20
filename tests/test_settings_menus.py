@@ -136,7 +136,8 @@ class WhatGoesWhere(unittest.TestCase):
     def test_interface_is_menus_and_the_hud(self):
         keys = set(open_screen("interface").ui_hitboxes) - set(FOOTER)
         self.assertEqual(keys, {"toggle_tooltips", "toggle_hide_cursor", "cycle_hud_left", "cycle_hud_right",
-                                "toggle_ai_banter", "cycle_instant_replay_left", "cycle_instant_replay_right"})
+                                "toggle_ai_banter", "cycle_instant_replay_left", "cycle_instant_replay_right",
+                                "toggle_friend_emotes"})             # (1.9: online, the friend's emotes)
 
 
 class Layout(unittest.TestCase):

@@ -42,6 +42,9 @@ TIPS = {
     "opponent_ai": "vs AI\nYou play one paddle, the AI the other.",
     "opponent_human": "vs Human\nTwo players on one keyboard.",
     "opponent_online": "Online\nPlay a friend over the internet: one of you hosts, the other joins with a code.",
+    "toggle_friend_emotes": "Friend's Emotes\nOnline, your friend's quick emotes (Nice shot!, Oops...) show by "
+                            "their side of the court.\n• Off: you don't see theirs; yours still go to them\n"
+                            "~ Send your own with keys 1-5, or the controller buttons set in Gameplay",
     "opponent_practice": "Practice\nPlay on your own, against a wall or the AI, with every setting and mode as usual.\n"
                          "• Nothing counts towards your stats\n• Choose what you play against, whether points count, "
                          "and a talisman to practise with",
@@ -663,6 +666,10 @@ class Renderer:
                 jobs.append(lambda finish=finish, level=level: art.paddle_flash(w, h, finish, level))
         jobs.append(self.warm_pause_screen)
         jobs.append(lambda: art.stone(self.PRACTICE_WALL, BASE_H, "pillar"))      # (Practice's wall, 1.9)
+        # Each quick emote's bubble (1.9)
+        from core.emotes import EMOTES
+        for n in range(len(EMOTES)):
+            jobs.append(lambda n=n: art.get(("emote_bubble", n), self.emote_bubble, n))
         # Each achievement's banner, ready for the moment it's earned (6 ms to make: a jolt mid-rally)
         from core.achievements import LIST as ACHIEVEMENTS
         for a in ACHIEVEMENTS:
@@ -1508,13 +1515,16 @@ class Renderer:
         play here, and its buttons for Pause and the talisman list."""
         controls, pads = self.app.settings.gameplay, self.app.gamepads
         sides = ["Red", "Blue"]
-        names = {"pause": "Pause", "list": "Talisman list"}
+        from core.emotes import EMOTES
+        names = {"pause": "Pause", "list": "Talisman list",
+                 **{f"emote_{i + 1}": f"Emote: {text}" for i, (text, _) in enumerate(EMOTES)}}
         samples = ["Press a button", "Triangle", "Options", "D-pad right"]
 
         def bind(action):
             return KeyButton(f"pad_{action}", lambda: pads.label(getattr(controls, "pad_" + action)), font,
                              lambda: state.listening_pad == action, samples,
-                             tip=f"{names[action]}\nThe controller button for it in a match.\n"
+                             tip=f"{names[action]}\nThe controller button for it in a match"
+                                 f"{' (online: keys 1-5 send them too)' if action.startswith('emote') else ''}.\n"
                                  "• Click, then press the button on the controller\n"
                                  "• A button that's already used swaps over\n~ Esc cancels")
         rows = [[Text("First controller", font, theme.GOLD, align="right"),
@@ -2114,6 +2124,7 @@ class Renderer:
             match = self.section(ui, s, "In a Match",
                                  Cycle("cycle_hud", lambda: huds[i.hud], f, huds, tip=hud_tip),
                                  flag("AI Banter", "ai_banter"),
+                                 flag("Friend's Emotes", "friend_emotes"),
                                  Cycle("cycle_instant_replay", lambda: replays[i.instant_replay], f, replays, tip=replay_tip))
             return Grid([[menus, match]], gap_x=int(BASE_W * 0.1 * s))
 
@@ -2254,13 +2265,49 @@ class Renderer:
         surf.blit(label, label.get_rect(center=(r, r)))
         return surf
 
+    def emote_bubble(self, n):
+        """A quick emote's bubble (1.9): its words, and Hu Tao's ghost for the two that have her."""
+        from core.emotes import EMOTES
+        text, mood = EMOTES[n]
+        font = self.ui.fnt(0.034)
+        label = font.render(text, True, theme.GOLD_BRIGHT)
+        ghost = self.art.emote_ghost(64, mood) if mood else None
+        w = label.get_width() + 44 + (ghost.get_width() + 12 if ghost else 0)
+        h = max(label.get_height(), ghost.get_height() if ghost else 0) + 28
+        surf = blank(w, h)
+        surf.blit(self.art.inset(w, h), (0, 0))
+        x = 22
+        if ghost:
+            surf.blit(ghost, ghost.get_rect(midleft=(x, h // 2)))
+            x += ghost.get_width() + 12
+        surf.blit(label, label.get_rect(midleft=(x, h // 2)))
+        return surf
+
+    def draw_emotes(self, screen):
+        """Online, the quick emotes showing: each by its sender's side of the court, popping up and
+        fading away."""
+        from core.emotes import SHOW
+        for n, side, age in self.app.emotes.bubbles:
+            surf = self.art.get(("emote_bubble", n), self.emote_bubble, n)
+            pop = min(1.0, age / 0.15)
+            fade = min(1.0, (SHOW - age) / 0.5)
+            if pop < 1:
+                surf = pygame.transform.smoothscale(surf, (max(1, int(surf.get_width() * (0.6 + 0.4 * pop))),
+                                                           max(1, int(surf.get_height() * (0.6 + 0.4 * pop)))))
+            else:
+                surf = surf.copy()
+            surf.set_alpha(None if fade >= 1 else int(255 * max(0.0, fade)))
+            cx = BASE_W * 0.2 if side == 1 else BASE_W * 0.8
+            screen.blit(surf, surf.get_rect(center=(int(cx), int(BASE_H * 0.24))))
+
     def draw_pad_prompts(self, screen):
-        """While a controller works the menus: what A and B do, at the bottom right."""
+        """While a controller works the menus: what A and B do, at the top right (clear of every
+        screen's buttons)."""
         nav = self.app.navigator
         if not nav.active or nav.via != "pad" or not self.app.gamepads.pads:
             return
         font, size = self.ui.fnt(0.026), 44
-        x, y = BASE_W - 40, BASE_H - 50
+        x, y = BASE_W - 40, 44
         for name, what in (("b", "Back"), ("a", "Select")):
             text = font.render(what, True, theme.GOLD_BRIGHT)
             x -= text.get_width()
