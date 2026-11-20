@@ -135,8 +135,8 @@ and saved as mono 44.1 kHz WAV.  CC0 needs no credit, but credit is given anyway
 
 The talisman tunes in `talisman_*.wav` (plucked strings on a pentatonic scale), Lantern Night's temple
 bell, and the wind, fire, grinding stone and goo sounds were synthesised for Hu Taong by a short script,
-from tones and filtered noise, as the Black Hole's were.  `hole_fling.wav` is `black_hole_swallow.wav`
-played backwards.  None of these are taken from anywhere, so they need no credit or licence.
+from tones and filtered noise, as the Black Hole's were, and so was `achievement.wav` (the chime for an
+achievement earned).  `hole_fling.wav` is `black_hole_swallow.wav` played backwards.  None of these are taken from anywhere, so they need no credit or licence.
 
 ## Sound effects made for the game
 

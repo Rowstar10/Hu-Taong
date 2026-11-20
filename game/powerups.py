@@ -1457,6 +1457,9 @@ class PowerUps:
         elif hole.get("eaten", 0) >= self.HOLE_GROWTHS:
             way, hold = self.scoring_way(b), self.COLLAPSE_TIME
             hole["collapse"] = 0.0
+            hook = getattr(self.game, "on_collapse", None)
+            if hook:
+                hook()
             renderer = getattr(app, "renderer", None)
             if renderer is not None:
                 renderer.shake(5, self.COLLAPSE_TIME)

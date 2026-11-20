@@ -79,6 +79,8 @@ class StatsState(State):
                 self.import_stats()
             if key == "open_replays":
                 self.push_state("replays")
+            if key == "open_achievements":
+                self.push_state("achievements")
             if key == "reset_stats":
                 action = lambda: (self.app.stats.reset(),
                                   save_data.save(self.app),

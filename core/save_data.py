@@ -152,11 +152,19 @@ def talismans_path():
     return data_dir() / "talisman_stats.json"
 
 
+def achievements_path():
+    """Achievements (1.9), likewise in a file of their own."""
+    return data_dir() / "achievements.json"
+
+
 def save(app):
     path = save_path()
     try:
         path.parent.mkdir(parents = True, exist_ok = True)
-        for target, data in ((path, collect(app)), (talismans_path(), app.stats.talismans_dict())):
+        files = [(path, collect(app)), (talismans_path(), app.stats.talismans_dict())]
+        if hasattr(app, "achievements"):
+            files.append((achievements_path(), app.achievements.to_dict()))
+        for target, data in files:
             tmp = target.with_suffix(".tmp")
             tmp.write_text(json.dumps(data, indent = 2))
             tmp.replace(target)    # never leave a half-written save behind
@@ -202,3 +210,8 @@ def load(app):
         app.stats.load_talismans(json.loads(talismans_path().read_text()))
     except (OSError, ValueError):
         pass                       # none yet, or a damaged file: none
+    if hasattr(app, "achievements"):
+        try:
+            app.achievements.load_dict(json.loads(achievements_path().read_text()))
+        except (OSError, ValueError):
+            pass

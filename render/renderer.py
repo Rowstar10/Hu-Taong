@@ -178,6 +178,31 @@ class _PowerDetails(Node):
         ui.screen.blit(stats, (x, r.bottom - self.pad - stats.get_height()))
 
 
+class _AchievementTile(Node):
+    """One achievement on the Achievements screen: its seal, name, how to earn it and when it was."""
+
+    def __init__(self, achievement, w, h, title_font, body_font, got):
+        super().__init__()
+        self.key, self.name, self.how, self.glyph, _ = achievement
+        self.w, self.h = w, h
+        self.title_font, self.body_font, self.got = title_font, body_font, got
+
+    def draw(self, ui):
+        r = self.rect
+        earned = self.got.get(self.key)
+        ui.screen.blit(ui.art.inset(r.w, r.h), r)
+        size = int(r.h * 0.66)
+        seal = ui.art.seal(size, bool(earned), self.glyph)
+        ui.screen.blit(seal, seal.get_rect(midleft=(r.x + int(r.h * 0.15), r.centery)))
+        x = r.x + int(r.h * 0.3) + seal.get_width()
+        name = ui.text(self.title_font, self.name, theme.GOLD_BRIGHT if earned else theme.GRAY)
+        how = ui.text(self.body_font, self.how + (f"   ({earned})" if earned else ""),
+                      theme.PARCHMENT if earned else theme.OFF_TEXT)
+        top = r.centery - (name.get_height() + how.get_height()) // 2
+        ui.screen.blit(name, (x, top))
+        ui.screen.blit(how, (x, top + name.get_height()))
+
+
 STYLE_TIPS = {
     "Balanced": "a steady all-rounder.",
     "Guardian": "a wall: reads the ball best, keeps to the middle of its goal and rarely misses. Rarely attacks.",
@@ -621,6 +646,10 @@ class Renderer:
                 jobs.append(lambda finish=finish, level=level: art.paddle_flash(w, h, finish, level))
         jobs.append(self.warm_pause_screen)
         jobs.append(lambda: art.stone(self.PRACTICE_WALL, BASE_H, "pillar"))      # (Practice's wall, 1.9)
+        # Each achievement's banner, ready for the moment it's earned (6 ms to make: a jolt mid-rally)
+        from core.achievements import LIST as ACHIEVEMENTS
+        for a in ACHIEVEMENTS:
+            jobs.append(lambda key=a[0]: art.get(("achievement", key), self.achievement_banner, key))
 
         # Every size and colour of butterfly the game sends out, at every angle: goal bursts (64),
         # hits (48, 40), talismans taken (44), the Firecracker's bang (80), the swarm (88) and the
@@ -1739,12 +1768,33 @@ class Renderer:
                                     tip=TIPS["export_stats"]),
                              Button("import_stats", "Import Stats", sm, (theme.BLUE, theme.BLUE_HOVER),
                                     tip=TIPS["import_stats"]),
+                             Button("open_achievements", "Achievements", sm, (theme.ORANGE, theme.ORANGE_HOVER),
+                                    tip="Achievements\nThe 21 achievements: the ones you've earned, and how to earn the rest."),
                              Button("reset_stats", "Reset Stats", sm, (theme.RED, theme.RED_HOVER),
                                     tip=TIPS["reset_stats"])],
                             vertical=False, gap=int(BASE_W * 0.015 * s), uniform=True)
             return Stack([table, buttons], gap=self.vgap(ui, s, 1.4))
 
         ui.screen_menu(state, screen, build, title="战绩 Stats", mark="绩")
+
+    def draw_achievements_menu(self, state, screen):
+        """Every achievement (1.9): a red seal for those earned (with the day), a grey one for the
+        rest, and how to earn each."""
+        ui = self.ui
+        from core.achievements import LIST as ACHIEVEMENTS
+        got = self.app.achievements.earned
+
+        def build(s):
+            title_font, body_font = ui.fnt(0.026, s), ui.fnt(0.019, s)
+            count = Text(lambda: f"{len(got)} of {len(ACHIEVEMENTS)} earned", ui.fnt(0.03, s), theme.GOLD,
+                         samples=[f"{len(ACHIEVEMENTS)} of {len(ACHIEVEMENTS)} earned"])
+            tiles = [_AchievementTile(a, int(BASE_W * 0.27 * s), int(BASE_H * 0.082 * s), title_font, body_font, got)
+                     for a in ACHIEVEMENTS]
+            rows = [tiles[i:i + 3] for i in range(0, len(tiles), 3)]
+            grid = Grid(rows, gap_x=int(BASE_W * 0.01 * s), gap_y=self.vgap(ui, s, 0.3))
+            return Stack([count, grid], gap=self.vgap(ui, s, 0.6))
+
+        ui.screen_menu(state, screen, build, title="成就 Achievements", mark="成", reset="Reset Achievements")
 
     # ── Replays ────────────────────────────────────────────────────────────────
 
@@ -2062,6 +2112,49 @@ class Renderer:
         surf.blit(flower, flower.get_rect(midleft=(pad, h // 2)))
         surf.blit(label, label.get_rect(midleft=(2 * pad + flower.get_width(), h // 2)))
         self._toast = [surf, 0.0, important]
+
+    BANNER = (760, 124)         # an achievement's banner (1.9)
+
+    def show_achievement(self, key):
+        """An achievement earned: its banner drops in at the top of the screen (one after another)."""
+        if not hasattr(self, "_banners"):
+            self._banners = []
+        self._banners.append([self.art.get(("achievement", key), self.achievement_banner, key), 0.0])
+
+    def achievement_banner(self, key):
+        from core.achievements import BY_KEY
+        _, name, how, glyph, _ = BY_KEY[key]
+        w, h = self.BANNER
+        surf = blank(w, h)
+        surf.blit(self.art.inset(w, h), (0, 0))
+        seal = self.art.seal(84, True, glyph)
+        surf.blit(seal, seal.get_rect(midleft=(18, h // 2)))
+        x = 18 + seal.get_width() + 18
+        head = self.ui.fnt(0.022).render("Achievement earned", True, theme.GOLD)     # (the UI font has no Chinese)
+        title = self.ui.fnt(0.036).render(name, True, theme.GOLD_BRIGHT)
+        line = self.ui.fnt(0.022).render(how, True, theme.PARCHMENT)
+        y = (h - head.get_height() - title.get_height() - line.get_height()) // 2
+        for part in (head, title, line):
+            surf.blit(part, (x, y))
+            y += part.get_height()
+        return surf
+
+    def draw_achievement(self, screen, dt):
+        """Drops in at the top, holds, then fades: the next one waits its turn."""
+        banners = getattr(self, "_banners", None)
+        if not banners:
+            return
+        surf, age = banners[0]
+        age += dt
+        banners[0][1] = age
+        drop, hold, fade = 0.35, 3.5, 0.6
+        if age > drop + hold + fade:
+            banners.pop(0)
+            return
+        t = min(1.0, age / drop)
+        y = int(lerp(-surf.get_height(), BASE_H * 0.02, 1 - (1 - t) ** 3))
+        surf.set_alpha(None if age < drop + hold else int(255 * (1 - (age - drop - hold) / fade)))
+        screen.blit(surf, (BASE_W // 2 - surf.get_width() // 2, y))
 
     def draw_toast(self, screen, dt):
         """Slides in at the bottom-left, holds, then fades out."""

@@ -6,6 +6,7 @@ from core.platform import ANDROID
 from core.backgrounds import Backgrounds
 from core.settings import Settings
 from core.stats import Stats
+from core.achievements import Achievements
 from core.sound_manager import SoundManager
 from core.state_manager import StateManager
 from core.states.base_state import State
@@ -41,6 +42,8 @@ class App:
         self.hud = Hud(self)
         self.fx = Ambience(self)
         self.stats = Stats()
+        self.achievements = Achievements()        # (1.9)
+        self.achievements.on_earn = self.earned
         self.choose_file = files.ask      # the Save / Open dialog (tests swap in their own)
         self.net = None                   # an online session (core/net.py) while hosting or joining
         save_data.load(self)
@@ -135,6 +138,21 @@ class App:
             pygame.display.set_icon(icon)
         except Exception:
             return
+
+    def earned(self, key):
+        """An achievement has just been earned (1.9): its banner and chime.  It's saved at the next
+        quiet moment (saving takes a few ms, enough to jolt a rally)."""
+        self.renderer.show_achievement(key)
+        self.sound_manager.play("Match/achievement.wav", multiplier = 0.8)
+        self.save_soon = True
+
+    def rally_on(self):
+        """A point is being played on screen (here, or the friend's online)."""
+        state = self.state_manager.current()
+        if getattr(state, "NAME", "") == "guest_match":
+            return True
+        game = getattr(state, "game", None)
+        return bool(game and game.running and not game.paused and game.countdown is None)
 
     def apply_display_mode(self):
         if ANDROID:
@@ -562,6 +580,10 @@ class App:
 
         # ---------- Now-playing toast, then tooltips over everything ----------
         self.renderer.draw_toast(self.virtual, self.dt)
+        self.renderer.draw_achievement(self.virtual, self.dt)
+        if getattr(self, "save_soon", False) and not self.rally_on():
+            self.save_soon = False
+            save_data.save(self)              # (an achievement earned: see earned)
         self.renderer.tips.draw(self.virtual, self.dt)
 
         # ---------- Show FPS ----------

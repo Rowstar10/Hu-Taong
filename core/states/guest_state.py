@@ -202,12 +202,19 @@ class GuestMatchState(State):
         self.clock = None
         self.pending.clear()
         self.app.stats.new_match()
+        view = self.view
+        self.app.achievements.start(lambda: {self.my_side()}, lambda: (view.p1.score, view.p2.score))
         self.pred = None
         self.teleport_hold, self.teleport_claim = None, False
         self.history.clear()
         self.bounce = None
         self.calm()
         self.started = True
+
+    def my_side(self):
+        """Which side you play now (a Switch can hand you the other paddle)."""
+        net = self.net
+        return net.snaps[-1][2].get("guest", 2) if net is not None and net.snaps else 2
 
     def take_events(self):
         net = self.net
@@ -219,6 +226,7 @@ class GuestMatchState(State):
                     net.played = event[0]
                     self.pending.append((clock, event[1], event[2:]))
                     self.app.stats.tally(event[1], event[2:], self.view.kind)     # (your talisman stats, 1.9)
+                    self.app.achievements.event(event[1], event[2:], self.view.kind)    # (and achievements)
                     log = net.__dict__.setdefault("event_log", [])
                     log.append((clock, event[1], event[2:]))     # for the replay afterwards
                     del log[:-20000]
@@ -980,6 +988,11 @@ class GuestResultState(JukeboxControls, State):
         sound.set_mood("victory" if self.won else "defeat")
         app = self.app
         app.stats.record_online(self.won)
+        match = app.state_manager.get_state(GuestMatchState)
+        info = match.view.clip.info if match is not None and match.view is not None else {}
+        score = self.over.get("score", [0, 0])
+        app.achievements.match_over(self.won, lost_score = score[2 - self.side] if self.side in (1, 2) else 0,
+                                    court = info.get("court"), chaos = bool(info.get("chaos")), online = True)
         from core import save_data
         save_data.save(app)
         tint = "red" if self.over.get("winner") == 1 else "blue"

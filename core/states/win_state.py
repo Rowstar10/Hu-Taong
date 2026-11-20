@@ -35,6 +35,7 @@ class WinState(JukeboxControls, State):
             self.app.stats.record_online(not getattr(winner, "remote", False))
         elif not getattr(winner.game, "practice", False):     # (Practice counts for nothing: 1.9)
             self.app.stats.record_match(p1, winner, loser)
+        self.judge(winner, loser)
         save_data.save(self.app)
         if not winner.ai_enabled and loser.ai_enabled:
             sound_manager.play("you_win.wav")
@@ -151,6 +152,28 @@ class WinState(JukeboxControls, State):
             self.reel_shown = True
             if self.app.settings.interface.instant_replay in (2, 3) and self.reel():
                 self.watch("reel")
+
+    def judge(self, winner, loser):
+        """The achievements for how the match went (1.9).  Not Practice, and not computer v computer."""
+        game = winner.game
+        if getattr(game, "practice", False) or not hasattr(game, "you"):
+            return
+        net = getattr(game, "net", None)
+        humans = [p for p in (winner, loser) if not p.ai_enabled and not getattr(p, "remote", False)]
+        if not humans and not net:
+            self.app.achievements.watch = None
+            return
+        if net:
+            won = not getattr(winner, "remote", False)
+        elif len(humans) == 1:
+            won = humans[0] is winner
+        else:
+            won = None                          # two players on one keyboard
+        vs_ai = not net and len(humans) == 1
+        self.app.achievements.match_over(won, lost_score = loser.score,
+                                         ai_level = game.settings.ai_difficulty if vs_ai else None,
+                                         court = game.court.name, chaos = game.settings.mode_talisman_rush,
+                                         online = bool(net))
 
     def handle_event(self, event):
         if self.track_list:

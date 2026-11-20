@@ -162,6 +162,7 @@ class Recorder:
                 "switching": g.settings.switching,
                 "court": g.court.name, "strings": self.strings, "rows": ROWS,
                 "bench": 0 if getattr(g, "bench", None) is None else 1 if g.bench is g.p1 else 2,   # (1.9)
+                "chaos": bool(g.settings.mode_talisman_rush),                                      # (1.9)
                 "title": f"{datetime.datetime.now():%d %b %Y, %H:%M}"}
 
     def new_point(self):
@@ -313,6 +314,9 @@ class Recorder:
     def on_spawn(self, key):
         return self.event("spawn", KIND_KEYS.index(key))
 
+    def on_collapse(self):
+        return self.event("collapse")
+
     def on_hit(self, ball, paddle, data):
         p = self.point
         p["hits"] += 1
@@ -327,7 +331,7 @@ class Recorder:
         speed = math.hypot(ball.vx, ball.vy)                # the shot, as it leaves the paddle
         p["last_shot"] = (side, speed)
         self.shots.append(speed)
-        self.event("hit", side, (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2)
+        self.event("hit", side, (ball.x0 + ball.x1) / 2, (ball.y0 + ball.y1) / 2, round(speed))   # (speed: 1.9)
         # A save near your own goal, at full stretch: off the paddle's end or its very edge
         offset = abs(((ball.y0 + ball.y1) / 2 - (paddle.y0 + paddle.y1) / 2) / (paddle.height / 2))
         nx, ny = data["normal"]
@@ -336,6 +340,7 @@ class Recorder:
             near_goal = ((ball.x0 + ball.x1) / 2 < BASE_W * 0.3) if paddle.is_left else ((ball.x0 + ball.x1) / 2 > BASE_W * 0.7)
             if near_goal:
                 p["saves"].append((self.now, side, "end" if ny else "edge", p["hits"], incoming))
+                self.event("save", side)                    # (1.9: for the Great Save achievement)
 
     def on_bounce(self, ball, other):
         """Off a wall or a stone.  The event says what it was (match_sounds.surface: since 1.9, as a

@@ -20,8 +20,10 @@ class GameState(State):
         if not self.game:
             self.game = Hu_Taong(self.app)
             self.game.tally = self.app.stats.tally         # (the talisman stats, 1.9)
+            self.game.achieve = self.app.achievements.event
             self.app.stats.new_match()
             self.game.start()
+            self.watch()
 
     def exit(self, **kwargs):
         net = self.game.net if self.game else None
@@ -43,8 +45,14 @@ class GameState(State):
         sm.push_state("match_setup", mute = True)
         sm.push_state("online", mute = True, resume = "host")
 
+    def watch(self):
+        """The achievements follow this match (1.9)."""
+        game = self.game
+        self.app.achievements.start(game.you, lambda: (game.p1.score, game.p2.score))
+
     def restart(self):
         self.game.reset_game()
+        self.watch()
         self.last_total_score = 0
         if self.game.net:
             self.game.net.over = None

@@ -4,10 +4,11 @@ Every version of Hu Taong, newest first. Toki Hub shows each version's section o
 
 ## 1.9 — 2026-11-18
 
-A Practice mode, talisman stats, sounds for every surface the ball bounces off and for every talisman, computer players that go back round a ball that's got past them, a harder Hard and Insane, and three game modes renamed.
+A Practice mode, talisman stats, achievements, sounds for every surface the ball bounces off and for every talisman, computer players that go back round a ball that's got past them, a harder Hard and Insane, and three game modes renamed.
 
 ### Added
 - Practice, on Match Setup beside vs AI and vs Human: play on your own against a wall or the AI. You choose whether points count, and a talisman to practise with (only it turns up, even with Power-Ups off), or keep the talismans as set. Every other setting and mode works as usual, and nothing counts towards your stats. Against the wall, a miss counts against you and the match never ends; Soul Swap stays out, as there's no one to swap with.
+- 21 achievements, on an Achievements screen reached from Stats: from your first match and first win to beating an Insane AI, a 30-hit rally, a bank shot, every talisman taken, and a win on every court. A banner and a chime show when you earn one. Online matches count; Practice doesn't. Two players on one keyboard earn the ones that aren't about winning.
 - Talisman stats: point at a talisman on the Power-Ups page to see how many times it has turned up in your matches, how many times it was taken, and how often whoever took it won that point. Online matches count on each player's own stats; Practice doesn't count. The Stats screen's Export and Import carry them, and Reset Stats clears them.
 - The ball makes a sound off everything it bounces off: a light knock off the top and bottom of the court, stone off a tombstone, deep wood off a Ferry Gate, a plank off Narrow Pass's long walls, and a thud as a Twin Ball turns back from its own goal. The harder it's going, the louder.
 - Every talisman has its own pickup sound: a paper flutter and a short plucked tune. Boons climb, the Shrink Curse falls and Wilds twist about.

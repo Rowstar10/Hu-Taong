@@ -197,12 +197,23 @@ class Hu_Taong(GameBase):
     def on_spawn(self, key):
         self.recorder.on_spawn(key)
 
+    def on_collapse(self):
+        self.recorder.on_collapse()
+
     def noted(self, event):
-        """Every event recorded: the talisman stats count from them (1.9), when the match screen has
-        asked (`tally`), and not in Practice."""
-        tally = getattr(self, "tally", None)
-        if tally is not None and not self.practice:
-            tally(event[1], event[2:])
+        """Every event recorded: the talisman stats and the achievements count from them (1.9), when
+        the match screen has asked (`tally`, `achieve`), and not in Practice."""
+        if self.practice:
+            return
+        for listener in (getattr(self, "tally", None), getattr(self, "achieve", None)):
+            if listener is not None:
+                listener(event[1], event[2:])
+
+    def you(self):
+        """The sides (1 left, 2 right) played by someone here: no AI, not the friend online, not
+        sitting out.  (A Switch moves players and their AI between the paddles.)"""
+        return {1 if p is self.p1 else 2 for p in (self.p1, self.p2)
+                if not p.ai_enabled and not getattr(p, "remote", False) and p is not self.bench}
 
     def moment(self, kind, *values):
         """Something worth hearing (core/match_sounds.py): recorded, for replays and the friend's
