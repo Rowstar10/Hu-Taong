@@ -801,14 +801,17 @@ class UILayout:
 
     # ---------- Full-screen menus ----------
     def screen_menu(self, state, screen, builder, *, title, mark, reset=None, back=True, pinned=None,
-                    scroll=False):
-        """Title board, a lacquered panel holding the body, and a footer of Back and Reset.
+                    scroll=False, middle=(), right=None):
+        """Title board, a lacquered panel holding the body, and a footer: Back at the bottom left,
+        the page's own buttons (`middle`) in the middle, and Reset (or `right`) at the bottom right.
+        `middle` and `right` are (key, text, (colour, hover colour), tip).  (Back was in the middle
+        till Rowan's ask after 1.9's release: "move the back button to the bottom left".)
         `scroll` (1.9): rather than shrink past SCROLL_SCALE to fit, the body scrolls (the screen's
         state works it: core/states/scrolling.py).  `pinned(scale)`: a node that stays put at the
         top of the panel, over the scrolling part."""
         laid = getattr(state, "_laid", None)
         if laid is None:
-            laid = state._laid = self._fit_screen(builder, reset, back, pinned, scroll)
+            laid = state._laid = self._fit_screen(builder, reset, back, pinned, scroll, middle, right)
         body, footer, page = laid
 
         self._begin(state, screen)
@@ -823,7 +826,7 @@ class UILayout:
         for node in footer:
             node.draw(self)
 
-    def _fit_screen(self, builder, reset, back, pinned=None, scroll=False):
+    def _fit_screen(self, builder, reset, back, pinned=None, scroll=False, middle=(), right=None):
         p = self.PANEL
         top, bottom = p.top + self.PANEL_TOP, p.bottom - self.PANEL_BOTTOM
         page = None
@@ -857,15 +860,29 @@ class UILayout:
             body.place(page.x, view.top + self.gap // 2, page.w, body.h)
 
         footer = []
-
-        footer = []
         if back:
             node = Button("back", "Back", self.fnt(0.04), (theme.RED, theme.RED_HOVER))
             node.measure()
             node.w = max(node.w, 280)
-            node.place(0, self.FOOTER_Y - node.h // 2, BASE_W, node.h)
+            node.place(p.left, self.FOOTER_Y - node.h // 2, node.w, node.h)
             footer.append(node)
-        if reset:
+        if middle:
+            nodes = [Button(key, text, self.fnt(0.034), colours, tip=tip) for key, text, colours, tip in middle]
+            for node in nodes:
+                node.measure()
+            gap = 24
+            x = (BASE_W - sum(node.w for node in nodes) - gap * (len(nodes) - 1)) // 2
+            for node in nodes:
+                node.place(x, self.FOOTER_Y - node.h // 2, node.w, node.h)
+                x += node.w + gap
+            footer += nodes
+        if right:
+            key, text, colours, tip = right
+            node = Button(key, text, self.fnt(0.034), colours, tip=tip)
+            node.measure()
+            node.place(p.right - node.w, self.FOOTER_Y - node.h // 2, node.w, node.h)
+            footer.append(node)
+        elif reset:
             node = Button("reset_defaults", reset, self.fnt(0.034), (theme.WHITE, theme.WHITE_HOVER),
                           tip="Reset to Default\nEvery setting on this screen back to its default.")
             node.measure()

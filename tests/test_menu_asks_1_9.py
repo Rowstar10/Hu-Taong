@@ -40,9 +40,9 @@ class Order(unittest.TestCase):
     def test_achievements_next_to_replays(self):
         boxes = open_screen("stats").ui_hitboxes
         replays, achievements = boxes["open_replays"], boxes["open_achievements"]
-        others = [boxes[k] for k in ("export_stats", "import_stats", "reset_stats")]
         self.assertLess(replays.left, achievements.left)
-        self.assertTrue(all(achievements.left < r.left for r in others), "right after Replays")
+        self.assertEqual(replays.centery, achievements.centery, "side by side")
+        # (the others left the panel for the footer after 1.9's release: tests/test_back_bottom_left.py)
 
     def test_controls_to_the_right_of_ui(self):
         boxes = open_screen("settings").ui_hitboxes

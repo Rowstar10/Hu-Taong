@@ -75,7 +75,8 @@ class ModesView(unittest.TestCase):
         boxes = open_modes().ui_hitboxes
         switch, back = boxes["switch_view"], boxes["back"]
         self.assertLess(abs(switch.centery - back.centery), 3)
-        self.assertLess(switch.right, back.left, "to its left")
+        # (in the footer's middle, right of Back at the bottom left, since after 1.9's release)
+        self.assertGreater(switch.left, back.right, "to its right")
 
     def test_all_on_all_off(self):
         page = open_modes()

@@ -1075,13 +1075,14 @@ class Renderer:
 
         ui.screen_menu(state, screen, build, title="对局 Match Setup", mark="战")
 
-        # Match Settings at the bottom left and Start Match at the bottom right, level with Back
-        # (Rowan, 1.9), one width
+        # Start Match in the middle and Match Settings at the bottom right, level with Back at the
+        # bottom left, one width (Rowan, after 1.9's release: "the back button to swap with match
+        # settings"; till then Match Settings was at the left, Back in the middle, Start Match right)
         font = self.fnt(0.04)
         w = max(280, max(font.size(t)[0] for t in ("Match Settings", "Start Match")) + 2 * self._gx)
         mouse = self.mouse()
-        for key, text, colour, x in (("open_match_settings", "Match Settings", theme.BLUE, ui.PANEL.left + w // 2),
-                                     ("start_match", "Start Match", theme.ORANGE, ui.PANEL.right - w // 2)):
+        for key, text, colour, x in (("start_match", "Start Match", theme.ORANGE, BASE_W // 2),
+                                     ("open_match_settings", "Match Settings", theme.BLUE, ui.PANEL.right - w // 2)):
             rect = self.draw_button(screen, mouse, font, text, x, ui.FOOTER_Y, colour, width=w)
             self.tips.offer(rect, TIPS[key])
             state.ui_hitboxes[key] = rect
@@ -1493,15 +1494,19 @@ class Renderer:
         cards = (("match", "战", "Match", "jade"), ("display", "画", "Display", "amber"),
                  ("audio", "音", "Audio", "azure"), ("interface", "界", "UI", "crimson"),
                  ("gameplay", "控", "Controls", "ink"))          # (Controls after UI: Rowan, 1.9)
-        if not in_match(self.app) or (net is not None and getattr(net, "role", None) == "guest"):
+        # (nor opened by Match settings' More Settings: your own settings only, as from the main menu)
+        if not in_match(self.app) or (net is not None and getattr(net, "role", None) == "guest") or \
+                getattr(state, "general", False):
             cards = cards[1:]
         w, gap = 300, 34
         left = (BASE_W - (len(cards) * w + (len(cards) - 1) * gap)) // 2
         for i, (key, mark, label, finish) in enumerate(cards):
             self.draw_card(state, screen, mouse_pos, key, left + i * (w + gap), mark, label, finish, w=w)
 
+        # Back at the bottom left, Export and Import in the middle, Reset All at the right (Rowan, after
+        # 1.9's release: Back was in the middle, Export and Import at the left)
         back_rect = self.draw_button(screen, mouse_pos, self.fnt(0.04), "Back",
-                                     BASE_W // 2, ui.FOOTER_Y, theme.RED, width=280)
+                                     ui.PANEL.left + 140, ui.FOOTER_Y, theme.RED, width=280)
         font = self.fnt(0.034)
         text = "Reset All Settings"
         w = font.size(text)[0] + 2 * self._gx
@@ -1509,10 +1514,11 @@ class Renderer:
                                       ui.FOOTER_Y, theme.WHITE, width=w)
         self.tips.offer(reset_rect, TIPS["reset_all"])
 
-        # Export and import every setting (1.9), at the other end of the footer
-        x = ui.PANEL.left
-        for key, text, colour in (("export_settings", "Export", theme.GREEN), ("import_settings", "Import", theme.BLUE)):
-            w = font.size(text)[0] + 2 * self._gx
+        # Export and import every setting (1.9)
+        pair = (("export_settings", "Export", theme.GREEN), ("import_settings", "Import", theme.BLUE))
+        widths = [font.size(text)[0] + 2 * self._gx for _, text, _ in pair]
+        x = (BASE_W - sum(widths) - 24) // 2
+        for (key, text, colour), w in zip(pair, widths):
             rect = self.draw_button(screen, mouse_pos, font, text, x + w // 2, ui.FOOTER_Y, colour, width=w)
             self.tips.offer(rect, TIPS[key])
             state.ui_hitboxes[key] = rect
@@ -1622,8 +1628,12 @@ class Renderer:
             return Grid(rows, gap_x=self.column_gap(s, 0.015), gap_y=self.vgap(ui, s, 1.6))
 
         pinned = (lambda s: Text(state.note, self.row_font(ui, s), theme.FLAME)) if state.note else None
+        # More Settings in the footer's middle: your own settings (Display, Audio, UI, Controls), as
+        # from the main menu (Rowan, after 1.9's release)
+        more = ("more_settings", "More Settings", (theme.ORANGE, theme.ORANGE_HOVER),
+                "More Settings\nYour own settings: Display, Audio, UI and Controls.")
         ui.screen_menu(state, screen, build, title="对局 Match", mark="战", reset="Reset to Default",
-                       pinned=pinned, scroll=True)
+                       pinned=pinned, scroll=True, middle=[more])
 
     OPPONENTS = ["Practice Mode", "Multiplayer"]
 
@@ -1856,8 +1866,8 @@ class Renderer:
         font = self.fnt(0.034)
         text = "Switch to Talismans" if modes else "Switch to Modes"
         w = font.size("Switch to Talismans")[0] + 2 * self._gx       # (one width, whichever it says)
-        rect = self.draw_button(screen, self.mouse(), font, text, ui.PANEL.left + w // 2, ui.FOOTER_Y, theme.ORANGE,
-                                width=w)
+        # (in the footer's middle: Back took the bottom left, after 1.9's release)
+        rect = self.draw_button(screen, self.mouse(), font, text, BASE_W // 2, ui.FOOTER_Y, theme.ORANGE, width=w)
         self.tips.offer(rect, TIPS["switch_to_talismans" if modes else "switch_to_modes"])
         state.ui_hitboxes["switch_view"] = rect
 
@@ -2030,8 +2040,9 @@ class Renderer:
             pygame.draw.rect(screen, theme.GOLD_BRIGHT if hovered else theme.GOLD, handle.inflate(-6, -6), border_radius=6)
             state.ui_hitboxes["scrollbar"] = state.track
 
+        # (at the bottom left, under the panel's left edge: after 1.9's release; in the middle till then)
         state.ui_hitboxes["back"] = self.draw_button(screen, mouse_pos, self.fnt(0.036), "Back",
-                                                     BASE_W // 2, 1036, theme.RED, width=260)
+                                                     54 + 130, 1036, theme.RED, width=260)
 
     # ── Audio settings ─────────────────────────────────────────────────────────
 
@@ -2205,17 +2216,17 @@ class Renderer:
             buttons = Stack([Button("open_replays", "Replays", sm, (theme.ORANGE, theme.ORANGE_HOVER),
                                     tip=TIPS["open_replays"]),
                              Button("open_achievements", "Achievements", sm, (theme.ORANGE, theme.ORANGE_HOVER),
-                                    tip="Achievements\nThe 21 achievements: the ones you've earned, and how to earn the rest."),
-                             Button("export_stats", "Export Stats", sm, (theme.GREEN, theme.GREEN_HOVER),
-                                    tip=TIPS["export_stats"]),
-                             Button("import_stats", "Import Stats", sm, (theme.BLUE, theme.BLUE_HOVER),
-                                    tip=TIPS["import_stats"]),
-                             Button("reset_stats", "Reset Stats", sm, (theme.RED, theme.RED_HOVER),
-                                    tip=TIPS["reset_stats"])],
+                                    tip="Achievements\nThe 21 achievements: the ones you've earned, and how to earn the rest.")],
                             vertical=False, gap=int(BASE_W * 0.015 * s), uniform=True)
             return Stack([table, buttons], gap=self.vgap(ui, s, 1.4))
 
-        ui.screen_menu(state, screen, build, title="战绩 Stats", mark="绩")
+        # Export and Import in the footer's middle and Reset Stats at its right, out of the panel,
+        # with Back at the bottom left; Replays and Achievements stay in it (Rowan, after 1.9's
+        # release: all five were in a row in the panel, Back in the footer's middle)
+        middle = [("export_stats", "Export Stats", (theme.GREEN, theme.GREEN_HOVER), TIPS["export_stats"]),
+                  ("import_stats", "Import Stats", (theme.BLUE, theme.BLUE_HOVER), TIPS["import_stats"])]
+        right = ("reset_stats", "Reset Stats", (theme.RED, theme.RED_HOVER), TIPS["reset_stats"])
+        ui.screen_menu(state, screen, build, title="战绩 Stats", mark="绩", middle=middle, right=right)
 
     def draw_achievements_menu(self, state, screen):
         """Every achievement (1.9): a red seal for those earned (with the day), a grey one for the
@@ -2692,7 +2703,9 @@ class Renderer:
             x -= 34
 
     def draw_toast(self, screen, dt):
-        """Slides in at the bottom-left, holds, then fades out."""
+        """Slides in at the bottom-left, holds, then fades out.  Over a menu it's at the top-left
+        instead: the menus' Back button is at the bottom left (after 1.9's release), and the toast
+        hid it."""
         if self._toast is None:
             return
         surf, age = self._toast[0], self._toast[1]
@@ -2705,7 +2718,9 @@ class Renderer:
         t = min(1.0, age / slide)
         x = int(lerp(-surf.get_width(), BASE_W * 0.02, 1 - (1 - t) ** 3))
         surf.set_alpha(255 if age < slide + hold else int(255 * (1 - (age - slide - hold) / fade)))
-        screen.blit(surf, (x, BASE_H - surf.get_height() - int(BASE_H * 0.03)))
+        menu = getattr(self.app.state_manager.current(), "is_menu", False)
+        y = int(BASE_H * 0.03) if menu else BASE_H - surf.get_height() - int(BASE_H * 0.03)
+        screen.blit(surf, (x, y))
 
     # ── Game world ─────────────────────────────────────────────────────────────
 

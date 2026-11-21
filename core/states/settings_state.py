@@ -7,6 +7,10 @@ class SettingsState(State):
     NAME = "settings"
     is_menu = True
 
+    def __init__(self, app, general = False):
+        super().__init__(app)
+        self.general = general        # opened by Match settings' More Settings: no Match card (after 1.9)
+
     # ---------------- Export and import (1.9) ----------------
 
     KINDS = [("Hu Taong settings", "*.json")]

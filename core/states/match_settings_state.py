@@ -70,6 +70,8 @@ class MatchSettingsState(Scrolling, MatchControls, State):
                 self.push_state("powerups", view = "modes")
             if key == "open_ball_paddles":
                 self.push_state("ball_paddles")
+            if key == "more_settings":                  # your own settings, as from the main menu (after 1.9)
+                self.push_state("settings", general = True)
             if key == "reset_defaults":
                 if self.note:                   # mid-match: this match's rules
                     self.confirm_reset("Reset this match's settings?", m.reset)

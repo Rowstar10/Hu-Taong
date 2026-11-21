@@ -73,8 +73,10 @@ class Layouts(unittest.TestCase):
         self.assertLess(abs(body.centerx - BASE_W // 2), 3, "the two centred together")
         back, more, start = boxes["back"], boxes["open_match_settings"], boxes["start_match"]
         self.assertEqual((more.centery, start.centery), (back.centery, back.centery), "level with Back")
-        self.assertLess(more.right, back.left)
-        self.assertGreater(start.left, back.right)
+        # (after 1.9's release, Rowan: Back at the bottom left, Start Match in the middle and Match
+        # Settings at the right; see tests/test_back_bottom_left.py)
+        self.assertLess(back.right, start.left)
+        self.assertLess(start.right, more.left)
         self.assertEqual(more.size, start.size, "one size")
 
     def test_still_practice_mode(self):

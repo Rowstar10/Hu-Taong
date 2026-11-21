@@ -213,7 +213,8 @@ class Menus(Base):
         show("settings")
         nav.active, nav.via, nav.key = True, "pad", "back"
         press("dpad_down")
-        self.assertIn(nav.key, ("audio", "interface"), "down from the bottom: the top, in line with it")
+        # (Back is at the bottom left since after 1.9's release, so the card in line with it is Display)
+        self.assertEqual(nav.key, "display", "down from the bottom: the top, in line with it")
         press("dpad_up")
         self.assertEqual(nav.key, "back", "up from the top: the bottom")
         nav.key = "gameplay"                       # (Controls, the last card since 1.9)

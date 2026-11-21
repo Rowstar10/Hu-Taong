@@ -26,7 +26,7 @@ from core.touch import TouchControls                            # noqa: E402
 PAGES = [("gameplay",), ("display",), ("audio",), ("interface",), ("match",), ("match", "ball_paddles"),
          ("match", "powerups"), ("match", ("powerups", {"view": "modes"})), ("game", "pause", "match")]
 nav = app.navigator
-FOOTER = ("back", "reset_defaults", "scrollbar", "switch_view")
+FOOTER = ("back", "reset_defaults", "scrollbar", "switch_view", "more_settings")
 
 
 def squeezed():
@@ -313,13 +313,15 @@ class Scrolling(Squeezed):
         for _ in range(8):              # down again: on down the page to Back or Reset, never round to the top
             before = nav.targets()[nav.key].top
             nav.move(0, 1, via = "pad")
-            if nav.key in ("back", "reset_defaults"):
+            if nav.key in ("back", "reset_defaults", "more_settings"):
                 break
             self.assertGreater(nav.targets()[nav.key].top, before)
-        self.assertIn(nav.key, ("back", "reset_defaults"))
+        self.assertIn(nav.key, ("back", "reset_defaults", "more_settings"))
         nav.key = "open_modes"                      # the last control on the page, out of sight
         nav.move(0, 1, via = "pad")
-        self.assertIn(nav.key, ("back", "reset_defaults"), "down from it: Back or Reset, not up the page")
+        # (More Settings joined the footer, in its middle, after 1.9's release)
+        self.assertIn(nav.key, ("back", "reset_defaults", "more_settings"),
+                      "down from it: the footer, not up the page")
 
 
 class FromThePauseMenu(Squeezed):

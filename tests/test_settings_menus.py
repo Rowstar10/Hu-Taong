@@ -34,7 +34,8 @@ MATCH_KEYS = ("toggle_mode_", "cycle_mode_chaos", "cycle_mode_switch", "cycle_wi
               "toggle_lantern_night", "cycle_chaos_mode", "cycle_chaos_switch", "cycle_physics", "toggle_speed_cap")
 PERSONAL = ("gameplay", "display", "audio", "interface")
 FOOTER = ("back", "reset_defaults", "reset_all",
-          "open_match_settings", "start_match")         # (Match Setup's, by Back since later in 1.9)
+          "open_match_settings", "start_match",         # (Match Setup's, by Back since later in 1.9)
+          "more_settings")                              # (Match settings', after 1.9's release)
 
 
 def open_screen(name):
