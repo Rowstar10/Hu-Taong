@@ -210,9 +210,10 @@ class Settings(unittest.TestCase):
     def tearDown(self):
         m.reset()
 
-    def test_current_and_no_cap_by_default(self):
+    def test_current_and_the_cap_by_default(self):
+        """(The Speed Cap on by default since Rowan's 1.9 list.)"""
         m.reset()
-        self.assertEqual((m.physics, m.speed_cap), (engines.CURRENT, False))
+        self.assertEqual((m.physics, m.speed_cap), (engines.CURRENT, True))
         self.assertEqual(m.PHYSICS, ("Current", "Classic", "v0.9"))
 
     def test_saved(self):
@@ -233,12 +234,13 @@ class Settings(unittest.TestCase):
         m.physics, m.speed_cap = engines.CLASSIC, True
         m.reset()
         save_data.load(app)
-        self.assertEqual((m.physics, m.speed_cap), (engines.CURRENT, False))
+        # Current, as before; the Speed Cap, which 1.7 never had, is on as it is for anyone new (1.9)
+        self.assertEqual((m.physics, m.speed_cap), (engines.CURRENT, True))
 
     def test_from_the_next_serve(self):
         court = Court(engines.CURRENT)
         try:
-            m.physics = engines.CLASSIC
+            court.game.rules.physics = engines.CLASSIC              # (this match's own rules, since 1.9)
             self.assertEqual(court.game.settings.physics, engines.CURRENT, "not mid-rally")
             court.game.reset_round()
             self.assertEqual(court.game.settings.physics, engines.CLASSIC)

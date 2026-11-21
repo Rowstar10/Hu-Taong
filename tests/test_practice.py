@@ -9,6 +9,7 @@ Scoring (On or Off).  Against the AI with scoring on it's the old vs AI, a real 
 against the wall or with scoring off it's practice, which counts for nothing.  Against the wall,
 the other end of the court is a wall (the other paddle sits out), so the ball always comes back;
 with scoring on it counts your misses and never ends.  Online, a host's own choices are ignored.
+(Later in 1.9 Scoring became Goals, a rule of any match, in Match Settings: tests/test_goals_off.py.)
 """
 import json
 import unittest
@@ -64,13 +65,13 @@ class MatchSetup(unittest.TestCase):
         self.assertFalse(any("practice_talisman" in key for key in screen.ui_hitboxes), "no talisman picker")
         self.assertFalse(hasattr(m, "practice") or hasattr(m, "practice_talisman"))
         from render.renderer import TIPS
-        self.assertTrue(TIPS["opponent_ai"].startswith("Practice vs AI\n"))
+        self.assertTrue(TIPS["opponent_ai"].startswith("Practice Mode\n"))      # ("Practice vs AI" earlier in 1.9)
         self.assertNotIn("opponent_practice", TIPS)
 
-    def test_the_two_choices_show_with_practice_vs_ai(self):
+    def test_the_choice_shows_with_practice_mode(self):
         m.reset()
         screen = open_screen("match_setup")
-        for key in ("practice_ai", "practice_wall", "practice_scoring_on", "practice_scoring_off"):
+        for key in ("practice_ai", "practice_wall"):
             self.assertIn(key, screen.ui_hitboxes)
         self.assertEqual((m.vs_wall, m.scoring), (False, True), "by default, the old vs AI")
 
@@ -81,18 +82,14 @@ class MatchSetup(unittest.TestCase):
         self.assertTrue(m.vs_wall)
         click(screen, "practice_ai")
         self.assertFalse(m.vs_wall)
-        click(screen, "practice_scoring_off")
-        self.assertFalse(m.scoring)
-        click(screen, "practice_scoring_on")
-        self.assertTrue(m.scoring)
 
-    def test_greyed_out_for_vs_human(self):
+    def test_the_wall_greyed_out_for_multiplayer(self):
+        """(Goals are for any match since Rowan's next ask: tests/test_goals_off.py.)"""
         m.reset()
         m.vs_ai = False
         screen = open_screen("match_setup")
         click(screen, "practice_wall")
-        click(screen, "practice_scoring_off")
-        self.assertEqual((m.vs_wall, m.scoring), (False, True), "they only matter against the AI")
+        self.assertFalse(m.vs_wall, "the wall only matters against the AI")
 
     def test_saved(self):
         m.reset()
@@ -173,15 +170,49 @@ class Scoring(unittest.TestCase):
         self.g.stop()
         m.reset()
 
-    def test_scoring_off_nobody_scores(self):
+    def test_goals_off_the_rally_never_ends(self):
+        """Rowan, 1.9: "the toggle for scoring works the wrong way.  At the moment it still scores and
+        ends the rally ... What I want it to do is completely turn off the ability to score, so that
+        the rally never ends."  Goals OFF: both ends are walls, and the ball always comes back."""
         self.g = g = practice(scoring = False, powerups = False)
         self.assertTrue(g.p2.ai_enabled)
         self.assertTrue(g.practice)
-        g.p1.y0, g.p1.y1 = 0, g.p1.height
+        self.assertEqual(g.closed, {"left", "right"})
+        g.p1.y0, g.p1.y1 = 0, g.p1.height                       # (Red well out of the way)
         send(g, 300, -1600, y = 980)
-        self.assertTrue(run(g, 1.5, lambda: bool(g.message_text)))
+        self.assertTrue(run(g, 1.0, lambda: g.ball.vx > 0), "off Red's end and back")
+        self.assertGreater(g.ball.x0, Hu_Taong.PRACTICE_WALL - 2)
         self.assertEqual((g.p1.score, g.p2.score), (0, 0))
-        self.assertIn("not counted", g.message_text)
+        self.assertEqual(g.message_text, "", "no goal, no new serve: the rally goes on")
+        self.assertIsNone(g.countdown)
+        g.p2.ai_enabled = False
+        g.p2.y0, g.p2.y1 = 0, g.p2.height
+        send(g, BASE_W - 300, 1600, y = 980)
+        self.assertTrue(run(g, 1.0, lambda: g.ball.vx < 0), "and off Blue's")
+        self.assertEqual((g.p1.score, g.p2.score), (0, 0))
+
+    def test_scoring_off_hides_the_scores(self):
+        """Rowan, 1.9: "In Practice Mode, if scoring is turned off, hide the scores at the top of the
+        screen."  (A replay of it says so in place of a score.)"""
+        drawn = []
+        real = app.hud.draw_score
+        app.hud.draw_score = lambda *a, **k: drawn.append(a)
+        try:
+            from core.states.game_state import GameState
+            state = GameState(app)
+            self.g = g = practice(scoring = False, powerups = False)
+            app.hud.draw(state, app.virtual, g)
+            self.assertEqual(drawn, [], "no scores")
+            g.stop()
+            self.g = g = practice(powerups = False)
+            app.hud.draw(state, app.virtual, g)
+            self.assertEqual(len(drawn), 2, "scoring on: both scores, as ever")
+        finally:
+            app.hud.draw_score = real
+        for _ in range(30):
+            g.update(1 / 120)
+            g.recorder.capture(1 / 120)
+        self.assertFalse(ReplayView(g.recorder.clip(), app).scoreless)
 
     def test_against_the_ai_with_scoring_on_is_the_old_vs_ai(self):
         self.g = g = practice(powerups = True)
@@ -190,9 +221,9 @@ class Scoring(unittest.TestCase):
         self.assertTrue(g.p2.ai_enabled)
         self.assertIn(g.p2, g.objects)
 
-    def test_vs_human_ignores_them(self):
-        """(Saved choices from Practice vs AI don't follow you into vs Human.)"""
-        self.g = g = practice(vs_ai = False, vs_wall = True, scoring = False, powerups = False)
+    def test_multiplayer_ignores_the_wall(self):
+        """(A saved wall from Practice Mode doesn't follow you into Multiplayer.)"""
+        self.g = g = practice(vs_ai = False, vs_wall = True, powerups = False)
         self.assertFalse(g.practice or g.scoreless)
         self.assertIsNone(g.bench)
         self.assertFalse(g.p1.ai_enabled or g.p2.ai_enabled)
@@ -256,7 +287,7 @@ class NotOnline(unittest.TestCase):
         """Practice is your own: hosting, the match is a real one whatever you'd picked."""
         from core.net import HostSession
         m.reset()
-        m.vs_wall, m.scoring = True, False
+        m.vs_wall = True                                          # (Goals are the host's to set: test_goals_off)
         app.net = HostSession(app, port = 0, upnp = False)       # (on this PC only: no public servers)
         try:
             g = Hu_Taong(app)

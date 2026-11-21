@@ -28,10 +28,12 @@ RATE = 60                    # frames a second
 MOST_FRAMES = RATE * 60 * 30 # half an hour; a longer match keeps its last half hour
 MAGIC = b"HUTAONG-REPLAY 1\n"
 KIND_KEYS = [kind.key for kind in KINDS]
-ROWS = 5        # the rows' layout: 2 from 1.7 (each portal's size), 3 from 1.8 (each portal's flash, and
+ROWS = 6        # the rows' layout: 2 from 1.7 (each portal's size), 3 from 1.8 (each portal's flash, and
                 # the blue ball's visibility), 4 from 1.8's second playtest (each black hole's size, and how
                 # far it has collapsed), 5 from 1.9 (the wind's push across, at the very end: older readers
-                # stop before it and see the wind blow only up or down); none said in a header means 1
+                # stop before it and see the wind blow only up or down), 6 from 1.9 too (each row's state says which
+                # ends are walls and which paddle sits out: Practice Mode's choices can change mid-match);
+                # none said in a header means 1
 NO_AIM = 9.0                        # (Sticky Goo's aim, in a row, when it hasn't locked: 1.8)
 HOLE_FIELDS = 10                    # a black hole's numbers in a row (1.8; 15 in layout 3)
 RENAMED = {"chaos": "shape"}        # power-ups since renamed: Chaos Mode + is Shape Shift (1.6)
@@ -163,6 +165,7 @@ class Recorder:
                 "switching": g.settings.switching,
                 "court": g.court.name, "strings": self.strings, "rows": ROWS,
                 "bench": 0 if getattr(g, "bench", None) is None else 1 if g.bench is g.p1 else 2,   # (1.9)
+                "scoreless": bool(getattr(g, "scoreless", False)),     # Practice Mode, scoring off (1.9)
                 "chaos": bool(g.settings.mode_talisman_rush),                                      # (1.9)
                 "title": f"{datetime.datetime.now():%d %b %Y, %H:%M}"}
 
@@ -212,6 +215,12 @@ class Recorder:
         flags |= 8 if last is g.p1 else 16 if last is g.p2 else 0
         state = (1 if g.wall_up else 0) | (2 if g.p1.ai_enabled else 0) | (4 if g.p2.ai_enabled else 0)
         state |= 512 if g.p1.colour == "blue" else 0                        # 1.7: a Switch gave Blue the left paddle
+        # 1.9 (layout 6): which ends are walls, which paddle sits out, and whether goals are off
+        closed = getattr(g, "closed", ())
+        state |= (1024 if "left" in closed else 0) | (2048 if "right" in closed else 0)
+        bench = getattr(g, "bench", None)
+        state |= 4096 if bench is not None and bench is g.p1 else 8192 if bench is not None else 0
+        state |= 16384 if getattr(g, "scoreless", False) else 0
         cd = g.countdown
         message = 0 if not g.message_text else (1 if g.message_text.startswith("Red") else 2)
         if message and g.message_text.endswith("x2"):
@@ -625,12 +634,15 @@ class ReplayView:
         self.extra_balls = []           # Twin Balls' blue ball
         bench = info.get("bench", 0)    # Practice against the wall (1.9): that side's paddle sits out
         self.bench = self.p1 if bench == 1 else self.p2 if bench == 2 else None
+        self.scoreless = bool(info.get("scoreless", False))     # (no scores shown: 1.9)
+        # the ends that are walls (layout 6's rows say, row by row; before, only a bench's)
+        self.closed = {"left" if self.bench is self.p1 else "right"} if self.bench is not None else set()
         self.powerups = ViewPowerUps(self)
         self.stones = []
         self.objects = []
         self.remap = info.get("remap")
         self.strings = info.get("strings", [])
-        rows = info.get("rows", 1)
+        rows = self.rows = info.get("rows", 1)
         self.portal_fields = 5 if rows >= 3 else 4 if rows >= 2 else 3     # 1.6's: no size; 1.7's: no flash
         self.extra_fields = 8 if rows >= 3 else 7                           # 1.7's blue ball: no visibility
         self.hole_fields = HOLE_FIELDS if rows >= 4 else 15                 # (layout 3's had arrows)
@@ -677,6 +689,10 @@ class ReplayView:
         self.wall_up = bool(state & 1)
         self.p1.ai_enabled, self.p2.ai_enabled = bool(state & 2), bool(state & 4)
         self.p1.color1, self.p2.color1 = ("Blue", "Red") if state & 512 else ("Red", "Blue")
+        if self.rows >= 6:                   # (1.9: Practice Mode's choices, row by row)
+            self.closed = {side for side, bit in (("left", 1024), ("right", 2048)) if state & bit}
+            self.bench = self.p1 if state & 4096 else self.p2 if state & 8192 else None
+            self.scoreless = bool(state & 16384)
         self.countdown = _Countdown(a[20], int(a[21])) if a[20] >= 0 else None
         message = int(a[22])
         red = message in (1, 3)

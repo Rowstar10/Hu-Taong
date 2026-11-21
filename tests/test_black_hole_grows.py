@@ -379,7 +379,7 @@ class InABlackHoleMatch(Match):
         self.assertFalse(self.pu.spawnable(BY_KEY["hole"]))
 
     def test_switched_off_mid_match_it_goes_at_the_next_serve(self):
-        m.mode_black_hole = False
+        self.game.rules.mode_black_hole = False                   # (this match's own rules, since 1.9)
         self.next_point()
         self.assertEqual(self.pu.holes, [])
 

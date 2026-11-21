@@ -331,6 +331,8 @@ class OnlineState(MatchControls, State):
                 self.app.settings.match.online_host_blue = False
             elif key == "host_blue":
                 self.app.settings.match.online_host_blue = True
+            elif key == "toggle_goals" and self.mode == "host":        # Goals ON/OFF, online too (1.9)
+                self.app.settings.match.scoring = not self.app.settings.match.scoring
             elif key == "paste_code":
                 self.paste()
             elif key == "join_now":

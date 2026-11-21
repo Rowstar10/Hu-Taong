@@ -2,17 +2,19 @@ import pygame
 
 from core.states.base_state import State
 from core.states.game_state import GameState
-from core.states.match_controls import MatchControls
+from core.states.match_controls import MatchControls, match_rules
 from core.states.scrolling import Scrolling
 
 class MatchSettingsState(Scrolling, MatchControls, State):
-    """Settings > Match: the rules of a match, the same for both players.  Online only the host
-    has it (its rules are the match's); opened mid-match, changes come in at the next serve.
-    (1.9: it scrolls, where the screen is too small for it at a size that reads.)"""
+    """Match settings: the rules of a match, the same for both players.  Opened from Match Setup
+    (or the hosting screen), the rules every new match starts from; from Pause > Settings, that
+    match's only, from its next serve (1.9: the main menu's Settings has no Match card).  Online
+    only the host has it (its rules are the match's).  (1.9: it scrolls, where the screen is too
+    small for it at a size that reads.)"""
     NAME = "match"
     is_menu = True
 
-    IN_MATCH_NOTE = "Changes come in at the next serve"
+    IN_MATCH_NOTE = "This match only: changes come in at the next serve"     # (this match only: 1.9)
 
     def __init__(self, app):
         super().__init__(app)
@@ -26,7 +28,7 @@ class MatchSettingsState(Scrolling, MatchControls, State):
         if self.scroll_event(event):
             return
         super().handle_event(event)
-        m = self.app.settings.match
+        m = match_rules(self.app)
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.pop_state()
@@ -50,11 +52,28 @@ class MatchSettingsState(Scrolling, MatchControls, State):
             if key in toggles:
                 setattr(m, toggles[key], not getattr(m, toggles[key]))
 
+            # Players (1.9): Match Setup's choices; the wall and your paddle are Practice Mode's.  Goals
+            # is a rule of any match, Multiplayer and online too
+            if key == "toggle_goals":
+                m.scoring = not m.scoring
+            if key in ("cycle_opponent_left", "cycle_opponent_right"):
+                m.vs_ai = not m.vs_ai
+            elif m.vs_ai:
+                if key in ("cycle_against_left", "cycle_against_right"):
+                    m.vs_wall = not m.vs_wall
+                if key in ("cycle_your_paddle_left", "cycle_your_paddle_right"):
+                    m.play_as_blue = not m.play_as_blue
+
             if key == "open_powerups":
                 self.push_state("powerups")
+            if key == "open_modes":                     # (the same page, on its Modes view: Rowan, 1.9)
+                self.push_state("powerups", view = "modes")
             if key == "open_ball_paddles":
                 self.push_state("ball_paddles")
             if key == "reset_defaults":
-                self.confirm_reset("Reset match settings?", self.app.reset_match_settings)
+                if self.note:                   # mid-match: this match's rules
+                    self.confirm_reset("Reset this match's settings?", m.reset)
+                else:
+                    self.confirm_reset("Reset match settings?", self.app.reset_match_settings)
             if key == "back":
                 self.pop_state()

@@ -107,6 +107,8 @@ class DisplaySettingsState(State):
                 settings.max_fps = (settings.max_fps + 1) % len(settings.max_fps_options)
             if key == "toggle_show_fps":
                 settings.show_fps = not settings.show_fps
+            if key == "toggle_show_ping":
+                settings.show_ping = not settings.show_ping
                 
             if key == "dim_slider":
                 self.dragging_dim = True

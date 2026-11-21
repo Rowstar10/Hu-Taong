@@ -50,7 +50,8 @@ class Hud:
             return
 
         left, right = 5 * BASE_W // 16, 11 * BASE_W // 16
-        if live:                                 # a replay shows its score in its own bar instead
+        scored = not getattr(game, "scoreless", False)     # (Practice Mode, scoring off: no scores shown, 1.9)
+        if live and scored:                      # a replay shows its score in its own bar instead
             finish = {"red": "crimson", "blue": "azure"}              # each player's colour, wherever they play
             self.draw_score(screen, "p1", p1.score, left, finish[p1.colour])
             self.draw_score(screen, "p2", p2.score, right, finish[p2.colour])
@@ -64,7 +65,7 @@ class Hud:
             self.draw_owner(screen, p2, right)
 
         if powerups:
-            if live and "double" in court_keys:        # Double or Nothing: a big x2 by both scores
+            if live and scored and "double" in court_keys:     # Double or Nothing: a big x2 by both scores
                 self.draw_double(screen, left - 130)
                 self.draw_double(screen, right + 130)
             wx, wy = powerups.wind_vector() if hasattr(powerups, "wind_vector") else (0.0, 0.0)

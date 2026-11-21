@@ -48,8 +48,9 @@ class CourtDimSlider(unittest.TestCase):
         self.screen.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button = 1, pos = (x / app.sx, y / app.sy)))
         self.assertAlmostEqual(display.court_dim_level, 0.2, delta = 0.05)
 
-    def test_the_default_is_as_dark_as_the_old_medium(self):
-        self.assertAlmostEqual(display.court_dim_level, 100 / 255)
+    def test_the_default_is_half(self):
+        """(As dark as the old Medium, 39%, until Rowan's 1.9 list: 0% or 50%.)"""
+        self.assertAlmostEqual(display.court_dim_level, 0.5)
 
 
 class DarkensMatches(unittest.TestCase):
@@ -95,7 +96,7 @@ class OldSaves(unittest.TestCase):
 
     def test_nonsense_is_ignored(self):
         self.load_display({"court_dim": 9})
-        self.assertAlmostEqual(display.court_dim_level, 100 / 255)
+        self.assertAlmostEqual(display.court_dim_level, 0.5)
         self.load_display({"court_dim_level": 7})
         self.assertEqual(display.court_dim_level, 1, "kept in range")
 

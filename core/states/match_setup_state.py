@@ -18,12 +18,10 @@ class MatchSetupState(MatchControls, State):
         self.set_state("game", mute = True)
 
     def handle_practice_key(self, key):
-        """Practice vs AI's two choices (1.9): against the AI or a wall, and scoring on or off."""
+        """Practice Mode's choice (1.9): against the AI or a wall."""
         m = self.app.settings.match
         if key in ("practice_wall", "practice_ai"):
             m.vs_wall = key == "practice_wall"
-        if key in ("practice_scoring_on", "practice_scoring_off"):
-            m.scoring = key == "practice_scoring_on"
 
     def handle_event(self, event):
         super().handle_event(event)
@@ -46,16 +44,33 @@ class MatchSetupState(MatchControls, State):
             if key == "opponent_online":
                 self.push_state("online")
 
-            if gameplay.vs_ai:      # the paddle choice and Practice's only matter against the AI
+            if gameplay.vs_ai:      # the paddle choice and the wall only matter against the AI
                 self.handle_practice_key(key)
                 if key == "side_red":
                     gameplay.play_as_blue = False
                 if key == "side_blue":
                     gameplay.play_as_blue = True
 
-            self.handle_match_key(key)          # the modes, their timings and the court
+            # The rules most matches change (Rowan, 1.9), greyed out where they don't count: the
+            # AI's level only against the AI, and Points to Win only where a match can be won
+            if key in ("cycle_ai_left", "cycle_ai_right") and gameplay.vs_ai and not gameplay.vs_wall:
+                step = 1 if key.endswith("right") else -1
+                gameplay.ai_difficulty = (gameplay.ai_difficulty + step) % len(gameplay.ai_difficulties)
+            if key in ("cycle_ai_style_left", "cycle_ai_style_right") and gameplay.vs_ai and not gameplay.vs_wall:
+                step = 1 if key.endswith("right") else -1           # (AI Style, under AI Level: Rowan, 1.9)
+                gameplay.ai_style = (gameplay.ai_style + step) % len(gameplay.ai_styles)
+            if key in ("cycle_win_score_left", "cycle_win_score_right") and gameplay.scoring \
+                    and not (gameplay.vs_ai and gameplay.vs_wall):
+                step = 1 if key.endswith("right") else -1
+                gameplay.winning_score_index = (gameplay.winning_score_index + step) % len(gameplay.winning_scores)
+
+            self.handle_match_key(key)          # the court
             if key == "open_match_settings":
                 self.push_state("match")
+            if key == "open_powerups":                      # (Choose Talismans and Choose Modes, under
+                self.push_state("powerups")                 # Points to Win: Rowan, 1.9)
+            if key == "open_modes":
+                self.push_state("powerups", view = "modes")
 
             if key == "start_match":
                 self.start_match()

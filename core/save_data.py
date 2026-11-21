@@ -16,7 +16,7 @@ GAMEPLAY = ["paddle_width", "paddle_height", "paddle_speed", "ball_diameter", "b
             "winning_score_index", "win_by_two", "ai_difficulty", "adaptive_ai",
             "vs_ai", "play_as_blue", "vs_wall", "scoring", "middle_wall", "ai_style", "pace", "physics", "speed_cap",
             "powerups", "powerup_rate", "talismans_at_once", "court", "online_host_blue"] + MODES + ["pu_" + kind.key for kind in POWERUP_KINDS]
-DISPLAY = ["max_fps", "show_fps", "dim", "rotate_backgrounds", "background", "rotate_every", "parallax", "court_dim_level"]
+DISPLAY = ["max_fps", "show_fps", "show_ping", "dim", "rotate_backgrounds", "background", "rotate_every", "parallax", "court_dim_level"]
 OLD_COURT_DIM = [0, 60, 100, 150]     # before the Court Dim slider: Off, Light, Medium, Strong (out of 255)
 AUDIO = ["play_mode", "even_volume", "fade", "menu_sounds", "ambience"]
 INTERFACE = ["tooltips", "ai_banter", "screen_shake", "ball_trail", "auto_pause", "hide_cursor",
@@ -188,6 +188,57 @@ def load(app):
     if not isinstance(data, dict):
         return
 
+    apply_settings(app, data)
+    app.stats.load_dict(data.get("stats"))
+    try:
+        app.stats.load_talismans(json.loads(talismans_path().read_text()))
+    except (OSError, ValueError):
+        pass                       # none yet, or a damaged file: none
+    if hasattr(app, "achievements"):
+        try:
+            app.achievements.load_dict(json.loads(achievements_path().read_text()))
+        except (OSError, ValueError):
+            pass
+
+
+# ---------------- Settings on their own, to export and import (1.9) ----------------
+
+SETTINGS_KIND = "hu-taong-settings"
+PRIVATE = ("server_user", "server_password")      # an exported file may be shared: never these
+
+
+def export_settings_text(app):
+    """Every setting, as a file to keep or take to another computer (Settings' Export Settings, 1.9).
+    The save's own sections, so any version reads it; not the stats, nor your own server's login."""
+    import datetime
+    data = collect(app)
+    data.pop("stats", None)
+    data["online"] = {k: v for k, v in data["online"].items() if k not in PRIVATE}
+    data.update(kind = SETTINGS_KIND, exported = datetime.datetime.now().isoformat(timespec = "seconds"))
+    return json.dumps(data, indent = 2)
+
+
+def read_settings_export(text):
+    """The settings in an exported file, or None if it isn't one.  (A save.json will do too.)"""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    if data.get("kind") != SETTINGS_KIND and not ({"gameplay", "display", "audio", "interface"} & set(data)):
+        return None
+    data = dict(data)
+    data.pop("stats", None)
+    if isinstance(data.get("online"), dict):
+        data["online"] = {k: v for k, v in data["online"].items() if k not in PRIVATE}
+    return data
+
+
+def apply_settings(app, data):
+    """Settings from a save (or an exported file) onto the game: each value onto the group it
+    belongs to now, anything unknown, mistyped or out of range left out, older versions' names
+    carried over."""
     limits = _limits(app)
     s = app.settings
     _restore_section(s, data.get("gameplay"), limits)
@@ -215,13 +266,3 @@ def load(app):
             setattr(s.gameplay, "pad_" + action, button)
     _restore(app.sound_manager, data.get("sound"), limits)
     _restore(s.online, data.get("online"), limits)
-    app.stats.load_dict(data.get("stats"))
-    try:
-        app.stats.load_talismans(json.loads(talismans_path().read_text()))
-    except (OSError, ValueError):
-        pass                       # none yet, or a damaged file: none
-    if hasattr(app, "achievements"):
-        try:
-            app.achievements.load_dict(json.loads(achievements_path().read_text()))
-        except (OSError, ValueError):
-            pass

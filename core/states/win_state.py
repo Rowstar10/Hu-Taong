@@ -170,9 +170,12 @@ class WinState(JukeboxControls, State):
         else:
             won = None                          # two players on one keyboard
         vs_ai = not net and len(humans) == 1
+        # (at the easiest it was played at: its rules can change mid-match, 1.9.  See Hu_Taong.tally_rules)
+        played = getattr(game, "played", None) or {"ai": game.settings.ai_difficulty, "court": game.court.name,
+                                                    "chaos": game.settings.mode_talisman_rush}
         self.app.achievements.match_over(won, lost_score = loser.score,
-                                         ai_level = game.settings.ai_difficulty if vs_ai else None,
-                                         court = game.court.name, chaos = game.settings.mode_talisman_rush,
+                                         ai_level = played["ai"] if vs_ai else None,
+                                         court = played["court"], chaos = played["chaos"],
                                          online = bool(net))
 
     def handle_event(self, event):

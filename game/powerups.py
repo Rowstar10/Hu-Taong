@@ -150,7 +150,7 @@ KINDS = (
          "Night falls on the court for 20 seconds of play.\n"
          "• Only lantern light round each paddle and the ball's own glow light it up\n"
          "• It stays dark between points, until its time is up and dawn comes\n"
-         "• Power-up talismans still glow in the dark\n"
+         "• Talismans on the court still glow in the dark\n"
          "• Doesn't turn up in a Lantern Night match"),
     Kind("portal", "Portal Pair", "门", "Wild", 0,
          "Two linked portals drift about the court until the point ends: in one, out the other.",

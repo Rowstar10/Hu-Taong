@@ -6,8 +6,14 @@ that reads.  A page that still doesn't fit (Match, and Match from the pause menu
 mouse wheel, the scrollbar, a finger, the controller's right stick (the wheel again), and the menus'
 highlight, which scrolls to whatever it moves to.  From the pause menu, "Changes come in at the
 next serve" stays put at the top.  No new tabs, and nothing moved between pages.
+
+Later in 1.9 Rowan laid Match settings out afresh (two rows of three sections, whole-button
+switches, the modes behind Choose Modes), and it fits without scrolling, so no page scrolls at the
+game's own size.  The scrolling is still there for a page that doesn't fit: these tests squeeze the
+panel (`squeezed`) to make Match settings scroll.
 """
 import unittest
+from unittest import mock
 
 from tests import harness
 
@@ -18,15 +24,27 @@ import pygame                                                   # noqa: E402
 from core.touch import TouchControls                            # noqa: E402
 
 PAGES = [("gameplay",), ("display",), ("audio",), ("interface",), ("match",), ("match", "ball_paddles"),
-         ("match", "powerups"), ("game", "pause", "match")]
+         ("match", "powerups"), ("match", ("powerups", {"view": "modes"})), ("game", "pause", "match")]
 nav = app.navigator
+FOOTER = ("back", "reset_defaults", "scrollbar", "switch_view")
+
+
+def squeezed():
+    """A panel 300 px shorter, so Match settings has to scroll (it fits the real one since later in 1.9)."""
+    ui = app.ui_layout
+    return mock.patch.object(ui, "PANEL_BOTTOM", ui.PANEL_BOTTOM + 300)
+
+
+def page_name(path):
+    return "/".join(p if isinstance(p, str) else p[0] + ":" + p[1]["view"] for p in path)
 
 
 def open_page(*path):
     sm = app.state_manager
     sm.set_state("main_menu", mute = True)
     for name in path:
-        sm.push_state(name, mute = True)
+        name, kwargs = name if isinstance(name, tuple) else (name, {})
+        sm.push_state(name, mute = True, **kwargs)
     harness.settle(app)
     page = sm.current()
     page.draw(app.virtual)
@@ -62,10 +80,9 @@ class EveryPage(Base):
     def test_nothing_overlaps_or_spills_out(self):
         panel = app.ui_layout.PANEL
         for path in PAGES:
-            with self.subTest(page = "/".join(path)):
+            with self.subTest(page = page_name(path)):
                 page = open_page(*path)
-                boxes = {k: r for k, r in harness.every_box(page).items()
-                         if k not in ("back", "reset_defaults", "scrollbar")}
+                boxes = {k: r for k, r in harness.every_box(page).items() if k not in FOOTER}
                 keys = sorted(boxes)
                 for i, a in enumerate(keys):
                     if not getattr(page, "max_scroll", 0):
@@ -74,24 +91,30 @@ class EveryPage(Base):
                         self.assertFalse(boxes[a].colliderect(boxes[b]), f"{a} overlaps {b}")
 
     def test_a_size_that_reads(self):
-        """Nothing shrunk much to fit: an on/off switch is as tall as at nine tenths of full size."""
+        """Nothing shrunk much to fit: an on/off switch is as tall as at nine tenths of full size.
+        (Match settings' whole-button switches are a little smaller by design, Rowan's layout, 1.9:
+        their labels fit three sections across.)"""
         for path in PAGES:
-            if path[-1] == "powerups":
-                continue                        # (the talisman tiles: unchanged)
-            with self.subTest(page = "/".join(path)):
+            if not isinstance(path[-1], str) or path[-1] == "powerups":
+                continue                        # (the talisman and mode tiles: as they were)
+            with self.subTest(page = page_name(path)):
                 page = open_page(*path)
                 switches = [r for k, r in harness.every_box(page).items() if k.startswith("toggle_")]
                 self.assertTrue(switches)
-                self.assertGreaterEqual(min(r.h for r in switches), 48)
+                self.assertGreaterEqual(min(r.h for r in switches), 44 if path[-1] == "match" else 48)
 
     def test_rows_line_up(self):
         """In a column, each row's control is centred on the same line, and its name ends just before.
         (Rowan, 1.9: the switches hung left of the arrow selectors, and looked untidy; they sit
         centred under them now.)"""
-        columns = {("match",): ("cycle_win_score_left", "toggle_win_by_two", "toggle_middle_wall",
-                                "cycle_countdown_left", "cycle_ai_left", "toggle_adaptive_ai", "cycle_court_left"),
-                   ("display",): ("cycle_res_left", "cycle_mode_left", "cycle_max_fps_left",
-                                  "toggle_show_fps", "cycle_effects_left", "toggle_screen_shake", "toggle_ball_trail"),
+        # (Match settings: since later in 1.9 each section lines up on its own)
+        columns = {("match",): ("cycle_win_score_left", "cycle_countdown_left"),
+                   ("match", "AI"): ("cycle_ai_left", "cycle_ai_style_left"),
+                   ("match", "Talismans"): ("cycle_powerup_rate_left", "cycle_at_once_left"),
+                   # (Display: since later in 1.9 each section lines up on its own)
+                   ("display", "Window"): ("cycle_res_left", "cycle_mode_left"),
+                   ("display", "Frame Rate"): ("cycle_max_fps_left", "toggle_show_fps", "toggle_show_ping"),
+                   ("display", "Effects"): ("cycle_effects_left", "toggle_screen_shake", "toggle_ball_trail"),
                    ("interface",): ("cycle_hud_left", "toggle_ai_banter", "toggle_auto_pause", "toggle_friend_emotes",
                                     "cycle_instant_replay_left"),
                    ("gameplay",): ("cycle_pad_first_left", "cycle_pad_stick_left", "pad_up", "pad_pause", "pad_list"),
@@ -103,7 +126,7 @@ class EveryPage(Base):
             return boxes[key].centerx
         for path, keys in columns.items():
             with self.subTest(page = "/".join(path)):
-                boxes = harness.every_box(open_page(*path))
+                boxes = harness.every_box(open_page(*path[:1]))
                 middles = [centre(boxes, k) for k in keys]
                 self.assertLess(max(middles) - min(middles), 3, dict(zip(keys, middles)))
         boxes = harness.every_box(open_page("audio"))
@@ -111,18 +134,26 @@ class EveryPage(Base):
 
     def test_a_lone_button_is_centred(self):
         """(Rowan, 1.9: Choose Talismans sat a little to the right.)  A button with no name of its
-        own sits in the middle of its section, as the section's other lone things do."""
-        boxes = harness.every_box(open_page("match"))
-        modes = (boxes["cycle_mode_chaos"].left + boxes["cycle_mode_switch"].right) / 2
-        self.assertLess(abs(boxes["open_powerups"].centerx - modes), 3)
-        self.assertLess(abs(boxes["open_ball_paddles"].centerx - modes), 3)
+        own sits in the middle of its section, under its heading, as the section's other lone
+        things do: Match settings' whole-button switches too (Rowan's layout, later in 1.9)."""
+        from render.ui.layout import Form, Label
+        page = open_page("match")
+        boxes = harness.every_box(page)
+        for form in (n for n in harness_nodes(page) if isinstance(n, Form)):
+            lone = [c for name, c in form.rows if name is None]
+            heading = next((c for c in lone if isinstance(c, Label)), None)
+            for node in lone:
+                with self.subTest(heading = heading and heading.text, node = type(node).__name__):
+                    self.assertLess(abs(node.rect.centerx - form.rect.centerx), 3)
+        self.assertLess(abs((boxes["open_powerups"].left + boxes["open_modes"].right) / 2
+                            - boxes["toggle_powerups"].centerx), 3, "Choose Talismans and Modes under the switch")
 
     def test_cycles_share_a_width(self):
-        """A column's cycles are as wide as each other, so their arrows line up too."""
+        """A section's cycles are as wide as each other, so their arrows line up too."""
         boxes = harness.every_box(open_page("match"))
-        rights = {boxes[k].right for k in ("cycle_win_score_right", "cycle_countdown_right", "cycle_ai_right",
-                                           "cycle_ai_style_right", "cycle_court_right")}
-        self.assertEqual(len(rights), 1)
+        for keys in (("cycle_win_score_right", "cycle_countdown_right"), ("cycle_ai_right", "cycle_ai_style_right"),
+                     ("cycle_powerup_rate_right", "cycle_at_once_right")):
+            self.assertEqual(len({boxes[k].right for k in keys}), 1, keys)
 
     def test_a_name_explains_its_control(self):
         """Pointing at a row's name shows its control's tooltip."""
@@ -152,19 +183,27 @@ def harness_nodes(page):
     return laid_out(page._laid[0])
 
 
-class OnlyMatchScrolls(Base):
+class NothingScrolls(Base):
     def test_which_pages_scroll(self):
+        """(Only Match settings did, till Rowan's layout later in 1.9.)"""
         for path in PAGES:
-            with self.subTest(page = "/".join(path)):
+            with self.subTest(page = page_name(path)):
                 page = open_page(*path)
-                scrolls = bool(getattr(page, "max_scroll", 0))
-                self.assertEqual(scrolls, path[-1] == "match", "only the Match page needs to")
+                self.assertFalse(getattr(page, "max_scroll", 0), "it all fits")
 
 
-class Scrolling(Base):
+class Squeezed(Base):
     def setUp(self):
+        squeeze = squeezed()
+        squeeze.start()
+        self.addCleanup(squeeze.stop)
+
+
+class Scrolling(Squeezed):
+    def setUp(self):
+        super().setUp()
         self.page = open_page("match")
-        self.hidden = "open_ball_paddles"         # at the bottom of the page: out of sight at first
+        self.hidden = "open_modes"                # at the bottom of the page: out of sight at first
 
     def test_starts_at_the_top_with_the_rest_out_of_sight(self):
         page = self.page
@@ -195,7 +234,7 @@ class Scrolling(Base):
         self.assertNotIn("cycle_win_score_left", page.ui_hitboxes)
         press(page, page.ui_hitboxes[self.hidden].center)
         harness.settle(app)
-        self.assertEqual(app.state_manager.current().NAME, "ball_paddles")
+        self.assertEqual(app.state_manager.current().NAME, "powerups")        # (Choose Modes' page)
 
     def test_it_eases_there(self):
         page = self.page
@@ -262,7 +301,7 @@ class Scrolling(Base):
         for event in events:
             page.handle_event(event)
         harness.settle(app)
-        self.assertEqual(app.state_manager.current().NAME, "ball_paddles")
+        self.assertEqual(app.state_manager.current().NAME, "powerups")        # (Choose Modes' page)
 
     def test_down_from_the_last_row_goes_to_the_footer(self):
         """Back and Reset stay below the whole page, wherever it's scrolled."""
@@ -278,12 +317,12 @@ class Scrolling(Base):
                 break
             self.assertGreater(nav.targets()[nav.key].top, before)
         self.assertIn(nav.key, ("back", "reset_defaults"))
-        nav.key = "open_ball_paddles"               # the last control on the page, out of sight
+        nav.key = "open_modes"                      # the last control on the page, out of sight
         nav.move(0, 1, via = "pad")
         self.assertIn(nav.key, ("back", "reset_defaults"), "down from it: Back or Reset, not up the page")
 
 
-class FromThePauseMenu(Base):
+class FromThePauseMenu(Squeezed):
     def test_the_note_stays_put(self):
         page = open_page("game", "pause", "match")
         self.assertTrue(page.note)

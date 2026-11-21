@@ -5,7 +5,7 @@ You and your friend both need this same version of the game. Play → Online giv
 ## Host a Game
 
 1. Pick **Host a Game**.
-2. Choose the **Court**, the **Modes** (any of them together, as on Match Setup), and whether
+2. Choose the **Court**, the **Modes** (any of them together), **Goals** on or off, and whether
    **You play** Red (left) or Blue (right). Your friend gets the other side. The rest of the
    rules come from your **Match Settings**.
 3. Let people in, either way:

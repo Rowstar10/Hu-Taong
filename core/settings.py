@@ -123,7 +123,7 @@ class MatchSettings:
         self.reset_ball_and_paddles()
         self.pace = 1.0
         self.physics = 0             # PHYSICS[physics]: how a ball comes off a paddle
-        self.speed_cap = False       # a paddle can only pass on so much of its speed to the ball
+        self.speed_cap = True        # a paddle can only pass on so much of its speed to the ball (on by default: Rowan, 1.9)
 
         # Match setup (chosen on the Match Setup screen)
         self.vs_ai = True            # True: you play one paddle and the AI takes the other ("Practice vs AI").
@@ -223,6 +223,12 @@ class MatchSettings:
         self.ball_diameter = (self.ball_diameter_min + self.ball_diameter_max) // 2
         self.ball_speed = (self.ball_speed_min + self.ball_speed_max) // 2
 
+    def reset_modes(self):
+        """Every game mode off, at its first version (the Modes page's Reset to Default, 1.9)."""
+        for mode in self.MODES:
+            setattr(self, "mode_" + mode, False)
+        self.chaos_timing = self.switch_timing = 0
+
     def reset_powerups(self):
         """Power-ups on, at the normal rate, every one of them allowed."""
         self.powerups = True
@@ -304,7 +310,7 @@ class GameplaySettings:
         self.pad_first = 0           # two players: the first controller plays Red (1: Blue), the second the other
         for action, button in self.PAD_DEFAULTS.items():
             setattr(self, "pad_" + action, button)
-        self.pad_stick = 0           # PAD_STICKS: the left stick steers
+        self.pad_stick = 2           # PAD_STICKS: either stick steers (Rowan, 1.9)
         self.pad_deadzone = 1        # PAD_DEADZONES: Normal
         # The mouse (1.9, Rowan): the paddle heads for the pointer once the mouse moves in a match
         self.mouse_steer = False
@@ -393,14 +399,16 @@ class DisplaySettings:
         # was 120 whatever the screen).  A saved choice is kept (see save_data).
         self.max_fps = 1 if ANDROID else self.fps_for_screen(refresh_rate())
         self.show_fps = True
+        self.show_ping = True        # online, in a match: the round trip to your friend (1.9)
         self.dim = 0
         self.resolution = (1920, 1080)
         self.rotate_backgrounds = True
         self.rotate_every = 0
         self.parallax = 2
         # How much the background is darkened during a match (0-1), on top of the Dim Overlay,
-        # so the ball and paddles stand out.  The default is the old Court Dim: Medium.
-        self.court_dim_level = 100 / 255
+        # so the ball and paddles stand out.  Half, since 1.9 (Rowan): it was the old Court Dim's
+        # Medium, 39%.
+        self.court_dim_level = 0.5
         self.effects = 0             # butterflies, embers and bursts: Full
         self.screen_shake = True
         self.ball_trail = True

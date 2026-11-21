@@ -14,7 +14,7 @@ from tests import harness
 app = harness.app()
 
 from core import save_data                                      # noqa: E402
-from tests.test_settings_menus import open_screen               # noqa: E402
+from tests.test_settings_menus import open_modes                # noqa: E402
 
 m = app.settings.match
 
@@ -36,7 +36,7 @@ class Names(unittest.TestCase):
 
     def test_the_match_screen_draws_with_them_on(self):
         m.mode_chaos, m.chaos_timing, m.mode_switch, m.switch_timing, m.mode_talisman_rush = True, 1, True, 1, True
-        keys = open_screen("match").ui_hitboxes
+        keys = open_modes().ui_hitboxes         # (Choose Modes' page since later in 1.9)
         for key in ("cycle_mode_chaos", "cycle_mode_switch", "toggle_mode_talisman_rush"):
             self.assertIn(key, keys)
 

@@ -1,6 +1,7 @@
 import pygame, random
 
 from core.states.base_state import State
+from core.states.match_controls import match_rules
 
 class BallPaddlesState(State):
     """Settings > Match > Ball & Paddles: the ball's and paddles' sizes and speeds, the pace, and
@@ -25,7 +26,7 @@ class BallPaddlesState(State):
         self.app.renderer.draw_ball_paddles_menu(self, screen)
 
     def set_from_slider(self, key, event):
-        m = self.app.settings.match
+        m = match_rules(self.app)          # (mid-match, this match's: 1.9)
         percent = self.update_slider_from_mouse(key, event)
         if key == "ball_speed_slider":
             m.ball_speed = m.ball_speed_min + percent * m.ball_speed_range
@@ -40,14 +41,14 @@ class BallPaddlesState(State):
             m.paddle_width = m.paddle_width_min + percent * m.paddle_width_range
 
     def reset_defaults(self):
-        m = self.app.settings.match
+        m = match_rules(self.app)          # (mid-match, this match's: 1.9)
         m.reset_ball_and_paddles()
         m.pace = 1.0
-        m.physics, m.speed_cap = 0, False
+        m.physics, m.speed_cap = 0, True      # (the Speed Cap on by default since 1.9)
 
     def handle_event(self, event):
         super().handle_event(event)
-        m = self.app.settings.match
+        m = match_rules(self.app)          # (mid-match, this match's: 1.9)
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.pop_state()

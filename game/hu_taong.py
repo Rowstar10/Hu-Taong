@@ -28,7 +28,7 @@ class Hu_Taong(GameBase):
     MESSAGE_COLOURS = {"red": (255, 80, 80), "blue": (60, 140, 255)}
 
     def __init__(self, app, width=BASE_W, height=BASE_H):
-        self.practice, self.bench, self.scoreless = False, None, False     # (see build_world)
+        self.practice, self.bench, self.scoreless, self.closed = False, None, False, set()     # (see set_sides)
         super().__init__(app, width, height)
         self.message_text = ""
         self.message_color = (255, 255, 255)
@@ -41,6 +41,7 @@ class Hu_Taong(GameBase):
         self.message_text = ""
 
     def build_world(self):
+        self.settings = self.rules.copy()       # (a match started again plays by its own rules: 1.9)
         # Walls & Separator
         self.top_wall = Wall(self, -10, -10, BASE_W + 10, 0)
         self.bottom_wall = Wall(self, -10, BASE_H, BASE_W + 10, BASE_H + 10)
@@ -102,29 +103,15 @@ class Hu_Taong(GameBase):
             net.guest_clear_tau = None
             net.guest_tells_tau = False
 
-        # Practice vs AI's choices (1.9), never online: against a wall instead of the AI, and scoring
-        # off.  Either makes it a practice match, which counts for nothing.  Against the wall, the
-        # other side's goal is a wall the ball bounces off, and the other paddle leaves the court.
-        solo = bool(settings.vs_ai) and not net
-        self.scoreless = solo and not settings.scoring
-        self.practice = solo and (bool(settings.vs_wall) or self.scoreless)
+        # Practice Mode's choices (1.9), never online: against a wall, and Goals off (see set_sides)
+        self.practice, self.scoreless, self.bench, self.closed, self.sides = False, False, None, set(), None
+        self.end_walls = {"left": (self.left_wall.x0, self.left_wall.x1),
+                          "right": (self.right_wall.x0, self.right_wall.x1)}
         self.label_pads()
-        self.bench = None                       # the paddle that sits out (against the wall)
-        if solo and settings.vs_wall:
+        self.set_sides()
+        if self.bench is not None:
             settings.wall_rules()
-            you, other = (self.p2, self.p1) if settings.play_as_blue else (self.p1, self.p2)
-            you.ai_enabled, other.ai_enabled = False, False
-            self.bench = other
-            self.objects.remove(other)
-            other.controls_label = "Wall"
-            wall = self.left_wall if other.is_left else self.right_wall
-            wall.is_goal, wall.practice = False, True
-            if other.is_left:                       # (its face where the wall is drawn)
-                wall.x1 = self.PRACTICE_WALL
-            else:
-                wall.x0 = BASE_W - self.PRACTICE_WALL
-            wall.width = wall.x1 - wall.x0
-            self.label_pads()
+        self.served = dict(vars(self.rules))     # the rules as they stood at the serve (see update)
 
         self.ball = Ball(self, diameter = settings.ball_diameter, x = (BASE_W - settings.ball_diameter) / 2, y = (BASE_H - settings.ball_diameter) / 2, speed = settings.ball_speed * BALL_PACE, color = "white")
 
@@ -145,9 +132,13 @@ class Hu_Taong(GameBase):
 
         self.powerups = PowerUps(self)
 
-        # The court's own stones, for the whole match (power-up Tombstones come and go)
+        # The court's own stones (power-up Tombstones come and go): for the whole match, unless
+        # Match settings picks another mid-match (see change_court)
+        self.court_choice = settings.court
         self.court = courts.pick(settings.court)
         self.stones = courts.build(self, self.court)
+        self.played = None
+        self.tally_rules()
         if settings.mode_twin_ball:
             self.powerups.twin_serve()            # Twin Ball: the first serve is with both balls too
         self.powerups.serve_holes()               # a Black Hole match's: open from the first serve
@@ -213,6 +204,98 @@ class Hu_Taong(GameBase):
         for listener in (getattr(self, "tally", None), getattr(self, "achieve", None)):
             if listener is not None:
                 listener(event[1], event[2:])
+
+    def set_sides(self):
+        """Who plays each paddle, and which ends are open (1.9), from the rules it plays by now: as a
+        match starts and, if Match settings changed them mid-match, at a serve.  Answers whether
+        anything changed.
+        - Goals, in any match (Practice Mode, Multiplayer, online): off, both ends are walls, so
+          nobody can score and the rally never ends.
+        - Practice Mode, never online: the AI plays every paddle but yours (the one with your keys:
+          a Switch takes them along); against the wall, the far end is a wall and the paddle there
+          sits out.  In Multiplayer, nobody's: a second player can take over the AI's paddle.
+        A match that has been practice (the wall, or Goals off) counts for nothing."""
+        settings = self.settings
+        local = not self.net
+        vs_ai = bool(settings.vs_ai) and local
+        sides = (vs_ai, bool(settings.play_as_blue), vs_ai and bool(settings.vs_wall), bool(settings.scoring))
+        if sides == self.sides:
+            return False
+        self.sides = sides
+        _, blue, against_wall, goals = sides
+        bench = None
+        if local:                               # (online, the host's game has set who plays where)
+            controls = self.app.settings.gameplay
+            mine = "p2" if blue else "p1"
+            other = None
+            for paddle in (self.p1, self.p2):
+                theirs = "p1" if paddle.up == controls.p1_up else "p2"
+                paddle.ai_enabled = vs_ai and theirs != mine
+                if paddle.ai_enabled:
+                    other = paddle
+            bench = other if against_wall else None
+            if self.bench is not None and self.bench is not bench:      # back on the court
+                back, ball = self.bench, getattr(self, "ball", None)
+                self.objects.insert(self.objects.index(ball) if ball in self.objects else len(self.objects), back)
+            if bench is not None:
+                if bench in self.objects:
+                    self.objects.remove(bench)
+                bench.ai_enabled = False
+        self.bench = bench
+        self.scoreless = not goals
+        self.practice = self.practice or against_wall or not goals
+        if self.scoreless:
+            self.close_ends({"left", "right"})
+        else:
+            self.close_ends({"left" if bench.is_left else "right"} if bench is not None else set())
+        if local:
+            self.label_pads()
+            if bench is not None:
+                bench.controls_label = "Wall"
+        return True
+
+    def change_court(self):
+        """A court picked in Match settings mid-match (from Pause, 1.9) comes in at the serve, as
+        every change there does: the old court's stones go, the new one's stand.  (Replays and the
+        friend online draw the stones from the rows, so they follow.)"""
+        for stone in self.stones:
+            if stone in self.objects:
+                self.objects.remove(stone)
+        self.court_choice = self.settings.court
+        self.court = courts.pick(self.court_choice)
+        self.stones = courts.build(self, self.court)
+
+    def tally_rules(self):
+        """What the match has been played at, for the achievements (1.9).  Its rules can change at
+        any serve (Match settings, from Pause), so it counts at its easiest: the AI's lowest level
+        (none, if a second player had the AI's paddle for a while), CHAOS only if it was on for
+        every serve, and the court only if it never changed."""
+        ai = self.settings.ai_difficulty if self.sides and self.sides[0] else None
+        now = {"ai": ai, "chaos": bool(self.settings.mode_talisman_rush), "court": self.court.name}
+        was = self.played
+        if was is None:
+            self.played = now
+            return
+        was["ai"] = None if ai is None or was["ai"] is None else min(was["ai"], ai)
+        was["chaos"] = was["chaos"] and now["chaos"]
+        if was["court"] != now["court"]:
+            was["court"] = None
+
+    def close_ends(self, closed):
+        """Each end of the court a goal, or a wall the ball bounces off (Practice Mode, 1.9)."""
+        self.closed = set(closed)
+        for side, wall in (("left", self.left_wall), ("right", self.right_wall)):
+            x0, x1 = self.end_walls[side]
+            if side in self.closed:
+                wall.is_goal, wall.practice = False, True
+                if side == "left":                  # (its face where the wall is drawn)
+                    x1 = self.PRACTICE_WALL
+                else:
+                    x0 = BASE_W - self.PRACTICE_WALL
+            else:
+                wall.is_goal, wall.practice = True, False
+            wall.x0, wall.x1 = x0, x1
+            wall.width = x1 - x0
 
     def label_pads(self):
         """Each paddle played here says what steers it (the HUD's label), as its player is playing
@@ -604,11 +687,17 @@ class Hu_Taong(GameBase):
         self.message_timer = 2
 
     def reset_round(self):
-        # A new serve plays by the rules as they stand now: anything changed since (from Pause)
-        # comes in here, never mid-rally
-        settings = self.settings = self.app.settings.match.copy()
+        # A new serve plays by the match's rules as they stand now: anything changed since (Match
+        # settings, from Pause) comes in here, never mid-rally.  (Your saved Match settings, which
+        # every new match starts from, only until 1.9.)
+        settings = self.settings = self.rules.copy()
+        self.set_sides()                                # Practice Mode's choices, if they've changed
         if getattr(self, "bench", None) is not None:
             settings.wall_rules()                       # (against the wall: no swapping paddles)
+        self.served = dict(vars(self.rules))
+        if settings.court != self.court_choice:
+            self.change_court()
+        self.tally_rules()
         if settings.chaos_each_point:
             settings.chaos_roll()
             self.apply_gameplay_settings()
@@ -661,12 +750,12 @@ class Hu_Taong(GameBase):
             for out, nx in ((cx < 0, 1), (cx > BASE_W, -1)):
                 if not out:
                     continue
-                walled = self.bench is not None and (nx == 1) == self.bench.is_left    # (Practice's wall)
+                walled = ("left" if nx == 1 else "right") in self.closed    # (Practice Mode's wall, Goals off)
                 if b.scores_in(nx) and not walled:
                     self.on_score(b, {"normal": (nx, 0)})
                     return
                 # Twin Balls: past its own colour's goal it is put back and turned round (and past
-                # Practice's wall, in front of it)
+                # a closed end, in front of its wall)
                 edge = self.PRACTICE_WALL if walled else 0
                 cx = edge + r + 6 if nx == 1 else BASE_W - edge - r - 6
                 b.x0, b.x1 = cx - r, cx + r
@@ -689,6 +778,12 @@ class Hu_Taong(GameBase):
         super().update(dt)
         if self.running:
             self.keep_ball_in()
+        if self.running and not self.paused and self.countdown is None and {"left", "right"} <= self.closed \
+                and vars(self.rules) != self.served:
+            # Goals off: no serve would ever come for a change made in Match settings, so the
+            # change brings one (1.9)
+            self.reset_round()
+            return
         if self.running and not self.paused and self.countdown is None:
             # Chaos timers keep time with the game pace; messages and the serve countdown don't
             play_dt = min(dt, self.MAX_STEP) * self.settings.pace

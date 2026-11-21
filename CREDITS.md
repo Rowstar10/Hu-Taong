@@ -140,7 +140,7 @@ achievement earned).  `hole_fling.wav` is `black_hole_swallow.wav` played backwa
 
 ## Sound effects made for the game
 
-`Resources/Sounds/firecracker_bang.wav` (the Firecracker power-up's explosion) was synthesised for Hu Taong
+`Resources/Sounds/firecracker_bang.wav` (the Firecracker talisman's explosion) was synthesised for Hu Taong
 from noise and a falling tone by a short script; it isn't taken from anywhere, so it needs no credit or licence.
 
 So were the Black Hole's sounds (1.8), from tones and filtered noise: `black_hole_hum.wav` (its hum, a

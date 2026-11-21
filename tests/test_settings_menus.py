@@ -10,6 +10,9 @@ one giving the ball's and paddles' sizes, go under their buttons.
 
 Rowan's third 1.8 playtest (2026-11-18): Choose Talismans goes under the Power-Ups switch, and the
 Choose Talismans screen no longer has the switch or the spawn rate (they're on Match).
+
+Rowan, 1.9: the Match card only in a match (Pause > Settings): from the main menu the match rules
+are on Match Setup and its Match Settings button (tests/test_match_setup_essentials.py).
 """
 import unittest
 
@@ -18,6 +21,8 @@ from tests import harness
 app = harness.app()
 
 import pygame                                                   # noqa: E402
+
+from game.powerups import KINDS as POWERUP_KINDS                # noqa: E402
 
 s = app.settings
 
@@ -28,13 +33,25 @@ MATCH_KEYS = ("toggle_mode_", "cycle_mode_chaos", "cycle_mode_switch", "cycle_wi
               "ball_diameter_slider", "paddle_size_slider", "pace_slider", "randomise_all", "toggle_curveball",
               "toggle_lantern_night", "cycle_chaos_mode", "cycle_chaos_switch", "cycle_physics", "toggle_speed_cap")
 PERSONAL = ("gameplay", "display", "audio", "interface")
-FOOTER = ("back", "reset_defaults", "reset_all")
+FOOTER = ("back", "reset_defaults", "reset_all",
+          "open_match_settings", "start_match")         # (Match Setup's, by Back since later in 1.9)
 
 
 def open_screen(name):
     sm = app.state_manager
     sm.set_state("main_menu", mute = True)
     sm.push_state(name, mute = True)
+    harness.settle(app)
+    screen = sm.current()
+    screen.draw(app.virtual)
+    return screen
+
+
+def open_modes():
+    """The Talismans page on its Modes view (Rowan, 1.9), as Match settings' Choose Modes opens it."""
+    sm = app.state_manager
+    sm.set_state("main_menu", mute = True)
+    sm.push_state("powerups", mute = True, view = "modes")
     harness.settle(app)
     screen = sm.current()
     screen.draw(app.virtual)
@@ -54,17 +71,35 @@ class Hub(unittest.TestCase):
         app.state_manager.set_state("main_menu", mute = True)
         harness.settle(app)
 
-    def test_five_cards_the_match_first(self):
-        boxes = open_screen("settings").ui_hitboxes
-        cards = sorted(("match", "gameplay", "display", "audio", "interface"), key = lambda k: boxes[k].x)
-        self.assertEqual(cards, ["match", "gameplay", "display", "audio", "interface"])
+    def check_cards(self, boxes, order):
+        cards = sorted(order, key = lambda k: boxes[k].x)
+        self.assertEqual(cards, order)
         for a, b in zip(cards, cards[1:]):
             self.assertLess(boxes[a].right, boxes[b].left, f"{a} and {b} overlap")
-        self.assertGreaterEqual(boxes["match"].left, 0)
-        self.assertLessEqual(boxes["interface"].right, 1920)
+        self.assertGreaterEqual(boxes[cards[0]].left, 0)
+        self.assertLessEqual(boxes[cards[-1]].right, 1920)
+
+    def test_four_cards_from_the_main_menu(self):
+        boxes = open_screen("settings").ui_hitboxes
+        self.assertNotIn("match", boxes, "(1.9: a match's rules are on Match Setup)")
+        self.check_cards(boxes, ["display", "audio", "interface", "gameplay"])     # (Controls after UI: 1.9)
+
+    def test_five_in_a_match_the_match_first(self):
+        sm = app.state_manager
+        sm.set_state("main_menu", mute = True)
+        sm.push_state("game", mute = True)
+        sm.push_state("pause", mute = True)
+        sm.push_state("settings", mute = True)
+        harness.settle(app)
+        hub = sm.current()
+        hub.draw(app.virtual)
+        self.check_cards(hub.ui_hitboxes, ["match", "display", "audio", "interface", "gameplay"])
+        click(hub, "match")
+        harness.settle(app)
+        self.assertEqual(sm.current().NAME, "match")
 
     def test_each_card_opens_its_screen(self):
-        for card in ("match", "gameplay", "display", "audio", "interface"):
+        for card in ("gameplay", "display", "audio", "interface"):
             hub = open_screen("settings")
             click(hub, card)
             harness.settle(app)
@@ -84,18 +119,22 @@ class WhatGoesWhere(unittest.TestCase):
 
     def test_the_match_screen_has_the_rules(self):
         keys = harness.every_box(open_screen("match"))
-        for key in ("cycle_mode_chaos", "cycle_mode_switch", "toggle_mode_twin_ball", "cycle_win_score_left",
-                    "toggle_win_by_two", "toggle_middle_wall", "cycle_countdown_left", "cycle_ai_left",
-                    "cycle_ai_style_left", "toggle_adaptive_ai", "cycle_court_left", "toggle_powerups",
-                    "cycle_powerup_rate_left", "open_powerups", "open_ball_paddles"):
+        for key in ("cycle_win_score_left", "toggle_win_by_two", "toggle_middle_wall", "cycle_countdown_left",
+                    "cycle_ai_left", "cycle_ai_style_left", "toggle_adaptive_ai", "cycle_court_left", "toggle_powerups",
+                    "cycle_powerup_rate_left", "open_powerups", "open_modes", "open_ball_paddles"):
             self.assertIn(key, keys)
+        modes = open_modes().ui_hitboxes      # (the modes behind Choose Modes since later in 1.9)
+        for key in ("cycle_mode_chaos", "cycle_mode_switch", "toggle_mode_twin_ball"):
+            self.assertIn(key, modes)
 
-    def test_choose_talismans_under_power_ups(self):
+    def test_choose_talismans_and_modes_under_the_talismans_switch(self):
+        """(Rowan, 1.9: Choose Talismans under its switch, centred in its section; later Choose Modes
+        beside it.)"""
         keys = harness.every_box(open_screen("match"))
-        on, choose = keys["toggle_powerups"], keys["open_powerups"]
+        on, choose, modes = keys["toggle_powerups"], keys["open_powerups"], keys["open_modes"]
         self.assertGreater(choose.top, on.bottom - 1, "below it")
-        self.assertLess(abs(choose.centerx - (keys["cycle_mode_chaos"].left + keys["cycle_mode_switch"].right) / 2), 3,
-                        "centred in its section (Rowan, 1.9: it sat a little to the right)")
+        self.assertEqual((modes.top, modes.size), (choose.top, choose.size), "side by side, one size")
+        self.assertLess(abs((choose.left + modes.right) / 2 - on.centerx), 3, "centred in their section")
         self.assertLess(keys["cycle_powerup_rate_left"].bottom, keys["cycle_at_once_left"].top + 1)
 
     def test_choose_talismans_has_no_switch_or_spawn_rate(self):
@@ -121,7 +160,7 @@ class WhatGoesWhere(unittest.TestCase):
             seen.append(s.match.PHYSICS[s.match.physics])
         self.assertEqual(seen, ["Classic", "v0.9", "Current"])
         click(screen, "toggle_speed_cap")
-        self.assertTrue(s.match.speed_cap)
+        self.assertFalse(s.match.speed_cap, "(on by default since 1.9)")
         s.match.reset()
 
     def test_gameplay_is_your_controls(self):
@@ -184,10 +223,12 @@ class Summaries(unittest.TestCase):
         screen = open_screen("match")
         body = screen._laid[0]
         texts = {_val(n.text): n.rect for n in laid_out(body) if isinstance(n, Text) and isinstance(_val(n.text), str)}
-        talismans = next(r for t, r in texts.items() if "talismans switched on" in t)
-        sizes = next(r for t, r in texts.items() if t.startswith("Ball ") and "Paddles" in t)
+        talismans = next(r for t, r in texts.items() if t.endswith(f"of {len(POWERUP_KINDS)} on"))
+        modes = next(r for t, r in texts.items() if t.endswith(f"of {len(s.match.MODES)} on"))
+        sizes = next(r for t, r in texts.items() if t.startswith("Ball ") and " px" in t)
         boxes = harness.every_box(screen)
         self.assertGreaterEqual(talismans.top, boxes["open_powerups"].bottom)
+        self.assertGreaterEqual(modes.top, boxes["open_modes"].bottom)
         self.assertGreaterEqual(sizes.top, boxes["open_ball_paddles"].bottom)
 
 
@@ -204,11 +245,18 @@ class Clicks(unittest.TestCase):
         self.assertEqual(s.match.serve_seconds, 2)
         click(screen, "toggle_powerups")
         self.assertFalse(s.match.powerups)
-        click(screen, "cycle_mode_switch")
-        self.assertTrue(s.match.mode_switch)
         click(screen, "open_ball_paddles")
         harness.settle(app)
         self.assertEqual(app.state_manager.current().NAME, "ball_paddles")
+        app.state_manager.pop_state(mute = True)
+        harness.settle(app)
+        click(screen, "open_modes")
+        harness.settle(app)
+        modes = app.state_manager.current()
+        self.assertEqual((modes.NAME, modes.view), ("powerups", "modes"))
+        modes.draw(app.virtual)
+        click(modes, "cycle_mode_switch")
+        self.assertTrue(s.match.mode_switch)
 
     def test_display_screen(self):
         screen = open_screen("display")

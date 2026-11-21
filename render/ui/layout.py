@@ -603,11 +603,12 @@ class Stack(Node):
 class Grid(Node):
     """Rows of cells; columns share a width and rows share a height, so
     everything lines up.  Cells hang from the top of their row so headers share a
-    line; a short row is centred under the full ones."""
+    line (a page's columns start level); a short row is centred under the full ones.  `middle`:
+    each cell centred down its row instead, so a name beside a taller button lines up with it (1.9)."""
 
-    def __init__(self, rows, gap_x=0, gap_y=0, uniform=False):
+    def __init__(self, rows, gap_x=0, gap_y=0, uniform=False, middle=False):
         super().__init__()
-        self.rows, self.gap_x, self.gap_y, self.uniform = rows, gap_x, gap_y, uniform
+        self.rows, self.gap_x, self.gap_y, self.uniform, self.middle = rows, gap_x, gap_y, uniform, middle
 
     def measure(self):
         cols = max((len(r) for r in self.rows), default=0)
@@ -632,8 +633,7 @@ class Grid(Node):
             row_w = sum(self.col_w[:len(row)]) + self.gap_x * max(0, len(row) - 1)
             cx = self.rect.left + (self.w - row_w) // 2
             for ci, c in enumerate(row):
-                # (each centred down its row, so a name beside a taller button lines up with it: 1.9)
-                c.place(cx, cy + (self.row_h[ri] - c.h) // 2, self.col_w[ci], c.h)
+                c.place(cx, cy + ((self.row_h[ri] - c.h) // 2 if self.middle else 0), self.col_w[ci], c.h)
                 cx += self.col_w[ci] + self.gap_x
             cy += self.row_h[ri] + self.gap_y
 

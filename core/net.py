@@ -26,7 +26,7 @@ from xml.etree import ElementTree
 from core import rooms
 
 PORT = 47620
-PROTOCOL = 18                 # raised whenever the messages or the shared rules change, so old and new builds turn each other away clearly
+PROTOCOL = 19                 # raised whenever the messages or the shared rules change, so old and new builds turn each other away clearly
 MAGIC = b"HT"
 TIMEOUT = 6.0                 # seconds of silence before the other side is taken as gone
 SEND_RATE = 60                # packets a second each way
@@ -426,7 +426,9 @@ class HostSession:
         win = g.winning_scores[g.winning_score_index]
         parts = ["Endless" if win == "Endless Mode" else f"First to {win}",
                  f"Court: {courts.NAMES[g.court]}",
-                 "Power-ups on" if g.powerups else "Power-ups off"]
+                 "Talismans on" if g.powerups else "Talismans off"]     # (Power-ups till 1.9: Rowan)
+        if not g.scoring:
+            parts.insert(0, "No goals")                   # (Goals off: 1.9)
         if modes:
             versions = {"chaos": g.CHAOS_TIMINGS[g.chaos_timing], "switch": g.SWITCH_TIMINGS[g.switch_timing]}
             names = [g.MODE_NAMES[mode] + (f": {versions[mode]}" if mode in versions else "") for mode in g.modes_on()]
@@ -642,8 +644,8 @@ class HostSession:
                                     for p in (game.p1, game.p2)],
                          "pace": game.settings.pace, "switch_each_point": game.settings.switch_each_point,
                          "switching": game.settings.switching,
-                         "court": game.court.name, "rows": ROWS,
-                         "chaos": bool(game.settings.mode_talisman_rush)}}     # (1.9: Utter CHAOS)
+                         "court": game.played["court"], "rows": ROWS,     # (for the achievements, 1.9:
+                         "chaos": bool(game.played["chaos"])}}            # as played all match long)
         if getattr(self, "emote", None):
             info["emote"] = self.emote                  # your latest quick emote (1.9)
         head = pack_json(info)

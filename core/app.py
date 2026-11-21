@@ -613,7 +613,15 @@ class App:
             fps_surf = self.fps_surf
             self.virtual.blit(fps_surf, (BASE_W - 3 * fps_surf.get_width() // 2, BASE_H - 2 * fps_surf.get_height()))
 
+        self.show_ping()
+
         self.present()
+
+    def show_ping(self):
+        """Show Ping (Display, 1.9): online, in a match, the round trip to your friend, for the host
+        and the friend who joined alike."""
+        if self.settings.display.show_ping and self.net is not None and self.in_match():
+            self.renderer.draw_ping(self.virtual, getattr(self.net, "ping", None))
 
     def present(self):
         # ---------- Scale + Flip ----------

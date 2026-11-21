@@ -844,8 +844,7 @@ class GuestMatchState(State):
             self.countdown_shown = shown
         renderer.draw_world(screen, self.view)
         self.app.hud.draw(self, screen, self.view, live=True)
-        renderer.draw_ping(screen, net.ping)
-        renderer.draw_emotes(screen)
+        renderer.draw_emotes(screen)              # (the ping: App.loop, if Display shows it, 1.9)
 
     def handle_event(self, event):
         super().handle_event(event)

@@ -14,7 +14,12 @@ class GameBase:
 
     def __init__(self, app, width=BASE_W, height=BASE_H):
         self.app = app
-        self.settings = self.app.settings.match.copy()     # the rules it plays by, renewed at each serve
+        # The match's own rules (1.9, Rowan): Match settings as they were when the match was made.
+        # Opened mid-match, Match settings changes these, for this match only, never the ones
+        # every new match starts from.  `settings` is what it plays by now: renewed from them at
+        # each serve, so a change comes in at the next one.
+        self.rules = self.app.settings.match.copy()
+        self.settings = self.rules.copy()
         self.width = width
         self.height = height
 

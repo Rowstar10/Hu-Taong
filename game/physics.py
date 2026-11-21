@@ -57,6 +57,18 @@ class Physics:
         only_paddles = [obj for obj in objects if obj.is_paddle
                         and not (getattr(obj, "remote", False) and getattr(obj.game, "net", None))]
         stones = [obj for obj in objects if getattr(obj, "is_obstacle", False) and obj.solid]
+        # The same goes for a paddle against the Middle Wall: grown across it (Shape Shift's drift,
+        # Giant Paddle), the sweep saw no wall ahead and it walked on through to the far side
+        # (Rowan, 1.9).  It goes back to its own side of the line.
+        for wall in (obj for obj in objects if getattr(obj, "is_separator", False)):
+            line = (wall.x0 + wall.x1) / 2
+            for paddle in (obj for obj in objects if obj.is_paddle):
+                if paddle.can_collide_with(wall) and paddle.x0 < line < paddle.x1:
+                    shift = line - paddle.x1 if paddle.is_left else line - paddle.x0
+                    paddle.x0 += shift
+                    paddle.x1 += shift
+                    if paddle.vx * shift < 0:
+                        paddle.vx = 0.0             # (it was pushing into the wall)
         for ball in balls:
             for stone in stones:
                 if ball.can_collide_with(stone):         # a Ghost Ball is let pass through

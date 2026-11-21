@@ -145,7 +145,7 @@ class Steering(Base):
         game = self.match(vs_ai = True)
         pads.using = "pad"
         game.label_pads()
-        self.assertEqual(game.p1.controls_label, "Left stick", "(1.9: the stick it steers with)")
+        self.assertEqual(game.p1.controls_label, "Either stick", "(1.9: the stick it steers with; either, by default)")
         pads.using = "keys"
         game.label_pads()
         self.assertEqual(game.p1.controls_label, "W A S D", "the keys again, once they're what's used")
@@ -213,15 +213,20 @@ class Menus(Base):
         show("settings")
         nav.active, nav.via, nav.key = True, "pad", "back"
         press("dpad_down")
-        self.assertEqual(nav.key, "display", "down from the bottom: the top, in line with it")
+        self.assertIn(nav.key, ("audio", "interface"), "down from the bottom: the top, in line with it")
         press("dpad_up")
         self.assertEqual(nav.key, "back", "up from the top: the bottom")
-        nav.key = "interface"
+        nav.key = "gameplay"                       # (Controls, the last card since 1.9)
         press("dpad_right")
-        self.assertEqual(nav.key, "match", "the row's other end, not the Reset button below")
+        self.assertEqual(nav.key, "display", "the row's other end, not the Reset button below "
+                                             "(the first card: the Match card is only there in a match)")
 
     def test_wrapping_on_a_page_that_scrolls(self):
+        from tests.test_settings_layout import squeezed
         plug("Xbox 360 Controller")
+        squeeze = squeezed()            # (the Match page fits since later in 1.9: a smaller panel makes it scroll)
+        squeeze.start()
+        self.addCleanup(squeeze.stop)
         state = show("settings", "match")
         self.assertGreater(state.max_scroll, 0, "(the Match page scrolls)")
         state.scroll = state.scroll_target = state.scroll_at = state.max_scroll     # (at the bottom)
@@ -331,7 +336,9 @@ class MoreControls(Base):
         game = self.game()
         right = (pygame.CONTROLLER_AXIS_RIGHTX, pygame.CONTROLLER_AXIS_RIGHTY)
         pads.pads[500].axes[right[1]] = 1.0
-        self.assertIsNone(pads.steer_paddle(game.p1), "the left stick, by default")
+        self.assertEqual(g.PAD_STICKS[g.pad_stick], "Either stick", "(the default since Rowan's 1.9 list)")
+        g.pad_stick = 0
+        self.assertIsNone(pads.steer_paddle(game.p1), "the left stick doesn't see the right")
         g.pad_stick = 1
         self.assertEqual(pads.steer_paddle(game.p1), (0.0, game.p1.speed))
         stick(0, -1.0)
@@ -363,9 +370,9 @@ class MoreControls(Base):
             self.assertIn(key, screen.ui_hitboxes)
         click(screen, "cycle_pad_stick_right")
         click(screen, "cycle_pad_deadzone_left")
-        self.assertEqual((g.pad_stick, g.pad_deadzone), (1, 0))
+        self.assertEqual((g.pad_stick, g.pad_deadzone), (0, 0), "(round from Either to Left)")
         saved = save_data.collect(app)["interface"]
-        self.assertEqual((saved["pad_stick"], saved["pad_deadzone"], saved["pad_up"]), (1, 0, "dpad_up"))
+        self.assertEqual((saved["pad_stick"], saved["pad_deadzone"], saved["pad_up"]), (0, 0, "dpad_up"))
 
     def test_emotes_have_a_page_of_their_own(self):
         """Rowan: "Move the emotes section into its own settings menu inside control settings"."""
@@ -457,7 +464,7 @@ class Prompts(Base):
         m.vs_ai = True
         pads.using = "pad"
         red, blue = app.renderer.setup_controls("W A S D", "Arrow Keys")
-        self.assertEqual((red, blue), ("Left stick", "Arrow Keys"))
+        self.assertEqual((red, blue), ("Either stick", "Arrow Keys"))
 
 
 class FollowsWhatYouUse(Base):
@@ -497,11 +504,11 @@ class FollowsWhatYouUse(Base):
     def test_match_setup_two_players(self):
         plug("Xbox 360 Controller")
         m.vs_ai = False
-        self.assertEqual(app.renderer.setup_controls("W A S D", "Arrow Keys"), ("Left stick", "Arrow Keys"),
+        self.assertEqual(app.renderer.setup_controls("W A S D", "Arrow Keys"), ("Either stick", "Arrow Keys"),
                          "the side the controller plays shows its stick")
         plug("Xbox 360 Controller", "Xbox 360 Controller")
         self.assertEqual(app.renderer.setup_controls("W A S D", "Arrow Keys"),
-                         ("Pad 1, left stick", "Pad 2, left stick"))
+                         ("Pad 1, either stick", "Pad 2, either stick"))
 
     def test_match_setup_caption_follows_without_laying_out_again(self):
         """(Match Setup's layout is built once; its caption must still change as you switch.)"""
@@ -518,7 +525,7 @@ class FollowsWhatYouUse(Base):
         finally:
             del app.renderer.setup_controls
         self.assertIn(("W A S D", "Arrow Keys"), seen)
-        self.assertEqual(seen[-1], ("Left stick", "Arrow Keys"))
+        self.assertEqual(seen[-1], ("Either stick", "Arrow Keys"))
 
     def test_tooltips(self):
         plug("Xbox 360 Controller")
@@ -543,7 +550,7 @@ class FollowsWhatYouUse(Base):
         stick(0, 0.9)
         game.update(1 / 60)
         game.label_pads()
-        self.assertEqual(game.p1.controls_label, "Left stick")
+        self.assertEqual(game.p1.controls_label, "Either stick")
         stick(0, 0)
         app.keys_down.add(g.p1_up)
         game.update(1 / 60)

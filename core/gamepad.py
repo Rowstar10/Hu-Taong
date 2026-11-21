@@ -473,6 +473,7 @@ class Navigator:
             return self.nudge(dx)       # left and right move a slider
         cx, cy = here.center
         best, score = None, math.inf
+        overlapping = []                # (how far, how far off the line, key) of those it overlaps that way
         for key, r in targets.items():
             if key == self.key:
                 continue
@@ -481,11 +482,18 @@ class Navigator:
             if along <= 4:
                 continue
             across = abs(vx * dy - vy * dx)
+            if (r.left < here.right and r.right > here.left) if dy else (r.top < here.bottom and r.bottom > here.top):
+                overlapping.append((along, across, key))
             if across > along * 2.5:
                 continue
             s = along + 2.2 * across
             if s < score:
                 best, score = key, s
+        if overlapping:
+            # The nearest of those it overlaps comes first (1.9: Match Setup's Online, centred under
+            # Practice Mode and Multiplayer, was skipped for the buttons straight below it)
+            near = min(o[0] for o in overlapping)
+            best = min((o for o in overlapping if o[0] <= near + self.BAND), key = lambda o: o[1])[2]
         if best is None:
             best = self.wrap(targets, here, dx, dy)
         if best is not None:

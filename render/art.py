@@ -1265,6 +1265,23 @@ class Art:
         pygame.draw.circle(surf, (0, 0, 0), P(0, 0), u * .36)
         pygame.draw.circle(surf, (255, 232, 196), P(0, 0), u * .36, max(1, line // 3))
 
+    def _icon_rush(self, surf, P, u, pale, line):
+        # CHAOS (a game mode, not a talisman: on the Modes page, 1.9): a flurry of paper talismans
+        # bursting out from the middle
+        for k in range(8):
+            a = k * math.tau / 8 + .2
+            pygame.draw.line(surf, pale, P(math.cos(a) * .25, math.sin(a) * .25),
+                             P(math.cos(a) * .98, math.sin(a) * .98), max(1, line // 3))
+        for x, y, turn in ((-.48, -.4, -.55), (.45, -.45, .45), (.52, .38, -.35), (-.42, .45, .6), (0, 0, .1)):
+            w, h = .36, .64
+            ca, sa = math.cos(turn), math.sin(turn)
+            place = lambda pts: [P(x + cx * ca - cy * sa, y + cx * sa + cy * ca) for cx, cy in pts]
+            slip = [(-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2), (-w / 2, h / 2)]
+            pygame.draw.polygon(surf, (246, 214, 120), place(slip))
+            pygame.draw.polygon(surf, (150, 40, 30), place(slip), max(1, line // 3))
+            mark = [(-w * .3, -h * .12), (w * .3, -h * .12), (w * .3, h * .12), (-w * .3, h * .12)]
+            pygame.draw.polygon(surf, (200, 40, 30), place(mark))
+
     def _icon_snowball(self, surf, P, u, pale, line):
         # a big snowball rolling right, a small one behind it, and the track it left
         pygame.draw.line(surf, pale, P(-1.0, .95), P(.95, .95), line)
