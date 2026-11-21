@@ -2,9 +2,9 @@
 
 Every version of Hu Taong, newest first. Toki Hub shows each version's section on that version's page.
 
-## 1.9 — 2026-11-18
+## 1.9 — 2026-11-21
 
-Controller support, mouse steering, online quick emotes, Practice Mode (against a wall, or with no score), settings to export and import, talisman stats, achievements, a Wind Gust that blows any way, sounds for every surface the ball bounces off and for every talisman, computer players that go back round a ball that's got past them, a harder Hard and Insane, three game modes renamed, and tidier settings pages.
+Controller support, mouse steering, online quick emotes, Practice Mode (against the AI or a wall), Goals on or off for any match, rules changed from the pause menu for that match only, settings to export and import, talisman stats, achievements, a Wind Gust that blows any way, a slightly slower ball, sounds for every surface the ball bounces off and for every talisman, computer players that go back round a ball that's got past them, a harder Hard and Insane, three game modes renamed, a Modes page beside the Talismans (power-ups till now), and Match Setup and the settings pages laid out afresh.
 
 ### Added
 - Controllers (Xbox, PlayStation, Nintendo and most others). In a match the left stick or D-pad steers your paddle, as finely as you push the stick. On your own, any controller plays your paddle; with two players here, the first controller takes the side set in Controls settings and a second takes the other, and the keyboard still works for either. Start pauses and Back shows the talisman list. In Controls settings you can change the buttons for Pause, the talisman list and the paddle's four directions, steer with either stick (the default), the left or the right, and set the dead zone (how far the stick must move before the paddle does). In the menus, the D-pad or stick moves a highlight from control to control, A presses it, B goes back, left and right move a slider and the right stick scrolls. The highlight goes round in one push: down from the bottom row to the top, up from the top to the bottom, and right from the end of a row to its start, or left the other way. In an instant replay or the highlights, A skips on and X saves. Pulling the controller out mid-match pauses it.

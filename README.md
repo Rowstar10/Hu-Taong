@@ -1,8 +1,8 @@
-# Hu Taong 1.8
+# Hu Taong 1.9
 
-Pong, the Wangsheng Funeral Parlor way. Version 1.8, 18 November 2026.
+Pong, the Wangsheng Funeral Parlor way. Version 1.9, 21 November 2026.
 
-Three physics to choose from, a Speed Cap so a charge shot can always be reached, the Black Hole talisman and game mode, and a review of the talismans.
+Controllers and mouse steering, quick emotes online, Practice Mode against the AI or a wall, Goals on or off, achievements and talisman stats, new sounds, a Modes page beside the Talismans, and Match Setup and the settings pages laid out afresh.
 
 ## Play it
 
@@ -27,12 +27,12 @@ The .exe appears in `dist`.
 ## Android
 
 Hu Taong also plays on Android phones and tablets, with touch controls: Toki Hub for Android
-installs it, or get the APK from the version's release (`Hu-Taong-1.8-android.apk` on `v1.8`). It
+installs it, or get the APK from the version's release (`Hu-Taong-1.9-android.apk` on `v1.9`). It
 plays online with the PC version of the same number.
 
 GitHub builds the APK (`.github/workflows/android.yml`, with `android/build.sh` and
 python-for-android), plays it on an emulated phone, and publishes it on the release of every
-version tag: pushing `v1.8` is all a new version needs. A version tagged before that can be
+version tag: pushing `v1.9` is all a new version needs. A version tagged before that can be
 published by running the Android workflow by hand with its tag. The phone's controls live in
 `core/touch.py`.
 
