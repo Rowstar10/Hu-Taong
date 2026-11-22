@@ -11,6 +11,7 @@ from pathlib import Path
 SOURCE = Path(os.environ["HUTAONG_SOURCE"]).resolve()
 ENTRY = os.environ.get("HUTAONG_ENTRY", "main.py")
 TKINTER = os.environ.get("HUTAONG_TK") == "1"
+CONSOLE = os.environ.get("HUTAONG_CONSOLE") == "1"     # a build that shows its errors (for finding a fault)
 
 # Everything in Resources (pictures, sounds, music, fonts) goes in, keeping its folders: the game
 # finds them under sys._MEIPASS. Settings and saves aren't here: the game keeps them in
@@ -53,7 +54,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=False,
+    console=CONSOLE,
     disable_windowed_traceback=False,
     icon=[str(icon)] if icon.exists() else None,
 )

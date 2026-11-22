@@ -44,6 +44,23 @@ jobs:
           $old = -not $saves
           ./release/try-build.ps1 -Zip dist/Hu-Taong-test-windows.zip -NoSave:$old
 
+      # If it didn't start, a build with a console shows why
+      - name: Why it failed
+        if: failure()
+        shell: pwsh
+        env:
+          HUTAONG_CONSOLE: "1"
+          SDL_AUDIODRIVER: dummy
+        run: |
+          python release/build.py --source .release-work/game --version console --out console
+          $env:APPDATA = Join-Path $env:RUNNER_TEMP "appdata"
+          $out = Join-Path $env:RUNNER_TEMP "game.log"
+          $game = Start-Process -FilePath "console\Hu Taong\Hu Taong.exe" -WorkingDirectory "console\Hu Taong" `
+            -RedirectStandardOutput $out -RedirectStandardError "$out.err" -PassThru
+          if (-not $game.WaitForExit(25000)) { Stop-Process $game -Force }
+          Get-Content $out -Tail 40 -ErrorAction SilentlyContinue
+          Get-Content "$out.err" -Tail 60 -ErrorAction SilentlyContinue
+
       - uses: actions/upload-artifact@v4
         with:
           name: Hu-Taong-windows
