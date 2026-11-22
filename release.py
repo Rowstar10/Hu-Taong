@@ -198,8 +198,9 @@ def notes(commit, version):
         if inside:
             section.append(line)
     text = "\n".join(section).strip() or f"Hu Taong {version}."
-    return (text + f"\n\nInstall it from Toki Hub. Or download {build.zip_name(version)}, unzip it and "
-            "run Hu Taong.exe; on Android, download the APK and open it.\n")
+    # (Toki Hub shows what's above the ---: what's below is for the release's page on GitHub)
+    return (text + f"\n\n---\n\nInstall it from Toki Hub. Or download {build.zip_name(version)}, unzip it "
+            "and run Hu Taong.exe; on Android, download the APK and open it.\n")
 
 
 def publish(tag, version, files, commit):
