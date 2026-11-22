@@ -40,7 +40,7 @@ jobs:
         shell: pwsh
         run: |
           # Before 0.9 the game saved nothing
-          $saves = Get-ChildItem -Recurse -Filter *.py .release-work/source | Select-String -Quiet -Pattern "APPDATA"
+          $saves = [bool](Get-ChildItem -Recurse -File -Include *.py .release-work/source | Select-String -Pattern "APPDATA" -List | Select-Object -First 1)
           $old = -not $saves
           ./release/try-build.ps1 -Zip dist/Hu-Taong-test-windows.zip -NoSave:$old
 
