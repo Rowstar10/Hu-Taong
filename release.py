@@ -104,7 +104,7 @@ def resolve(version, ref):
 
 
 def checkout(commit, version):
-    folder = WORK / version
+    folder = WORK / f"hu-taong-{version}"      # (a folder named like one of the game's packages would confuse PyInstaller)
     if folder.exists():
         subprocess.run(["git", "worktree", "remove", "--force", str(folder)], cwd=ROOT, capture_output=True)
         shutil.rmtree(folder, ignore_errors=True)

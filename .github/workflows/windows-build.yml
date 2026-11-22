@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.sha }}
-          path: .release-work/game
+          path: .release-work/source
 
       - uses: actions/setup-python@v5
         with:
@@ -34,13 +34,13 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r release/requirements.txt
 
       - name: Build and zip
-        run: python release/build.py --source .release-work/game --version test --out dist
+        run: python release/build.py --source .release-work/source --version test --out dist
 
       - name: Play it
         shell: pwsh
         run: |
           # Before 0.9 the game saved nothing
-          $saves = Get-ChildItem -Recurse -Filter *.py .release-work/game | Select-String -Quiet -Pattern "APPDATA"
+          $saves = Get-ChildItem -Recurse -Filter *.py .release-work/source | Select-String -Quiet -Pattern "APPDATA"
           $old = -not $saves
           ./release/try-build.ps1 -Zip dist/Hu-Taong-test-windows.zip -NoSave:$old
 
@@ -52,7 +52,7 @@ jobs:
           HUTAONG_CONSOLE: "1"
           SDL_AUDIODRIVER: dummy
         run: |
-          python release/build.py --source .release-work/game --version console --out console
+          python release/build.py --source .release-work/source --version console --out console
           $env:APPDATA = Join-Path $env:RUNNER_TEMP "appdata"
           $out = Join-Path $env:RUNNER_TEMP "game.log"
           $game = Start-Process -FilePath "console\Hu Taong\Hu Taong.exe" -WorkingDirectory "console\Hu Taong" `
