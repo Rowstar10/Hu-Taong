@@ -1,0 +1,51 @@
+name: Windows build
+
+# Builds Hu Taong's Windows version, the zip release.py publishes, and tries it: unzips it, starts
+# it, closes its window and checks its settings were saved to %APPDATA% (release/try-build.ps1).
+# Run it by hand (Actions > Windows build > Run workflow) for any commit or tag; it also runs when
+# the build recipe changes. The zip is kept on the run's page (Artifacts).
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit or tag to build (empty: this branch)"
+        required: false
+  push:
+    branches: [main]
+    paths: ["release/**", "release.py", ".github/workflows/windows-build.yml"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      # The build tools from this commit, the game from the commit asked for
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          path: .release-work/game
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build tools
+        run: python -m pip install --disable-pip-version-check -r release/requirements.txt
+
+      - name: Build and zip
+        run: python release/build.py --source .release-work/game --version test --out dist
+
+      - name: Play it
+        shell: pwsh
+        run: |
+          # Before 0.9 the game saved nothing
+          $saves = Get-ChildItem -Recurse -Filter *.py .release-work/game | Select-String -Quiet -Pattern "APPDATA"
+          $old = -not $saves
+          ./release/try-build.ps1 -Zip dist/Hu-Taong-test-windows.zip -NoSave:$old
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hu-Taong-windows
+          path: dist/Hu-Taong-test-windows.zip
+          retention-days: 7

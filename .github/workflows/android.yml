@@ -1,27 +1,22 @@
 name: Android
 
-# Builds Hu Taong's Android APK, plays it on an Android emulator, and for a version's tag (v1.7)
-# publishes it on that tag's release, which Toki Hub installs from. Every new version tag does
-# this by itself.
-#
-# To publish a version that's already tagged, run this workflow by hand (Actions > Android > Run
-# workflow) with the tag, and optionally the commit to build if that version's Android-ready code
-# isn't the tag itself (1.5's is its hit-fix update, 0e742ec). It never makes tags.
+# Builds Hu Taong's Android APK and plays it on an Android emulator. release.py runs it for each
+# version it publishes, then downloads the APK (the run's Hu-Taong-android artifact) and puts it on
+# the public releases repo with the Windows zip. It runs only when started (to save Actions
+# minutes): release.py starts it, or Actions > Android > Run workflow, with a version's tag and,
+# optionally, the commit to build if that isn't the tag itself (1.5's is its hit-fix update).
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Version tag to publish the APK on, like v1.6"
-        required: true
+        description: "Version tag, like v1.9 (empty: build this branch)"
+        required: false
       ref:
         description: "Commit to build (leave empty to build the tag)"
         required: false
 
 permissions:
-  contents: write
+  contents: read
 
 # A newer push to the same branch (or for the same tag) replaces a build still running
 concurrency:
@@ -147,6 +142,13 @@ jobs:
             echo "::warning::No ANDROID_KEYSTORE secret: this APK is signed with a throwaway debug key"
           fi
 
+      # A version's APK (release.py publishes it) must carry your key, or phones can't update to it
+      - name: A release needs your signing key
+        if: needs.plan.outputs.tag != '' && steps.key.outputs.signed != 'true'
+        run: |
+          echo "::error::Add the ANDROID_KEYSTORE and ANDROID_KEYSTORE_PASSWORD secrets (Settings > Secrets and variables > Actions), then run this again"
+          exit 1
+
       - name: Build the APK
         run: android/build.sh
         env:
@@ -218,41 +220,3 @@ jobs:
         with:
           name: emulator-screenshots
           path: build/android-test
-
-  release:
-    needs: [plan, build, emulator]
-    if: needs.plan.outputs.tag != ''
-    runs-on: ubuntu-24.04
-    steps:
-      - name: A release needs your signing key
-        env:
-          SIGNED: ${{ needs.build.outputs.signed }}
-        run: |
-          if [[ "$SIGNED" != "true" ]]; then
-            echo "::error::This run's APK was signed with a throwaway key. Add the ANDROID_KEYSTORE and ANDROID_KEYSTORE_PASSWORD secrets, then use Re-run all jobs (so the APK is rebuilt with your key)"
-            exit 1
-          fi
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: Hu-Taong-android
-          path: dist
-
-      - name: Publish
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.plan.outputs.tag }}
-          REF: ${{ needs.plan.outputs.ref }}
-          VERSION: ${{ needs.plan.outputs.version }}
-        run: |
-          repo="$GITHUB_REPOSITORY"
-          tagged="$(gh api "repos/$repo/commits/$TAG" --jq .sha)"
-          notes="Hu Taong $VERSION for Android phones and tablets (Android 7 or later): install it from Toki Hub, or download the APK below and open it on your phone. It plays online with Hu Taong $VERSION on a PC."
-          if [[ "$tagged" != "$REF" ]]; then
-            notes="$notes"$'\n\n'"Built from ${REF:0:10}, $VERSION's Android-ready update."
-          fi
-          if gh release view "$TAG" --repo "$repo" > /dev/null 2>&1; then
-            gh release upload "$TAG" dist/*.apk --repo "$repo" --clobber
-          else
-            gh release create "$TAG" dist/*.apk --repo "$repo" --verify-tag --title "Hu Taong $VERSION" --notes "$notes"
-          fi

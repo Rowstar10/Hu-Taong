@@ -1,0 +1,3 @@
+# What release.py builds Hu Taong with (in .release-venv)
+pygame==2.6.1
+pyinstaller>=6.11,<7

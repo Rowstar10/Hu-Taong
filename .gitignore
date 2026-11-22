@@ -3,3 +3,6 @@ dist/
 build/
 __pycache__/
 *.pyc
+# release.py's build tools and working copies
+.release-venv/
+.release-work/

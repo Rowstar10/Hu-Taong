@@ -1,0 +1,23 @@
+name: Tests
+
+# The game's tests (tests/), with no window or sound, on every push to main. Quick and cheap: the
+# Android and Windows builds run only when releasing (release.py) or by hand.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q pygame==2.6.1
+      - run: python -m unittest discover -s tests -t .
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
